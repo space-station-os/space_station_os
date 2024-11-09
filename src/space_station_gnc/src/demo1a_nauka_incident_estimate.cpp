@@ -263,7 +263,7 @@ void user_input_thread(rclcpp::Node::SharedPtr node)
             msg->data = "100_emergency_begin";
             pub_control_media->publish(*msg);
             mode_demo = "101_emergency_begin";
-            printf("Are you aeady to take actions? (Answer `ok` to react)\n");            
+            printf("Are you ready to take actions? (Answer `ok` to react)\n");            
             std::cin >> userinput;
         }
         else if(mode_demo == "101_emergency_begin"){
