@@ -2,789 +2,789 @@
 <robot name="ISS_stationaryFromNasa">
   <link name="Root">
     <visual>
-      <origin xyz="0. 0. 0." rpy="0. 0. 0."/>
+      <origin xyz="0. 0. 0." rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_2_Unity_Node_1_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_022.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="0. 0. -338.34464" rpy="0. 0. 0."/>
+      <origin xyz="-338.34464 0. 0. " rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_3__PMA__Pressurized_Mating_Adapter_1_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_001.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="0. 73.47772 -584.09314" rpy="0. 0. 0."/>
+      <origin xyz="-584.09314 0. 73.47772" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_1_Zarya____FGB__Funtional_Cargo_Block_Sphere_002.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Sphere_002.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="0. 73.47772 -1880.5836 " rpy="0. 0. 0."/>
+      <origin xyz="-1880.5836 0. 73.47772" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_5_Zvezda__SM__Service_Module_sm_ext_sm_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/sm_ext_sm_000.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="0. -42.45119 -1996.3052 " rpy="0. 0. 0."/>
+      <origin xyz="-1996.3052 0. -42.45119" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_3_Pirs_Docking_Compartment__DC__and_Airlock_Sphere_002.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Sphere_001.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="0. 189.20503 -1996.3052 " rpy="0. 0. 0."/>
+      <origin xyz="-1996.3052 -0. 189.20503" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_4_Poisk__MRM_2__Mini_Research_Module_Sphere_002.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Sphere_003.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="222.68456 70.179726 -2406.2449 " rpy="0. 0. 0."/>
+      <origin xyz="-2406.2449 222.68456 70.179726" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_01_p_001_sm_ext_sm_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/sm_ext_sm_001.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-222.68478 70.17979 -2406.6084 " rpy="0. 0. 0."/>
+      <origin xyz="-2406.6084 -222.68478 70.17979" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_01_s_001_sm_ext_sm_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/sm_ext_sm_002.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="351.11862 70.39795 -2406.4263 " rpy="0. 0. 0."/>
+      <origin xyz="-2406.4263 351.11862 70.39795" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_02_p_001_sm_ext_sm_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/sm_ext_sm_003.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-351.11877 70.39794 -2406.4297 " rpy="0. 0. 0."/>
+      <origin xyz="-2406.4297 -351.11877 70.39794" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_02_s_001_sm_ext_sm_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/sm_ext_sm_004.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="503.22925 70.39799 -2406.4243 " rpy="0. 0. 0."/>
+      <origin xyz="-2406.4243 503.22925 70.39799" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_03_p_001_sm_ext_sm_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/sm_ext_sm_005.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-503.23 70.397865 -2406.4302 " rpy="0. 0. 0."/>
+      <origin xyz="-2406.4302 -503.23 70.397865" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_03_s_001_sm_ext_sm_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/sm_ext_sm_006.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="655.613 70.39788 -2406.4248 " rpy="0. 0. 0."/>
+      <origin xyz="-2406.4248 655.6129 70.39788" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_04_p_001_sm_ext_sm_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/sm_ext_sm_007.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-655.6135 70.39795 -2406.4294 " rpy="0. 0. 0."/>
+      <origin xyz="-2406.4294 -655.6135 70.39795" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_04_s_001_sm_ext_sm_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/sm_ext_sm_008.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="806.5858 70.397865 -2406.4248 " rpy="0. 0. 0."/>
+      <origin xyz="-2406.4248 806.5858 70.397865" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_05_p_sm_ext_sm_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/sm_ext_sm_009.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-806.58606 70.39791 -2406.4297 " rpy="0. 0. 0."/>
+      <origin xyz="-2406.4297 -806.58606 70.39791" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_05_s_sm_ext_sm_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/sm_ext_sm_010.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="958.45306 70.39788 -2406.425 " rpy="0. 0. 0."/>
+      <origin xyz="-2406.425 958.45306 70.39788" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_06_p_sm_ext_sm_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/sm_ext_sm_011.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-958.453 70.397964 -2406.4297 " rpy="0. 0. 0."/>
+      <origin xyz="-2406.4297 -958.453 70.397964" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_06_s_sm_ext_sm_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/sm_ext_sm_012.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="1116.1602 70.39788 -2406.4248 " rpy="0. 0. 0."/>
+      <origin xyz="-2406.4248 1116.1602 70.39788" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_07_p_sm_ext_sm_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/sm_ext_sm_013.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1116.1615 70.397896 -2406.4297 " rpy="0. 0. 0."/>
+      <origin xyz="-2406.4297 -1116.1615 70.397896" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_07_s_sm_ext_sm_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/sm_ext_sm_014.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="1274.2556 70.39783 -2406.4253 " rpy="0. 0. 0."/>
+      <origin xyz="-2406.4253 1274.2556 70.39783" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_08_p_sm_ext_sm_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/sm_ext_sm_015.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1274.2561 70.39784 -2406.4302 " rpy="0. 0. 0."/>
+      <origin xyz="-2406.4302 -1274.2561 70.39784" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_08_s_sm_ext_sm_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/sm_ext_sm_016.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="1432.7574 70.397804 -2406.4255 " rpy="0. 0. 0."/>
+      <origin xyz="-2406.4255 1432.7574 70.397804" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_09_p_sm_ext_sm_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/sm_ext_sm_017.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1432.7585 70.397766 -2406.4297 " rpy="0. 0. 0."/>
+      <origin xyz="-2406.4297 -1432.7585 70.397766" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_09_s_sm_ext_sm_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/sm_ext_sm_018.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="189.571 70.17976 -2406.428 " rpy="0. 0. 0."/>
+      <origin xyz="-2406.428 189.571 70.17976" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_bracket_p_sm_ext_sm_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/sm_ext_sm_019.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-189.57124 70.17971 -2406.4265 " rpy="0. 0. 0."/>
+      <origin xyz="-2406.4265 -189.57124 70.17971" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_bracket_s_sm_ext_sm_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/sm_ext_sm_020.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="0. -385.2363 -699.4864" rpy="0. 0. 0."/>
+      <origin xyz="-699.4864 0. -385.2363" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_9_Rassvet__MRM_1__Mini_Research_Module_Sphere_002.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Sphere_004.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="0. 175.91571 0. " rpy="0. 0. 0."/>
+      <origin xyz="0. 0. 175.91571" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_6_Z1_Truss_z1_ext_01_001.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/z1_ext_01_001.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="0. 0. 222.10367" rpy="0. 0. 0."/>
+      <origin xyz="222.10367 0. 0. " rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_9_Destiny_Space_Laboratory_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_002.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="272.93942 -47.69992 422.85428" rpy="0. 0. 0."/>
+      <origin xyz="422.85428 272.93942 -47.69992" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_0__ESP__External_Stowage_Platform_1_z1_ext_01_001.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/z1_ext_01_002.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="0. 500.7069 318.75455" rpy="0. 0. 0."/>
+      <origin xyz="318.75455 0. 500.7069 " rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_4_S0_Truss_s0_ani_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/s0_ani_000.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-286.5464 441.15942 835.7587 " rpy="0. 0. 0."/>
+      <origin xyz="835.7587 -286.5464 441.15942" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
         <mesh filename="package://space_station_gnc/urdf/meshes/mss_mbs_001.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-430.01895 600.1681 855.60626" rpy="0. 0. 0."/>
+      <origin xyz="855.60626 -430.01895 600.1681 " rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_1_Canadarm2_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_008.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-496.9462 635.72815 953.5998 " rpy="0. 0. 0."/>
+      <origin xyz="953.5998 -496.9462 635.72815" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_1_Canadarm2_02_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_003.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-497.5336 671.529 976.56323" rpy="0. 0. 0."/>
+      <origin xyz="976.56323 -497.5336 671.529 " rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_1_Canadarm2_03_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_004.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-484.14682 696.8919 1007.97797" rpy="0. 0. 0."/>
+      <origin xyz="1007.97797 -484.14682 696.8919 " rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_1_Canadarm2_04_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_005.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1218.5002 697.33105 1065.4954 " rpy="0. 0. 0."/>
+      <origin xyz="1065.4954 -1218.5002 697.33105" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_1_Canadarm2_05_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_006.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1218.0608 1431.6842 1123.0128" rpy="0. 0. 0."/>
+      <origin xyz="1123.0128 -1218.0608 1431.6842" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_1_Canadarm2_06_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_007.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1246.8191 1431.9033 1154.3533" rpy="0. 0. 0."/>
+      <origin xyz="1154.3533 -1246.8191 1431.9033" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_1_Canadarm2_07_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_008.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1278.1604 1460.6621 1154.5731" rpy="0. 0. 0."/>
+      <origin xyz="1154.5731 -1278.1604 1460.6621" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_1_Canadarm2_08_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_001.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1278.1602 1580.9965 1154.5729" rpy="0. 0. 0."/>
+      <origin xyz="1154.5729 -1278.1602 1580.9965" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_9_DEXTRE_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_009.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1278.1597 1603.0116 1154.5723" rpy="0. 0. 0."/>
+      <origin xyz="1154.5723 -1278.1597 1603.0115" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
         <mesh filename="package://space_station_gnc/urdf/meshes/armA_SY_joint_000.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1278.16 1799.2032 1155.1705" rpy="0. 0. 0."/>
+      <origin xyz="1155.1705 -1278.16 1799.2032" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_9_DEXTRE_002_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_002.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1278.16 1895.4904 1155.1705" rpy="0. 0. 0."/>
+      <origin xyz="1155.1705 -1278.16 1895.4905" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_9_DEXTRE_003_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_003.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1140.1782 1745.5184 1154.5841" rpy="0. 0. 0."/>
+      <origin xyz="1154.5841 -1140.1782 1745.5186" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_9_DEXTRE_004_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_010.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1102.687 1735.2113 1181.4512" rpy="0. 0. 0."/>
+      <origin xyz="1181.4512 -1102.687 1735.2114" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_9_DEXTRE_005_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_011.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1072.3203 1723.8793 1195.7292" rpy="0. 0. 0."/>
+      <origin xyz="1195.7292 -1072.3203 1723.8794" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_9_DEXTRE_006_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_012.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-963.5861 1725.1362 1201.8768" rpy="0. 0. 0."/>
+      <origin xyz="1201.8768 -963.5861 1725.1364" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_9_DEXTRE_007_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_013.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-854.85175 1723.8785 1169.1665 " rpy="0. 0. 0."/>
+      <origin xyz="1169.1665 -854.85175 1723.8787 " rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_9_DEXTRE_008_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_014.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-826.6734 1711.8777 1157.9835" rpy="0. 0. 0."/>
+      <origin xyz="1157.9835 -826.6734 1711.8778" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_9_DEXTRE_009_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_015.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1416.1414 1745.5184 1154.5841" rpy="0. 0. 0."/>
+      <origin xyz="1154.5841 -1416.1414 1745.5186" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_9_DEXTRE_010_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_016.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1453.6337 1735.2113 1181.4514" rpy="0. 0. 0."/>
+      <origin xyz="1181.4514 -1453.6337 1735.2114" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_9_DEXTRE_011_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_017.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1483.9994 1723.8794 1195.7294" rpy="0. 0. 0."/>
+      <origin xyz="1195.7294 -1483.9994 1723.8794" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_9_DEXTRE_012_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_018.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1592.7338 1725.137 1201.8766" rpy="0. 0. 0."/>
+      <origin xyz="1201.8766 -1592.7338 1725.1371" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_9_DEXTRE_013_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_019.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1701.4677 1723.8789 1169.1665" rpy="0. 0. 0."/>
+      <origin xyz="1169.1665 -1701.4677 1723.879 " rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_9_DEXTRE_014_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_020.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1729.6451 1711.8763 1157.9832" rpy="0. 0. 0."/>
+      <origin xyz="1157.9832 -1729.6451 1711.8765" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_9_DEXTRE_015_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_021.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1380.7954 500.71426 562.4942 " rpy="0. 0. 0."/>
+      <origin xyz="562.4942 -1380.7954 500.71426" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_6_S1_Truss_s0_ani_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/s0_ani_001.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1524.8876 499.86765 468.50177" rpy="0. 0. 0."/>
+      <origin xyz="468.50177 -1524.8876 499.8676 " rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_6_S1_Truss_02_s0_ani_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/s0_ani_002.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-2385.6238 501.22375 480.25443" rpy="0. 0. 0."/>
+      <origin xyz="480.25443 -2385.6238 501.22375" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_2_S3_Truss_s0_ani_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/s0_ani_003.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-2687.904 498.56915 478.9415 " rpy="1.0471976 0. 0. "/>
+      <origin xyz="478.9415 -2687.904 498.56915" rpy="2.6179938 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_3_S4_Truss_p6_ani_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/p6_ani_000.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-3501.814 391.30215 539.86707" rpy="1.0471976 0. 0. "/>
+      <origin xyz="539.8671 -3501.8142 391.30215" rpy="2.6179938 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_4_S5_Truss_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_004.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-3453.0886 367.9388 632.4135" rpy="1.0471976 0. 0. "/>
+      <origin xyz="632.4136 -3453.0889 367.93878" rpy="2.6179938 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_3_S4_Truss_01_p6_ani_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/p6_ani_001.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-3453.0889 564.3115 361.37476" rpy="1.0471976 0. 0. "/>
+      <origin xyz="361.37485 -3453.089 564.31146" rpy="2.6179938 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_3_S4_Truss_02_p6_ani_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/p6_ani_002.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-3646.2812 464.79825 497.43405" rpy="1.0471976 0. 0. "/>
+      <origin xyz="497.43414 -3646.2815 464.79825" rpy="2.6179938 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_2_S6_Truss_p6_ani_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/p6_ani_003.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-4995.488 367.18735 632.70215" rpy="1.0471976 0. 0. "/>
+      <origin xyz="632.7022 -4995.488 367.18735" rpy="2.6179938 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_2_S6_Truss_01_p6_ani_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/p6_ani_004.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-4995.488 563.56 361.66345" rpy="1.0471976 0. 0. "/>
+      <origin xyz="361.6635 -4995.488 563.56006" rpy="2.6179938 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_2_S6_Truss_02_p6_ani_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/p6_ani_005.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-2516.8772 276.66797 479.9901 " rpy="0. 0. 0."/>
+      <origin xyz="479.9901 -2516.8772 276.66797" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
         <mesh filename="package://space_station_gnc/urdf/meshes/ESP3_000.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-2570.1177 1006.95966 479.99014" rpy="0. 0. 0."/>
+      <origin xyz="479.99014 -2570.1177 1006.95966" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_6_Express_Logistics_Carrier__ELC__2_esp2_lo_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/esp2_lo_000.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-2164.807 -6.188774 479.99014 " rpy="0. 0. 0."/>
+      <origin xyz="479.99014 -2164.807 -6.188774" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_1_Express_Logistics_Carrier__ELC__4_esp2_lo_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/esp2_lo_001.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-2174.7512 872.92255 456.62537" rpy="0. 0. 0."/>
+      <origin xyz="456.62537 -2174.7512 872.9225 " rpy="1.5707964 0. 1.5707964"/>
       <geometry>
         <mesh filename="package://space_station_gnc/urdf/meshes/AMS2_000.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1112.6919 691.5575 574.99927" rpy="0. 0. 0."/>
+      <origin xyz="574.99927 -1112.6919 691.5575 " rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_4_Enhanced_ISS_Boom_Assembly__EIBA__Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_023.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="682.18243 724.4315 469.20395" rpy="0. 0. 0."/>
+      <origin xyz="469.20395 682.18243 724.4315 " rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_7_P1_Truss_s0_ani_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/s0_ani_004.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="1524.8893 501.34702 468.5063 " rpy="0. 0. 0."/>
+      <origin xyz="468.5063 1524.8894 501.34702" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_7_P1_Truss_02_s0_ani_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/s0_ani_005.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="2386.3464 501.22375 480.25443" rpy="0. 0. 0."/>
+      <origin xyz="480.25443 2386.3464 501.22375" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_9_P3_Truss_s0_ani_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/s0_ani_006.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="2687.9038 502.2017 476.84427" rpy="1.0471976 0. 0. "/>
+      <origin xyz="476.84427 2687.9038 502.2017 " rpy="2.6179938 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_0_P4_Truss_p6_ani_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/p6_ani_006.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="3501.814 608.59814 414.41113" rpy="1.0471976 0. 0. "/>
+      <origin xyz="414.41113 3501.8142 608.59814" rpy="2.6179938 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_1_P5_Truss_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_005.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="3646.2812 535.102 456.84418" rpy="1.0471976 0. 0. "/>
+      <origin xyz="456.84415 3646.2815 535.102 " rpy="2.6179938 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_8_P6_Truss_p6_ani_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/p6_ani_007.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="4995.488 368.1402 474.48907" rpy="1.0471976 0. 0. "/>
+      <origin xyz="474.48907 4995.488 368.14023" rpy="2.6179938 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_8_P6_Truss_01_p6_ani_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/p6_ani_008.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="4995.488 701.0529 439.94476" rpy="1.0471976 0. 0. "/>
+      <origin xyz="439.9447 4995.488 701.053 " rpy="2.6179938 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_8_P6_Truss_02_p6_ani_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/p6_ani_009.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="3453.0889 367.51447 474.9956 " rpy="1.0471976 0. 0. "/>
+      <origin xyz="474.99557 3453.089 367.5145 " rpy="2.6179938 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_0_P4_Truss_01_p6_ani_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/p6_ani_010.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="3453.0886 700.4273 440.4513" rpy="1.0471976 0. 0. "/>
+      <origin xyz="440.4513 3453.0886 700.4273" rpy="2.6179938 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_0_P4_Truss_02_p6_ani_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/p6_ani_011.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="2492.0098 -6.188822 475.79565 " rpy="0. 0. 0."/>
+      <origin xyz="475.79565 2492.0098 -6.188822" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_5_Express_Logistics_Carrier__ELC__1_esp2_lo_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/esp2_lo_002.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="2570.6123 1006.9597 473.0185" rpy="0. 0. 0."/>
+      <origin xyz="473.0185 2570.6123 1006.9597" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_3_Express_Logistics_Carrier__ELC__3_esp2_lo_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/esp2_lo_003.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="0. 0. 1138.4989" rpy="0. 0. 0."/>
+      <origin xyz="1138.4989 0. -0. " rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_6_Harmony_Node_2_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_024.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="0. 0. 1835.3384" rpy="0. 0. 0."/>
+      <origin xyz="1835.3384 0. -0. " rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_4__PMA__Pressurized_Mating_Adapter_2_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_025.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-417.18164 -0.0374058 1621.4526 " rpy="0. 0. 0."/>
+      <origin xyz="1621.4526 -417.18164 -0.0374058" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_7_Columbus_Space_Laboratory_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_026.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1007.24945 -133.4009 1621.4487 " rpy="0. 0. 0."/>
+      <origin xyz="1621.4487 -1007.24945 -133.4009 " rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_5_RapidScat_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_006.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-1080.3381 -215.9925 1599.5293" rpy="0. 0. 0."/>
+      <origin xyz="1599.5293 -1080.3381 -215.9925" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/RapidScat_dish_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_007.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="748.0916 -0.0371476 1621.4529 " rpy="0. 0. 0."/>
+      <origin xyz="1621.4529 748.0916 -0.0371476" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_0_Kibo_Space_Laboratory__PSM__Pressurized_Module_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_027.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="1030.3108 403.71002 1621.2568 " rpy="0. 0. 0."/>
+      <origin xyz="1621.2568 1030.3108 403.71002" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_8_Kibo_Space_Laboratory__PSM__Pressurized_Stowage_Module_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_028.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="1261.9143 87.58062 1789.5538 " rpy="0. 0. 0."/>
+      <origin xyz="1789.5538 1261.9143 87.58062" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
         <mesh filename="package://space_station_gnc/urdf/meshes/jem_layers_jemrms_001.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="1337.5696 117.190765 1756.8865 " rpy="0. 0. 0."/>
+      <origin xyz="1756.8865 1337.5696 117.190765" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_1_Robotic_Arm_001_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_029.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="1337.5667 158.03796 1809.8026 " rpy="0. 0. 0."/>
+      <origin xyz="1809.8026 1337.5667 158.03796" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_1_Robotic_Arm_002_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_030.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="1744.2112 158.03796 1756.1389 " rpy="0. 0. 0."/>
+      <origin xyz="1756.1389 1744.2112 158.03796" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_1_Robotic_Arm_003_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_031.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="2151.6487 158.03796 1704.1257 " rpy="0. 0. 0."/>
+      <origin xyz="1704.1257 2151.6487 158.03796" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_1_Robotic_Arm_004_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_032.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="2195.9739 209.57811 1705.2854 " rpy="0. 0. 0."/>
+      <origin xyz="1705.2854 2195.9739 209.57811" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_1_Robotic_Arm_005_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_033.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="1353.502 -156.16759 1612.6815 " rpy="0. 0. 0."/>
+      <origin xyz="1612.6815 1353.502 -156.16759" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_3_Kibo_Space_Laboratory_Exposed_Platform_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_009.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="1797.3951 -194.60982 1513.7781 " rpy="0. 0. 0."/>
+      <origin xyz="1513.7781 1797.3951 -194.60982" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/CATS_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_010.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-0.0216407 -232.26865 700.2389 " rpy="0. 0. 0."/>
+      <origin xyz="700.2389 -0.0216407 -232.26865 " rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/Destiny_Window_Cover_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_011.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-369.45425 -36.707462 0. " rpy="0. 0. 0."/>
+      <origin xyz="0. -369.45425 -36.707462" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_2_Quest_Airlock_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_034.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-305.24765 -37.10947 242.7423 " rpy="0. 0. 0."/>
+      <origin xyz="242.7423 -305.24765 -37.10947" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_8_ESP_External_Stowage_Platform_2_esp2_lo_000.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/esp2_lo_004.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="223.40622 -0.0385444 0.0031302" rpy="0. 0. 0."/>
+      <origin xyz="0.0031302 223.40622 -0.0385444" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_7_Tranquility_Node_3_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_035.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="920.20667 -0.0000078 -0.0000078" rpy="0. 0. 0."/>
+      <origin xyz="-0.0000078 920.20667 -0.0000078" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_7__PMA__Pressurized_Mating_Adapter_3_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_036.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="706.1644 -262.2884 0.0346459" rpy="0. 0. 0."/>
+      <origin xyz="0.0346459 706.1644 -262.2884 " rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_8_Cupola_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_037.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="826.16174 -298.06183 -1.1424317" rpy="0. 0. 0."/>
+      <origin xyz="-1.1424317 826.16174 -298.06183 " rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_8_Cupola_001_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_038.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="764.66223 -298.09705 104.845825" rpy="0. 0. 0."/>
+      <origin xyz="104.845825 764.66223 -298.09705 " rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_8_Cupola_002_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_012.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="648.6948 -298.06885 105.4203 " rpy="0. 0. 0."/>
+      <origin xyz="105.4203 648.6948 -298.06885" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_8_Cupola_003_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_013.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="586.1669 -298.0535 0.0352428" rpy="0. 0. 0."/>
+      <origin xyz="0.0352428 586.1669 -298.0535 " rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_8_Cupola_004_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_039.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="647.66815 -298.08176 -104.77302" rpy="0. 0. 0."/>
+      <origin xyz="-104.77302 647.66815 -298.08176" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_8_Cupola_005_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_014.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="767.6822 -298.0817 -103.02815" rpy="0. 0. 0."/>
+      <origin xyz="-103.02815 767.6822 -298.0817 " rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_8_Cupola_006_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_015.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="644.37036 -367.14963 30.30808" rpy="0. 0. 0."/>
+      <origin xyz="30.30808 644.37036 -367.14963" rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_8_Cupola_007_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_016.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="706.1644 -264.58478 0.0346459" rpy="0. 0. 0."/>
+      <origin xyz="0.0346459 706.1644 -264.58478 " rpy="1.5707964 0. 1.5707964"/>
       <geometry>
         <mesh filename="package://space_station_gnc/urdf/meshes/Plane_000.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
-      <origin xyz="-0.0315367 -219.143 0. " rpy="0. 0. 0."/>
+      <origin xyz="0. -0.0315367 -219.143 " rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/node_0_Leonardo_Raffaello_Perm_Multi_Purpose_Logistics_Module__PMM__Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_040.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
       <origin xyz="168.68329 84.55504 -1108.7028 " rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_01_p_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_017.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
       <origin xyz="217.26859 79.664566 -1250.7697 " rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/hinge_02_p_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_018.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
       <origin xyz="293.69742 79.66464 -962.9722 " rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_03_p_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_019.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
       <origin xyz="390.95355 79.66303 -1249.8241 " rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/hinge_04_p_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_020.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
       <origin xyz="168.6834 79.663826 -1108.7028 " rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/hinge_01_p_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_021.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
       <origin xyz="216.74812 79.66395 -966.36896" rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_02_p_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_022.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
       <origin xyz="292.8345 79.665306 -1254.2343 " rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/hinge_03_p_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_023.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
       <origin xyz="390.56366 79.66514 -967.57996" rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_04_p_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_024.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
       <origin xyz="-168.68365 84.55507 -1108.7029 " rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_01_s_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_025.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
       <origin xyz="-217.26894 79.664604 -1250.7693 " rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/hinge_02_s_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_026.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
       <origin xyz="-293.69736 79.66523 -962.9717 " rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_03_s_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_027.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
       <origin xyz="-390.95395 79.66457 -1249.8243 " rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/hinge_04_s_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_028.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
       <origin xyz="-292.83484 79.66433 -1254.2339 " rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/hinge_03_s_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_029.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
       <origin xyz="-390.5637 79.66335 -967.5795 " rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_04_s_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_030.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
       <origin xyz="-216.74829 79.664024 -966.3684 " rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/panel_02_s_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_031.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
       <origin xyz="-168.6836 79.66383 -1108.7026 " rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/hinge_01_s_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_032.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
       <origin xyz="1553.2164 -212.30655 1989.7129 " rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/OCO3_Cube_008.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cube_033.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
     <visual>
       <origin xyz="1891.3917 -195.7145 1610.6842" rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="package://space_station_gnc/urdf/meshes/ECOStress_Cylinder_022.obj" scale="1. 1. 1."/>
+        <mesh filename="package://space_station_gnc/urdf/meshes/Cylinder_041.obj" scale="1. 1. 1."/>
       </geometry>
     </visual>
   </link>
