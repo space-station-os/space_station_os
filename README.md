@@ -4,7 +4,8 @@
 - Ubuntu 22.04
 - ROS 2 Humble (desktop install)
 
-### Common procedures for preparing Space Station OS  
+## installation
+Common procedures for preparing Space Station OS:
 - Install Ubuntu 22.04
 - Install ROS 2 Humble (desktop install)
   https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html  
@@ -23,7 +24,7 @@ In Demo 1a, we estimate what happened and how the system and people reacted in t
 https://www.nasaspaceflight.com/2021/07/nauka-docking/  
 In Demo 1b, we prepared for an imaginary difficult case.  
 
-Through these cases, we will study the importance of determining FDIR (Fault Detection, Isolation and Recovery).
+Through these cases, we will study the importance of determining fault detection, isolation and recovery (FDIR).
 
 ### Procedures to run Demo 1a/1b  
 - Terminal 1:  
