@@ -4,7 +4,7 @@
 - Ubuntu 22.04
 - ROS 2 Humble (desktop install)
 
-## installation
+## Installation
 Common procedures for preparing Space Station OS:
 - Install Ubuntu 22.04
 - Install ROS 2 Humble (desktop install)
