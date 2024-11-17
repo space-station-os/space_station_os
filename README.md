@@ -29,7 +29,7 @@ Through these cases, we will study the importance of determining fault detection
 ### Procedures to run Demo 1a/1b  
 - Terminal 1:  
 for Demo 1a  
-$ ros2 run space_station_gnc demo1a_nauka_incident_estimatate  
+$ ros2 run space_station_gnc demo1a_nauka_incident_estimate  
 for Demo 1b  
 $ ros2 run space_station_gnc demo1b_crisis_mainengine  
 Terminal 1 handles scenario description and user input.  
