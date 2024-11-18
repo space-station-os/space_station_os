@@ -1,0 +1,33 @@
+services:
+  terminal1: &terminal
+    build: ../../
+    environment:
+      - DISPLAY=novnc:0.0
+    depends_on:
+      novnc:
+        condition: service_healthy
+    command: xterm -hold -e bash -i -c "source install/setup.bash && ros2 run space_station_gnc demo1a_nauka_incident_estimate"
+
+  terminal2:
+    <<: *terminal
+    command: xterm -hold -e bash -i -c "source install/setup.bash && ros2 launch space_station_gnc launch_gnc.py"
+
+  terminal3:
+    <<: *terminal
+    volumes: [./default.rviz:/root/.rviz2/default.rviz]
+    command: xterm -hold -e bash -i -c "source install/setup.bash && ros2 run rviz2 rviz2"
+
+  novnc:
+    image: theasp/novnc:latest
+    environment:
+      # Adjust to your screen size
+      - DISPLAY_WIDTH=1600
+      - DISPLAY_HEIGHT=968
+      - RUN_XTERM=no
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "xdpyinfo -display :0.0"]
+      interval: 1s
+      timeout: 5s
+      retries: 5
