@@ -65,11 +65,5 @@ Through these cases, we will study the importance of determining fault detection
 4. Then you go back to Terminal 1 and follow the scenario in the console as the attitude of ISS is displayed in rviz2.
 
 ## TODOs
-### November 2024
-- Documentation site establishment and maintenance
-- Integration with Isaac Sim
-- Adding CMG control in space_station_gnc
-- Power generation simulation in space_staton_electrical
-### December 2024
-TBA
+Moved to project backlog https://github.com/orgs/space-station-os/projects/2/views/1 
 
