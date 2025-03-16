@@ -84,9 +84,9 @@ class DemoCrisisNode : public rclcpp::Node
 public:
     DemoCrisisNode() : Node("demo_crisis_node"){
         sub_topic_control_media = this->create_subscription<std_msgs::msg::String>(
-            "topic_control_media", 10, std::bind(&DemoCrisisNode::callback_control_media, this, std::placeholders::_1));
+            "gnc/topic_control_media", 10, std::bind(&DemoCrisisNode::callback_control_media, this, std::placeholders::_1));
         sub_angvel_body = this->create_subscription<geometry_msgs::msg::Vector3>(
-            "angvel_body", 1, std::bind(&DemoCrisisNode::callback_angvel_body, this, std::placeholders::_1));
+            "gnc/angvel_body", 1, std::bind(&DemoCrisisNode::callback_angvel_body, this, std::placeholders::_1));
 
 
         std::thread sdl_thread(sdl_event_loop);
@@ -103,15 +103,15 @@ private:
 
         if (input == "000_init")
         {
-            img_path = "src/space_station_gnc/media/001_start.png";            
+            img_path = "src/space_station_os/space_station_gnc/media/001_start.png";            
         }
         else if (input == "100_emergency_begin")
         {
-            img_path = "src/space_station_gnc/media/100_emergency_begin.png";
+            img_path = "src/space_station_os/space_station_gnc/media/100_emergency_begin.png";
         }
         else if (input == "102_emergency_reaction")
         {
-            img_path = "src/space_station_gnc/media/102_emergency_reaction.png";
+            img_path = "src/space_station_os/space_station_gnc/media/102_emergency_reaction.png";
         }
         else
         {
@@ -124,7 +124,7 @@ private:
             std::cerr << "Error: Unable to load image: " << img_path << std::endl;
             return;
         }
-
+	RCLCPP_INFO(this->get_logger(), "Image %s loaded\n", img_path.c_str());
         display_image_with_sdl(image);
     }
 
@@ -172,12 +172,12 @@ bool did_find_num(std::string str, int num) {
 
 void user_input_thread(rclcpp::Node::SharedPtr node)
 {
-    auto pub_control_media = node->create_publisher<std_msgs::msg::String>("topic_control_media", 1);
-    auto pub_target_thrust = node->create_publisher<std_msgs::msg::String>("str_target_thrust", 10);
-    auto pub_t_fwd_sim = node->create_publisher<std_msgs::msg::Float64>("t_fwd_sim", 10);
+    auto pub_control_media = node->create_publisher<std_msgs::msg::String>("gnc/topic_control_media", 1);
+    auto pub_target_thrust = node->create_publisher<std_msgs::msg::String>("gnc/str_target_thrust", 10);
+    auto pub_t_fwd_sim = node->create_publisher<std_msgs::msg::Float64>("gnc/t_fwd_sim", 10);
 
-    auto pub_angvel_overwrite = node->create_publisher<geometry_msgs::msg::Vector3>("angvel_overwrite", 1);
-    auto pub_attitude_overwrite = node->create_publisher<geometry_msgs::msg::Quaternion>("attitude_overwrite", 1);
+    auto pub_angvel_overwrite = node->create_publisher<geometry_msgs::msg::Vector3>("gnc/angvel_overwrite", 1);
+    auto pub_attitude_overwrite = node->create_publisher<geometry_msgs::msg::Quaternion>("gnc/attitude_overwrite", 1);
 
     auto msg = std::make_shared<std_msgs::msg::String>();
     std::string userinput;

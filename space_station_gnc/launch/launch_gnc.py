@@ -25,8 +25,8 @@ def generate_launch_description():
         ),
         Node(
             package='space_station_gnc',
-            executable='attitude_dynamics',
-            name='attitude_dynamics'
+            executable='physics_motion',
+            name='physics_motion'
         )
         
     ])
