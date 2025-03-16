@@ -21,7 +21,7 @@ class AttitudeDynamicsNode : public rclcpp::Node
 public:
     AttitudeDynamicsNode() : Node("attitude_dynamics_node")
     {
-        pub_attitude_all = this->create_publisher<geometry_msgs::msg::Quaternion>("gnc/attitude_all", 1);
+        pub_attitude_LVLH = this->create_publisher<geometry_msgs::msg::Quaternion>("gnc/attitude_LVLH", 1);
         pub_angvel_body = this->create_publisher<geometry_msgs::msg::Vector3>("gnc/angvel_body", 1);
         pub_pose_all = this->create_publisher<geometry_msgs::msg::PoseStamped>("gnc/pose_all", 10);
         //pub_pose_marker = this->create_publisher<visualization_msgs::msg::Marker>("pose_marker", 10);
@@ -88,11 +88,11 @@ private:
     rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr sub_angvel_overwrite;
     rclcpp::Subscription<geometry_msgs::msg::Quaternion>::SharedPtr sub_attitude_overwrite;
 
-    rclcpp::Publisher<geometry_msgs::msg::Quaternion>::SharedPtr pub_attitude_all;
+    rclcpp::Publisher<geometry_msgs::msg::Quaternion>::SharedPtr pub_attitude_LVLH;
     rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr pub_angvel_body;
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pub_pose_all;
     // rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr pub_pose_marker;
-    geometry_msgs::msg::Quaternion attitude_all;
+    geometry_msgs::msg::Quaternion attitude_LVLH;
     geometry_msgs::msg::Vector3 angvel_body;
     std::shared_ptr<tf2_ros::TransformBroadcaster> broadcaster_;
     rclcpp::TimerBase::SharedPtr timer_;
@@ -148,11 +148,11 @@ private:
 
     //utility function
     void publish_attitude(tf2::Quaternion att){
-        attitude_all.x = att.x();
-        attitude_all.y = att.y();
-        attitude_all.z = att.z();
-        attitude_all.w = att.w();
-        pub_attitude_all->publish(attitude_all);   //rclcpp::Publisher<geometry_msgs::msg::Quaternion>::SharedPtr pub_attitude_all;
+        attitude_LVLH.x = att.x();
+        attitude_LVLH.y = att.y();
+        attitude_LVLH.z = att.z();
+        attitude_LVLH.w = att.w();
+        pub_attitude_LVLH->publish(attitude_LVLH);   //rclcpp::Publisher<geometry_msgs::msg::Quaternion>::SharedPtr pub_attitude_LVLH;
             
         auto message = geometry_msgs::msg::PoseStamped();
         message.header.stamp = this->get_clock()->now();
