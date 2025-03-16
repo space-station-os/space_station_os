@@ -46,6 +46,7 @@ public:
         //attcur.setRPY(0.0,11.97/180.0*M_PI,0.0);
         attprv = attcur;
         
+        //TODO: handled by parameter surver?
         double J11 =  280.0 * 1000.0 * 1000.0;
         double J22 =  140.0 * 1000.0 * 1000.0;
         double J33 =  420.0 * 1000.0 * 1000.0;
@@ -53,6 +54,8 @@ public:
                 0.0, J22, 0.0,
                 0.0, 0.0, J33;
         J123inv = J123.inverse();
+        mu = 3.986004418e14;
+        rOrbit = 7.0e6;
 
         sub_t_fwd_sim = this->create_subscription<std_msgs::msg::Float64>(
             "t_fwd_sim", 1, 
@@ -100,6 +103,10 @@ private:
     // as well as CoG offset issue is a big TODO
     Eigen::Matrix3d J123;
     Eigen::Matrix3d J123inv;
+    double mu;               ///< Gravitational parameter (m^3/s^2)
+    double rOrbit;           ///< Nominal orbit radius (m)
+
+
 
     tf2::Quaternion attcur; // pose
     tf2::Quaternion attprv; // pose
@@ -108,8 +115,9 @@ private:
     tf2::Vector3 omedotbcur; //rad/sec^2 angular acc of body frame
     tf2::Vector3 omedotbprv; //rad/sec^2 angular acc of body frame
     
+    tf2::Vector3 tau_ctlcur; 
+    tf2::Vector3 tau_extcur; 
     tf2::Vector3 tau_allcur; 
-    tf2::Vector3 tau_allprv; 
 
 
 
@@ -120,7 +128,7 @@ private:
 
     const int N2disp = 10; // publish rate: Npublish * Ttorque
     int i2disp; // index for i2disp
-    const double Tpubatt_ = 0.1; //same as T_callback
+    const double Tpubatt_ = 0.1; 
 
     bool should_pub_att; // true then publish attitude for display purpose
 
@@ -242,8 +250,6 @@ private:
     }
 
     void forward_attitude_dynamics(double Tfwd_sec){
-        //int Nstep = (int)(Tfwd_sec/Tstep_);
-        // Step 1: Calculate rotation angle
         double thetab = omebcur.length();
         if (0.5 < thetab)
             Tstep_rk = 0.001;
@@ -309,24 +315,6 @@ private:
             omebcur.setValue(omega_k1.x(), omega_k1.y(), omega_k1.z());
             attcur.setValue(att_k1.x(), att_k1.y(), att_k1.z(), att_k1.w());
                 
-
-            /*
-            omebprv = omebcur;
-            omedotbprv = omedotbcur; //omedotbprv not used
-            attprv = attcur;
-
-            //1. compute omedotbcur: 
-            // J123 * omedotbcur = torque - omebprv (cross) (J123*omebprv)
-            tf2::Vector3 rhs1 = J123 * omebprv;
-            tf2::Vector3 rhs2 = tau_allcur - omebprv.cross(rhs1);
-            omedotbcur = J123inv * rhs2;
-
-            //2. compute omebcur
-            omebcur = omebprv + omedotbcur * Tstep_;
-            
-            //3. compute moved angle 
-            attcur = stepupdate_attitude(attprv,omebcur,Tstep_);
-            */
         }
     }
 
@@ -341,13 +329,50 @@ private:
         omebcur.setValue(msg->x,msg->y,msg->z);        
     }
 
+    /**
+     * @brief Computes the gravity gradient torque.
+     *
+    * This function calculates the gravity gradient torque acting on the spacecraft
+    * based on its attitude state and inertia properties.
+    *
+    * @param x The current attitude state.
+    * @param par The spacecraft parameters including inertia and gravitational parameters.
+    * @return Eigen::Vector3d The gravity gradient torque vector.
+    */
+    tf2::Vector3 gravityGradT()
+    {
+        //compute phi(roll) and theta(pitch) from attcur
+        double roll, pitch, yaw;
+        tf2::Matrix3x3(attcur).getRPY(roll, pitch, yaw); // RPY = Roll, Pitch, Yaw
+    
+       // Mean motion calculated from gravitational parameter and orbit radius
+        double n = std::sqrt(mu / std::pow(rOrbit, 3));
+        double srol = std::sin(roll),  crol = std::cos(roll);
+        double spit = std::sin(pitch), cpit = std::cos(pitch);
+
+        double Ixx = J123(0,0);
+        double Iyy = J123(1,1);
+        double Izz = J123(2,2);
+        // Torque components computed based on differences in moments of inertia
+        double T1 = (Iyy - Izz) * spit * cpit;
+        double T2 = (Izz - Ixx) * srol * crol;
+        double T3 = (Ixx - Iyy) * srol * spit;
+
+        return 3.0 * n * n * tf2::Vector3(T1, T2, T3);
+    }
+
+
     //receiving control torque input
     void callback_attitude_dynamics(const geometry_msgs::msg::Vector3::SharedPtr msg)
     {
         should_pub_att = true;
-        tau_allprv = tau_allcur;
-        tau_allcur.setValue(msg->x,msg->y,msg->z); 
-        
+        tau_ctlcur.setValue(msg->x,msg->y,msg->z); 
+
+        //TODO: Currently we assume only gravity gradient torque 
+        tau_extcur = gravityGradT();
+
+        tau_allcur = tau_ctlcur + tau_extcur;
+
         //compute attitude update
         forward_attitude_dynamics(Ttorque_); //Ttorque_ is simulation time period
 
