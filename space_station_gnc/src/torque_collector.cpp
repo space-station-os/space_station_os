@@ -28,12 +28,12 @@ public:
         //prop.push_back(PropulsionDevice("nauka_thruster_zenith",800,       -13,-1.5,-10,0,0,+1,1.0,"stuck-on"));
         prop.push_back(PropulsionDevice("nauka_thruster_zenith",800,   -13,-1.5,-10,0,0,-1));
 
-        pub_torque_control = this->create_publisher<geometry_msgs::msg::Vector3>("torque_control", 1);
+        pub_torque_control = this->create_publisher<geometry_msgs::msg::Vector3>("gnc/torque_control", 1);
 
         did_receive_thrust = false;
 
         sub_str_target_thrust = this->create_subscription<std_msgs::msg::String>(
-            "str_target_thrust", 10, 
+            "gnc/str_target_thrust", 10, 
             std::bind(&TorqueCollectorNode::callback_target_thrust, this, std::placeholders::_1));
         T_callback = 0.1;
         timer_ = this->create_wall_timer(
