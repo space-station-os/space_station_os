@@ -29,12 +29,12 @@ add_executable(space_station_gnc_node src/space_station_gnc.cpp)
 add_executable(demo1a_nauka_incident_estimate src/demo1a_nauka_incident_estimate.cpp)
 add_executable(demo1b_crisis_mainengine src/demo1b_crisis_mainengine.cpp)
 add_executable(torque_collector src/torque_collector.cpp)
-add_executable(attitude_dynamics src/attitude_dynamics.cpp)
+add_executable(physics_motion src/physics_motion.cpp)
 ament_target_dependencies(space_station_gnc_node rclcpp std_msgs)
 ament_target_dependencies(demo1a_nauka_incident_estimate rclcpp std_msgs tf2_geometry_msgs tf2 tf2_ros OpenCV)
 ament_target_dependencies(demo1b_crisis_mainengine rclcpp std_msgs tf2_geometry_msgs tf2 tf2_ros OpenCV)
 ament_target_dependencies(torque_collector rclcpp std_msgs tf2 tf2_ros tf2_geometry_msgs)
-ament_target_dependencies(attitude_dynamics rclcpp std_msgs tf2 tf2_ros tf2_geometry_msgs visualization_msgs)
+ament_target_dependencies(physics_motion rclcpp std_msgs tf2 tf2_ros tf2_geometry_msgs visualization_msgs)
 
 # Link OpenCV libraries
 target_link_libraries(demo1a_nauka_incident_estimate ${OpenCV_LIBRARIES} ${SDL2_LIBRARIES})
@@ -46,7 +46,7 @@ install(TARGETS
   demo1a_nauka_incident_estimate
   demo1b_crisis_mainengine
   torque_collector
-  attitude_dynamics
+  physics_motion
   DESTINATION lib/${PROJECT_NAME})
 
 # source by python
