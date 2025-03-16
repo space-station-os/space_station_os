@@ -103,15 +103,15 @@ private:
 
         if (input == "000_init")
         {
-            img_path = "src/space_station_gnc/media/001_start.png";            
+            img_path = "src/space_station_os/space_station_gnc/media/001_start.png";            
         }
         else if (input == "100_emergency_begin")
         {
-            img_path = "src/space_station_gnc/media/100_emergency_begin.png";
+            img_path = "src/space_station_os/space_station_gnc/media/100_emergency_begin.png";
         }
         else if (input == "102_emergency_reaction")
         {
-            img_path = "src/space_station_gnc/media/102_emergency_reaction.png";
+            img_path = "src/space_station_os/space_station_gnc/media/102_emergency_reaction.png";
         }
         else
         {
@@ -124,7 +124,7 @@ private:
             std::cerr << "Error: Unable to load image: " << img_path << std::endl;
             return;
         }
-
+	RCLCPP_INFO(this->get_logger(), "Image %s loaded\n", img_path.c_str());
         display_image_with_sdl(image);
     }
 

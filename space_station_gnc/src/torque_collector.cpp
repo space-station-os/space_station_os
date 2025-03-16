@@ -28,7 +28,7 @@ public:
         //prop.push_back(PropulsionDevice("nauka_thruster_zenith",800,       -13,-1.5,-10,0,0,+1,1.0,"stuck-on"));
         prop.push_back(PropulsionDevice("nauka_thruster_zenith",800,   -13,-1.5,-10,0,0,-1));
 
-        pub_torque_all = this->create_publisher<geometry_msgs::msg::Vector3>("torque_all", 1);
+        pub_torque_control = this->create_publisher<geometry_msgs::msg::Vector3>("torque_control", 1);
 
         did_receive_thrust = false;
 
@@ -72,8 +72,8 @@ private:
     std::vector<PropulsionDevice> prop;
     
     //ros2 stuff
-    rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr pub_torque_all;
-    geometry_msgs::msg::Vector3 torque_all;
+    rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr pub_torque_control;
+    geometry_msgs::msg::Vector3 torque_control;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_str_target_thrust;
     rclcpp::TimerBase::SharedPtr timer_;
 
@@ -135,10 +135,10 @@ private:
             //RCLCPP_INFO(this->get_logger(), "i=%d, name %s, taucur %f %f %f",ith,prop[ith].name.c_str(),
             //    taucur.x(),taucur.y(),taucur.z());
         }
-        torque_all.x = tausum.x();
-        torque_all.y = tausum.y();
-        torque_all.z = tausum.z();
-        pub_torque_all->publish(torque_all);        
+        torque_control.x = tausum.x();
+        torque_control.y = tausum.y();
+        torque_control.z = tausum.z();
+        pub_torque_control->publish(torque_control);        
         //RCLCPP_INFO(this->get_logger(), "got through?");
     }
 };

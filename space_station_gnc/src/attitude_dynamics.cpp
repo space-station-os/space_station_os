@@ -23,26 +23,28 @@ public:
         pub_attitude_all = this->create_publisher<geometry_msgs::msg::Quaternion>("attitude_all", 1);
         pub_angvel_body = this->create_publisher<geometry_msgs::msg::Vector3>("angvel_body", 1);
         pub_pose_all = this->create_publisher<geometry_msgs::msg::PoseStamped>("pose_all", 10);
-        pub_pose_marker = this->create_publisher<visualization_msgs::msg::Marker>("pose_marker", 10);
+        //pub_pose_marker = this->create_publisher<visualization_msgs::msg::Marker>("pose_marker", 10);
         broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
 
         i2disp = 0; //publish rate: Npublish * Ttorque
         should_pub_att = false;
 
-        omecur.setValue(0.0,0.0,0.0);
-        //omecur.setValue(0.0,+0.22 / 180.0 * M_PI,0.0);
-        omeprv = omecur;
-        omedotcur.setValue(0.0,0.0,0.0);
-        //omedotcur.setValue(0.0,+0.0003 / 180.0 * M_PI,0.0);
-        omedotcur.setValue(0.0,+0.0000780,0.0);
-        omedotprv = omedotcur;
+        omebcur.setValue(0.0,0.0,0.0);
+        //omebcur.setValue(0.0,+0.22 / 180.0 * M_PI,0.0);
+        omebprv = omebcur;
+        omedotbcur.setValue(0.0,0.0,0.0);
+        //omedotbcur.setValue(0.0,+0.0003 / 180.0 * M_PI,0.0);
+        omedotbcur.setValue(0.0,+0.0000780,0.0);
+        omedotbprv = omedotbcur;
         attcur.setRPY(0.0,0.0,0.0);
         publish_attitude(attcur);
+        printq(attcur);
+        
         //attcur.setRPY(0.0,1.72/180.0*M_PI,0.0);
         //attcur.setRPY(0.0,11.97/180.0*M_PI,0.0);
         attprv = attcur;
-
+        
         double J11 =  280.0 * 1000.0 * 1000.0;
         double J22 =  140.0 * 1000.0 * 1000.0;
         double J33 =  420.0 * 1000.0 * 1000.0;
@@ -64,8 +66,8 @@ public:
             "angvel_overwrite", 1, 
             std::bind(&AttitudeDynamicsNode::callback_angvel_overwrite, this, std::placeholders::_1));
 
-        sub_torque_all = this->create_subscription<geometry_msgs::msg::Vector3>(
-            "torque_all", 1, 
+        sub_torque_control = this->create_subscription<geometry_msgs::msg::Vector3>(
+            "torque_control", 1, 
             std::bind(&AttitudeDynamicsNode::callback_attitude_dynamics, this, std::placeholders::_1));
             
         timer_ = this->create_wall_timer(
@@ -78,7 +80,7 @@ public:
 private:
     
     //ros2 stuff
-    rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr sub_torque_all;
+    rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr sub_torque_control; 
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr sub_t_fwd_sim;
     rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr sub_angvel_overwrite;
     rclcpp::Subscription<geometry_msgs::msg::Quaternion>::SharedPtr sub_attitude_overwrite;
@@ -86,7 +88,7 @@ private:
     rclcpp::Publisher<geometry_msgs::msg::Quaternion>::SharedPtr pub_attitude_all;
     rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr pub_angvel_body;
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pub_pose_all;
-    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr pub_pose_marker;
+    // rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr pub_pose_marker;
     geometry_msgs::msg::Quaternion attitude_all;
     geometry_msgs::msg::Vector3 angvel_body;
     std::shared_ptr<tf2_ros::TransformBroadcaster> broadcaster_;
@@ -101,10 +103,10 @@ private:
 
     tf2::Quaternion attcur; // pose
     tf2::Quaternion attprv; // pose
-    tf2::Vector3 omecur; //rad/sec, angular velocity of local frame
-    tf2::Vector3 omeprv; //rad/sec, angular velocity of local frame
-    tf2::Vector3 omedotcur; //rad/sec^2 angular acc of local frame
-    tf2::Vector3 omedotprv; //rad/sec^2 angular acc of local frame
+    tf2::Vector3 omebcur; //rad/sec, angular velocity of body frame
+    tf2::Vector3 omebprv; //rad/sec, angular velocity of body frame
+    tf2::Vector3 omedotbcur; //rad/sec^2 angular acc of body frame
+    tf2::Vector3 omedotbprv; //rad/sec^2 angular acc of body frame
     
     tf2::Vector3 tau_allcur; 
     tf2::Vector3 tau_allprv; 
@@ -120,33 +122,37 @@ private:
     int i2disp; // index for i2disp
     const double Tpubatt_ = 0.1; //same as T_callback
 
-    bool should_pub_att; // in seconds
+    bool should_pub_att; // true then publish attitude for display purpose
 
 
     //utility function
-    tf2::Quaternion update_attitude(const tf2::Quaternion& qi, const tf2::Vector3& omega, double dt) 
+    tf2::Quaternion stepupdate_attitude(const tf2::Quaternion& qi, const tf2::Vector3& omeb, double dt) 
     {
         // Step 1: Calculate rotation angle
-        double theta = omega.length() * dt;
-        if(theta == 0.0)
+        double thetab = omeb.length() * dt;
+        if(thetab == 0.0)
             return qi;
 
         // Step 2: Calculate rotation axis (unit vector)
-        tf2::Vector3 u = omega.normalized();
+        tf2::Vector3 u = omeb.normalized();
 
-        // Step 3: Calculate rotation quaternion
-        double half_theta = theta / 2.0;
-        double sin_half_theta = std::sin(half_theta);
-        tf2::Quaternion q_omega;
-        double xx = u.x() * sin_half_theta;
-        double yy = u.y() * sin_half_theta; 
-        double zz = u.z() * sin_half_theta;
-        double ww = std::cos(half_theta);
-        q_omega.setValue(xx,yy,zz,ww); 
+        // Step 3: Calculate rotation quaternion in the body frame
+        double half_thetab = thetab / 2.0;
+        double sin_half_thetab = std::sin(half_thetab);
+        tf2::Quaternion q_omegab(
+            u.x() * sin_half_thetab,
+            u.y() * sin_half_thetab,
+            u.z() * sin_half_thetab,
+            std::cos(half_thetab)
+        );
+        q_omegab = q_omegab.normalize();
 
-        // Step 4: Calculate new orientation quaternion
-        //tf2::Quaternion qf = q_omega * qi; //rotation in global coordinatesystem
-        tf2::Quaternion qf = qi * q_omega; //rotation in local coordinatesystem
+        // Step 4: Transform q_omegab to world frame
+        tf2::Quaternion q_omega_world = qi * q_omegab * qi.inverse();
+
+        // Step 5: Calculate new orientation quaternion
+        tf2::Quaternion qf = q_omega_world * qi;
+        qf = qf.normalize();
         return qf;
     }
 
@@ -201,52 +207,59 @@ private:
         publish_attitude(attcur);
 
         //
-        angvel_body.x = omecur.x();
-        angvel_body.y = omecur.y();
-        angvel_body.z = omecur.z();
+        angvel_body.x = omebcur.x();
+        angvel_body.y = omebcur.y();
+        angvel_body.z = omebcur.z();
         pub_angvel_body->publish(angvel_body);           
     }
 
+    //forcing the simulation forward
     void callback_t_fwd_sim(const std_msgs::msg::Float64::SharedPtr msg){
-        double t_sim = msg->data;
+        double t_sim2forward = msg->data;
         RCLCPP_INFO(this->get_logger(),"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         RCLCPP_INFO(this->get_logger(),"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         RCLCPP_INFO(this->get_logger(),"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-        RCLCPP_INFO(this->get_logger(),"forwarding for %f mins!!!!",t_sim/60.0);
+        RCLCPP_INFO(this->get_logger(),"forwarding for %f mins!!!!",t_sim2forward/60.0);
         RCLCPP_INFO(this->get_logger(),"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         RCLCPP_INFO(this->get_logger(),"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         RCLCPP_INFO(this->get_logger(),"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         
-        int divide = 64;
+        //int divide = 64;
+        int divide = (int)(t_sim2forward / Ttorque_); 
         for(int ii = 0; ii < divide; ii++){
-            forward_attitude_dynamics(t_sim/(double)(divide));
-            publish_attitude(attcur);
-            std::this_thread::sleep_for(std::chrono::duration<double>(0.1)); 
+            //forward_attitude_dynamics(t_sim/(double)(divide));
+            forward_attitude_dynamics(Ttorque_);
+            if(ii % 60 == 1){
+                publish_attitude(attcur);
+                std::this_thread::sleep_for(std::chrono::duration<double>(0.1)); 
+            }
         }    
+        publish_attitude(attcur);
         RCLCPP_INFO(this->get_logger(),"forwarded");
     }
 
 
 
     void forward_attitude_dynamics(double Tfwd_sec){
+        //int Nstep = (int)(Tfwd_sec/Tstep_);
         int Nstep = (int)(Tfwd_sec/Tstep_);
 
         for(int istep = 0; istep < Nstep; istep++){
-            omeprv = omecur;
-            omedotprv = omedotcur; //omedotprv not used
+            omebprv = omebcur;
+            omedotbprv = omedotbcur; //omedotbprv not used
             attprv = attcur;
 
-            //1. compute omedotcur: 
-            // J123 * omedotcur = torque - omeprv (cross) (J123*omeprv)
-            tf2::Vector3 rhs1 = J123 * omeprv;
-            tf2::Vector3 rhs2 = tau_allcur - omeprv.cross(rhs1);
-            omedotcur = J123inv * rhs2;
+            //1. compute omedotbcur: 
+            // J123 * omedotbcur = torque - omebprv (cross) (J123*omebprv)
+            tf2::Vector3 rhs1 = J123 * omebprv;
+            tf2::Vector3 rhs2 = tau_allcur - omebprv.cross(rhs1);
+            omedotbcur = J123inv * rhs2;
 
-            //2. compute omecur
-            omecur = omeprv + omedotcur * Tstep_;
+            //2. compute omebcur
+            omebcur = omebprv + omedotbcur * Tstep_;
             
             //3. compute moved angle 
-            attcur = update_attitude(attprv,omecur,Tstep_);
+            attcur = stepupdate_attitude(attprv,omebcur,Tstep_);
         }
 
 
@@ -259,25 +272,27 @@ private:
     }
 
     void callback_angvel_overwrite(const geometry_msgs::msg::Vector3::SharedPtr msg){
-        omecur.setValue(msg->x,msg->y,msg->z);        
+        omebcur.setValue(msg->x,msg->y,msg->z);        
     }
 
-
+    //receiving control torque input
     void callback_attitude_dynamics(const geometry_msgs::msg::Vector3::SharedPtr msg)
     {
         should_pub_att = true;
         tau_allprv = tau_allcur;
         tau_allcur.setValue(msg->x,msg->y,msg->z); 
         
-        forward_attitude_dynamics(Ttorque_);
+        //compute attitude update
+        forward_attitude_dynamics(Ttorque_); //Ttorque_ is simulation time period
 
+        //
         i2disp++;
         if(N2disp <= i2disp){
             i2disp = 0;
             RCLCPP_INFO(this->get_logger(), "Received input: %f %f %f", 
                 msg->x,msg->y,msg->z);
             RCLCPP_INFO(this->get_logger(), " Angular velocity: %f %f %f (deg/sec)", 
-                omecur.x()/M_PI * 180.0,omecur.y()/M_PI * 180.0,omecur.z()/M_PI * 180.0);            
+                omebcur.x()/M_PI * 180.0,omebcur.y()/M_PI * 180.0,omebcur.z()/M_PI * 180.0);            
             printq(attcur);
             
         }
@@ -295,12 +310,6 @@ double get_time_double(rclcpp::Node::SharedPtr node) {
 int main(int argc, char *argv[])
 {
     rclcpp::init(argc, argv);
-    printf("###################################################\n");
-    printf("###################################################\n");
-    printf("###################################################\n");
-    printf("###################################################\n");
-    printf("###################################################\n");
-    printf("###################################################\n");
     auto node = std::make_shared<AttitudeDynamicsNode>();
     rclcpp::spin(node);
 
