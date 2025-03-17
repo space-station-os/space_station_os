@@ -51,7 +51,7 @@ public:
             std::bind(&PhysicsSensor::timer_callback_process_imu, this));
 
         startracker_timer_ = this->create_wall_timer(
-            std::chrono::milliseconds(10000), // 0.1Hz = 10 seconds interval
+            std::chrono::milliseconds(100), // 0.1Hz = 10 seconds interval TODO: at least this is too fast
             std::bind(&PhysicsSensor::timer_callback_process_startracker, this));
 
         gps_timer_ = this->create_wall_timer(
