@@ -1,0 +1,76 @@
+/* Ensure root elements fill viewport */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  font-family: "Helvetica", "Arial", sans-serif;
+  overflow: auto;
+}
+
+/* Global header styling */
+.global-header {
+  background-color: #282c34;
+  color: #dee4e6;
+  padding: 5px;
+  text-align: center;
+  font-size: 1.5em;
+  font-weight: bold;
+  box-sizing: border-box;
+  height: 50px;
+}
+
+/* Main container using grid layout */
+.container {
+  display: grid;
+  grid-template-columns: 50% 50%;
+  height: calc(100% - 50px); /* subtract header height */
+  background-color: #f0f0f0;
+  box-sizing: border-box;
+}
+
+/* Left panel: three rows (Yamcs, MongoDataViewer, CommandForm) */
+.left-panel {
+  display: grid;
+  grid-template-rows: 20% 20% 15%;
+  border-right: 1px solid #ccc;
+  box-sizing: border-box;
+}
+
+/* Right panel: two equal rows (Video and LivePlot) */
+.right-panel {
+  display: grid;
+  grid-template-rows: 25% 25%;
+  box-sizing: border-box;
+}
+
+/* Sub-panels styling */
+.left-top, .left-middle, .left-bottom,
+.right-top, .right-middle {
+  margin: 3px;
+  padding: 3px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background-color: #fff;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* Yamcs panel specifically scrollable */
+.left-top {
+  overflow-y: auto;
+}
+
+/* Image styling to fit container */
+.right-top img, .right-middle img {
+  width: 100%;
+  height: 50%;
+  object-fit: contain;
+}
+
+/* Optional heading styles */
+.left-top h2, .left-middle h2, .left-bottom h2,
+.right-top h2, .right-middle h2 {
+  margin-top: 0;
+}
