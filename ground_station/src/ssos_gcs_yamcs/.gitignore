@@ -1,0 +1,13 @@
+# Eclipse metadata
+/.settings/
+/.classpath
+/.project
+
+# Maven output
+/target/
+
+# VSCode
+.vscode/settings.json
+
+# Docker logs for CI
+docker/all.log

@@ -1,0 +1,151 @@
+serverId: "yamcs"
+
+restOptions:
+  enabled: true
+
+instances:
+  - name: "ssos_gcs_yamcs"
+    description: "CCSDS-based instance for real-time decoding of ROS-based data"
+
+    #
+    # 1) Mission Database (MDB)
+    #
+    mdb:
+      type: "yaml"
+      config:
+        spaceSystem:
+          name: "CCSDSRoot"
+
+          # Reference the built-in CCSDS definitions (requires Yamcs CCSDS plugin)
+          import:
+            - path: "ccsds:SpaceSystem"
+
+          # Declare a 32-bit float type for our parameter encoding
+          parameterTypeSet:
+            - name: float32
+              encoding:
+                type: float
+                sizeInBits: 32
+
+          # Container for IMU data (APID 0x123)
+          containers:
+            - name: IMU_Container
+              baseContainer:
+                name: "ccsds:CCSDS-SpacePacket"
+              restrictionCriteria:
+                - parameterRef: "ccsds:apid"
+                  value: 0x123
+
+              entryList:
+                - name: angular_velocity_x
+                  type: float32
+                  location: 0
+                  sizeInBits: 32
+
+                - name: angular_velocity_y
+                  type: float32
+                  location: 32
+                  sizeInBits: 32
+
+                - name: angular_velocity_z
+                  type: float32
+                  location: 64
+                  sizeInBits: 32
+
+            # Container for ISS pose data (APID 0x124)
+            - name: Pose_Container
+              baseContainer:
+                name: "ccsds:CCSDS-SpacePacket"
+              restrictionCriteria:
+                - parameterRef: "ccsds:apid"
+                  value: 0x124
+
+              entryList:
+                - name: position_x
+                  type: float32
+                  location: 0
+                  sizeInBits: 32
+
+                - name: position_y
+                  type: float32
+                  location: 32
+                  sizeInBits: 32
+
+                - name: position_z
+                  type: float32
+                  location: 64
+                  sizeInBits: 32
+
+                - name: orientation_x
+                  type: float32
+                  location: 96
+                  sizeInBits: 32
+
+                - name: orientation_y
+                  type: float32
+                  location: 128
+                  sizeInBits: 32
+
+                - name: orientation_z
+                  type: float32
+                  location: 160
+                  sizeInBits: 32
+
+                - name: orientation_w
+                  type: float32
+                  location: 192
+                  sizeInBits: 32
+
+            # Container for cleaned data (APID 0x125)
+            - name: CleanedData_Container
+              baseContainer:
+                name: "ccsds:CCSDS-SpacePacket"
+              restrictionCriteria:
+                - parameterRef: "ccsds:apid"
+                  value: 0x125
+
+              # We only have one float at offset 0
+              entryList:
+                - name: cleaned_data
+                  type: float32
+                  location: 0
+                  sizeInBits: 32
+
+    #
+    # 2) Stream Config
+    #
+    streamConfig:
+      - name: "tm_raw"
+        columns:
+          - name: "gentime"
+            type: "TIMESTAMP"
+          - name: "packet"
+            type: "BINARY"
+
+    #
+    # 3) Telemetry (TM) Data Links
+    #
+    tm:
+      dataLinks:
+        - name: "ccsds_tm"
+          class: "org.yamcs.tctm.ccsds.CcsdsTmDataLink"
+          stream: "tm_raw"
+          config:
+            inboundUdpPort: 10015
+
+    #
+    # 4) Telecommand (TC) Data Links
+    #
+    tc:
+      dataLinks:
+        - name: "ccsds_tc"
+          class: "org.yamcs.tctm.ccsds.CcsdsTcDataLink"
+          config:
+            inboundUdpPort: 10025
+
+    #
+    # 5) Services
+    #
+    services:
+      - class: "org.yamcs.xtceproc.XtceTmProcessor"
+      - class: "org.yamcs.http.HttpServer"
