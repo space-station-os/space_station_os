@@ -13,8 +13,9 @@
 #include <chrono>
 #include <thread>
 #include <Eigen/Dense>
+#include <vector>
+#include "L_p_func.cpp"
 //std::string mode_demo;
-
 
 class AttitudeDynamicsNode : public rclcpp::Node
 {
@@ -56,6 +57,8 @@ public:
         J123inv = J123.inverse();
         mu = 3.986004418e14;
         rOrbit = 7.0e6;
+
+        deltacur << 0.0, 0.0, 0.0, 0.0;
 
         sub_t_fwd_sim = this->create_subscription<std_msgs::msg::Float64>(
             "gnc/t_fwd_sim", 1, 
@@ -114,6 +117,8 @@ private:
     tf2::Vector3 omebprv; //rad/sec, angular velocity of body frame
     tf2::Vector3 omedotbcur; //rad/sec^2 angular acc of body frame
     tf2::Vector3 omedotbprv; //rad/sec^2 angular acc of body frame
+    Eigen::Vector4d deltacur; //rad, each CMG angle around torque axis
+
     
     tf2::Vector3 tau_ctlcur; 
     tf2::Vector3 tau_extcur; 
@@ -178,6 +183,45 @@ private:
         transform_stamped.transform.rotation.w = att.w();
 
         broadcaster_->sendTransform(transform_stamped);        
+    }
+
+    // utility function to calculate total angular momentum
+    Eigen::Vector3d compute_h(const Eigen::Vector4d& delta) {    
+        Eigen::Vector3d h;        
+        const casadi_real* deltaI[4] = {&delta(0), &delta(1), &delta(2), &delta(3)};
+
+        std::vector<casadi_real> h_out(3, 0.0);  
+        casadi_real* resH[1] = {h_out.data()};
+
+        casadi_int iwH[70] = {0}; 
+        casadi_real wH[70] = {0};
+        int mem = 0;
+
+        hFunc(deltaI, resH, iwH, wH, mem);
+
+        casadi_real* hArr = &h_out[0];
+        h = Eigen::Map<Eigen::Vector3d>(hArr);
+        return h;
+    }
+    
+    //utility function to calculate pseudo-inverse matrix
+    Eigen::Matrix<double,4,3> pseudoinverse(Eigen::Vector4d delta) {
+        Eigen::Matrix<double,4,3> pseudoinv;        
+        const casadi_real* deltaI[4] = {&delta(0), &delta(1), &delta(2), &delta(3)};
+
+        std::vector<casadi_real> Inv(12, 0.0);  
+        casadi_real* resInv[1] = {Inv.data()};
+
+        casadi_int iwInv[70] = {0}; 
+        casadi_real wInv[70] = {0};
+        int mem = 0;
+
+        pseudoInvFunc(deltaI, resInv, iwInv, wInv, mem);
+
+        casadi_real* invArr = &Inv[0];
+        pseudoinv = Eigen::Map<Eigen::Matrix<double,4,3>>(invArr);
+
+        return pseudoinv;
     }
 
     void callback_timer_pub_att() {
@@ -266,13 +310,18 @@ private:
 
         for(int istep = 0; istep < Nstep; istep++){
             // for current 
+            Eigen::Vector3d tau_inp(tau_ctlcur.x(), tau_ctlcur.y(), tau_ctlcur.z());
             Eigen::Vector3d omega_k1(omebcur.x(), omebcur.y(), omebcur.z());
             Eigen::Quaterniond att_k1(attcur.w(), attcur.x(), attcur.y(), attcur.z());
-        
+            Eigen::Vector4d delta_k1 = deltacur;
+            
             // for RK4 k1 
             Eigen::Vector3d rhs1 = J123 * omega_k1;
             Eigen::Vector3d tau_eff = tau_allcure - omega_k1.cross(rhs1);
             Eigen::Vector3d omega_dot_k1 = J123inv * tau_eff;
+            Eigen::Matrix<double,4,3> pseudoInv1 = pseudoinverse(delta_k1);
+            Eigen::Vector3d h1 = compute_h(delta_k1);
+            Eigen::Vector4d delta_dot_k1 = pseudoInv1 * (-(tau_inp + omega_k1.cross(h1)));
             Eigen::Quaterniond omega_quat_k1(0, omega_k1.x(), omega_k1.y(), omega_k1.z());
             Eigen::Quaterniond att_dot_k1;
             att_dot_k1.coeffs() = (omega_quat_k1 * att_k1).coeffs() * 0.5;
@@ -283,6 +332,10 @@ private:
             att_k2.coeffs() += 0.5 * Tstep_rk * att_dot_k1.coeffs();
             Eigen::Vector3d rhs2 = J123 * omega_k2;
             Eigen::Vector3d omega_dot_k2 = J123inv * (tau_allcure - omega_k2.cross(rhs2));
+            Eigen::Vector4d delta_k2 = delta_k1 + 0.5 * Tstep_rk * delta_dot_k1;
+            Eigen::Matrix<double,4,3> pseudoInv2 = pseudoinverse(delta_k2);
+            Eigen::Vector3d h2 = compute_h(delta_k2);
+            Eigen::Vector4d delta_dot_k2 = pseudoInv2 * (-(tau_inp + omega_k2.cross(h2)));
             Eigen::Quaterniond omega_quat_k2(0, omega_k2.x(), omega_k2.y(), omega_k2.z());
             Eigen::Quaterniond att_dot_k2;
             att_dot_k2.coeffs() = (omega_quat_k2 * att_k2).coeffs() * 0.5;
@@ -293,6 +346,10 @@ private:
             att_k3.coeffs() += 0.5 * Tstep_rk * att_dot_k2.coeffs();
             Eigen::Vector3d rhs3 = J123 * omega_k3;
             Eigen::Vector3d omega_dot_k3 = J123inv * (tau_allcure - omega_k3.cross(rhs3));
+            Eigen::Vector4d delta_k3 = delta_k1 + 0.5 * Tstep_rk * delta_dot_k2;
+            Eigen::Matrix<double,4,3> pseudoInv3 = pseudoinverse(delta_k3);
+            Eigen::Vector3d h3 = compute_h(delta_k3);
+            Eigen::Vector4d delta_dot_k3 = pseudoInv3 * (-(tau_inp + omega_k3.cross(h3)));
             Eigen::Quaterniond omega_quat_k3(0, omega_k3.x(), omega_k3.y(), omega_k3.z());
             Eigen::Quaterniond att_dot_k3;
             att_dot_k3.coeffs() = (omega_quat_k3 * att_k3).coeffs() * 0.5;
@@ -303,16 +360,22 @@ private:
             att_k4.coeffs() += Tstep_rk * att_dot_k3.coeffs();
             Eigen::Vector3d rhs4 = J123 * omega_k4;
             Eigen::Vector3d omega_dot_k4 = J123inv * (tau_allcure - omega_k4.cross(rhs4));
+            Eigen::Vector4d delta_k4 = delta_k1 + Tstep_rk * delta_dot_k3;
+            Eigen::Matrix<double,4,3> pseudoInv4 = pseudoinverse(delta_k4);
+            Eigen::Vector3d h4 = compute_h(delta_k4);
+            Eigen::Vector4d delta_dot_k4 = pseudoInv4 * (-(tau_inp + omega_k4.cross(h4)));
             Eigen::Quaterniond omega_quat_k4(0, omega_k4.x(), omega_k4.y(), omega_k4.z());
             Eigen::Quaterniond att_dot_k4;
             att_dot_k4.coeffs() = (omega_quat_k4 * att_k4).coeffs() * 0.5;
               
             // RK4 
             omega_k1 += (Tstep_rk  / 6.0) * (omega_dot_k1 + 2 * omega_dot_k2 + 2 * omega_dot_k3 + omega_dot_k4);
+            delta_k1 += (Tstep_rk  / 6.0) * (delta_dot_k1 + 2 * delta_dot_k2 + 2 * delta_dot_k3 + delta_dot_k4);
             att_k1.coeffs() += (Tstep_rk  / 6.0) * (att_dot_k1.coeffs() + 2 * att_dot_k2.coeffs() + 2 * att_dot_k3.coeffs() + att_dot_k4.coeffs());
             att_k1.normalize();
 
             omebcur.setValue(omega_k1.x(), omega_k1.y(), omega_k1.z());
+            deltacur = delta_k1;
             attcur.setValue(att_k1.x(), att_k1.y(), att_k1.z(), att_k1.w());
                 
         }
@@ -385,6 +448,8 @@ private:
             RCLCPP_INFO(this->get_logger(), " Angular velocity: %f %f %f (deg/sec)", 
                 omebcur.x()/M_PI * 180.0,omebcur.y()/M_PI * 180.0,omebcur.z()/M_PI * 180.0);            
             printq(attcur);
+            RCLCPP_INFO(this->get_logger(), " CMG angles: %f %f %f %f(deg)", 
+                deltacur(0)/M_PI * 180.0,deltacur(1)/M_PI * 180.0,deltacur(2)/M_PI * 180.0,deltacur(3)/M_PI * 180.0);
             
         }
     }
