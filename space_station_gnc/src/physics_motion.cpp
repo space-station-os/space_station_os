@@ -13,8 +13,9 @@
 #include <chrono>
 #include <thread>
 #include <Eigen/Dense>
+#include <vector>
+#include "L_p_func.cpp"
 //std::string mode_demo;
-
 
 class AttitudeDynamicsNode : public rclcpp::Node
 {
@@ -178,6 +179,48 @@ private:
         transform_stamped.transform.rotation.w = att.w();
 
         broadcaster_->sendTransform(transform_stamped);        
+    }
+
+    // utility function to calculate total angular momentum
+    Eigen::Vector3d compute_h(const Eigen::Vector4d& delta) {    
+        Eigen::Vector3d h;        
+        const casadi_real* deltaI[4] = {&delta(0), &delta(1), &delta(2), &delta(3)};
+
+        std::vector<casadi_real> h_out(3, 0.0);  
+        casadi_real* resH[1] = {h_out.data()};
+
+        casadi_int iwH[2] = {0,}; 
+        casadi_real wH[2] = {0,};
+        int mem = 0;
+
+        hFunc(deltaI, resH, iwH, wH, mem);
+
+        casadi_real* hArr = &h_out[0];
+        h = Eigen::Map<Eigen::Vector3d>(hArr);
+        std::cout << h << std::endl;
+
+        return h;
+    }
+    
+    //utility function to calculate pseudo-inverse matrix
+    Eigen::Matrix<double,4,3> pseudoinverse(Eigen::Vector4d delta) {
+        Eigen::Matrix<double,4,3> pseudoinv;        
+        const casadi_real* deltaI[4] = {&delta(0), &delta(1), &delta(2), &delta(3)};
+
+        std::vector<casadi_real> Inv(12, 0.0);  
+        casadi_real* resInv[1] = {Inv.data()};
+
+        casadi_int iwInv[2] = {0,}; 
+        casadi_real wInv[2] = {0,};
+        int mem = 0;
+
+        pseudoInvFunc(deltaI, resInv, iwInv, wInv, mem);
+
+        casadi_real* invArr = &Inv[0];
+        pseudoinv = Eigen::Map<Eigen::Matrix<double,4,3>>(invArr);
+        std::cout << pseudoinv << std::endl;
+
+        return pseudoinv;
     }
 
     void callback_timer_pub_att() {
