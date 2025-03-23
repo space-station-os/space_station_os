@@ -10,6 +10,7 @@
 #include <visualization_msgs/msg/marker.hpp>
 #include <tf2_ros/transform_broadcaster.h>
 #include <std_msgs/msg/float64.hpp>
+#include <std_msgs/msg/float64_multi_array.hpp>
 #include <chrono>
 #include <thread>
 #include <Eigen/Dense>
@@ -22,8 +23,9 @@ class AttitudeDynamicsNode : public rclcpp::Node
 public:
     AttitudeDynamicsNode() : Node("attitude_dynamics_node")
     {
-        pub_attitude_LVLH = this->create_publisher<geometry_msgs::msg::Quaternion>("gnc/attitude_LVLH", 1);
-        pub_angvel_body = this->create_publisher<geometry_msgs::msg::Vector3>("gnc/angvel_body", 1);
+        pub_attitude_LVLH = this->create_publisher<geometry_msgs::msg::Quaternion>("gnc/attitude_LVLH", 10);
+        pub_angvel_body = this->create_publisher<geometry_msgs::msg::Vector3>("gnc/angvel_body", 10);
+        pub_cmg_del = this->create_publisher<std_msgs::msg::Float64MultiArray>("gnc/cmg_del", 1);
         pub_pose_all = this->create_publisher<geometry_msgs::msg::PoseStamped>("gnc/pose_all", 10);
         //pub_pose_marker = this->create_publisher<visualization_msgs::msg::Marker>("pose_marker", 10);
         broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
@@ -75,6 +77,10 @@ public:
         sub_torque_control = this->create_subscription<geometry_msgs::msg::Vector3>(
             "gnc/torque_control", 1, 
             std::bind(&AttitudeDynamicsNode::callback_attitude_dynamics, this, std::placeholders::_1));
+        
+        sub_cmg_torque_control = this->create_subscription<geometry_msgs::msg::Vector3>(
+            "gnc/cmg_torque_cmd", 1, 
+            std::bind(&AttitudeDynamicsNode::callback_cmg_inp, this, std::placeholders::_1));
             
         timer_ = this->create_wall_timer(
             std::chrono::milliseconds((int)(Tpubatt_*1000.0)), 
@@ -86,17 +92,20 @@ public:
 private:
     
     //ros2 stuff
-    rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr sub_torque_control; 
+    rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr sub_torque_control;
+    rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr sub_cmg_torque_control;
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr sub_t_fwd_sim;
     rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr sub_angvel_overwrite;
     rclcpp::Subscription<geometry_msgs::msg::Quaternion>::SharedPtr sub_attitude_overwrite;
 
     rclcpp::Publisher<geometry_msgs::msg::Quaternion>::SharedPtr pub_attitude_LVLH;
     rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr pub_angvel_body;
+    rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr pub_cmg_del;
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pub_pose_all;
     // rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr pub_pose_marker;
     geometry_msgs::msg::Quaternion attitude_LVLH;
     geometry_msgs::msg::Vector3 angvel_body;
+    std_msgs::msg::Float64MultiArray cmg_del;
     std::shared_ptr<tf2_ros::TransformBroadcaster> broadcaster_;
     rclcpp::TimerBase::SharedPtr timer_;
 
@@ -233,7 +242,10 @@ private:
         angvel_body.x = omebcur.x();
         angvel_body.y = omebcur.y();
         angvel_body.z = omebcur.z();
-        pub_angvel_body->publish(angvel_body);           
+        pub_angvel_body->publish(angvel_body); 
+        
+        cmg_del.data = {deltacur(0), deltacur(1), deltacur(2), deltacur(3)};
+        pub_cmg_del->publish(cmg_del);
     }
 
     //forcing the simulation forward
@@ -426,10 +438,16 @@ private:
 
 
     //receiving control torque input
+    void callback_cmg_inp(const geometry_msgs::msg::Vector3::SharedPtr msg)
+    {
+        tau_ctlcur.setValue(msg->x,msg->y,msg->z); 
+        
+    }
+
     void callback_attitude_dynamics(const geometry_msgs::msg::Vector3::SharedPtr msg)
     {
         should_pub_att = true;
-        tau_ctlcur.setValue(msg->x,msg->y,msg->z); 
+        // tau_ctlcur.setValue(msg->x,msg->y,msg->z); 
 
         //TODO: Currently we assume only gravity gradient torque 
         tau_extcur = gravityGradT();
@@ -448,8 +466,8 @@ private:
             RCLCPP_INFO(this->get_logger(), " Angular velocity: %f %f %f (deg/sec)", 
                 omebcur.x()/M_PI * 180.0,omebcur.y()/M_PI * 180.0,omebcur.z()/M_PI * 180.0);            
             printq(attcur);
-            RCLCPP_INFO(this->get_logger(), " CMG angles: %f %f %f %f(deg)", 
-                deltacur(0)/M_PI * 180.0,deltacur(1)/M_PI * 180.0,deltacur(2)/M_PI * 180.0,deltacur(3)/M_PI * 180.0);
+            RCLCPP_INFO(this->get_logger(), " CMG angles: %f %f %f %f(raads)", 
+                deltacur(0),deltacur(1),deltacur(2),deltacur(3));
             
         }
     }

@@ -2,7 +2,7 @@ from casadi import *
 import casadi as ca
 import numpy as np
 
-H = 10
+H = 1000
 beta = 54.73*pi/180
 delta_1, delta_2, delta_3, delta_4 = ca.MX.sym('delta_1',1), ca.MX.sym('delta_2',1), ca.MX.sym('delta_3',1), ca.MX.sym('delta_4',1)
 
@@ -13,7 +13,7 @@ r2 = ca.vertcat(-cos(delta_2), -cos(beta)*sin(delta_2), sin(beta)*sin(delta_2))
 r3 = ca.vertcat(cos(beta)*sin(delta_3), -cos(delta_3), sin(beta)*sin(delta_3))
 r4 = ca.vertcat(cos(delta_4), cos(beta)*sin(delta_4), sin(beta)*sin(delta_4))
 
-h = 10*(r1 + r2 + r3 + r4)
+h = H*(r1 + r2 + r3 + r4)
 hFunc = Function('hFunc', [delta_1, delta_2, delta_3, delta_4], [h])
 
 jacob = jacobian(h,delta)
