@@ -1,8 +1,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/quaternion.hpp>
 #include <geometry_msgs/msg/vector3.hpp>
-#include <tf2/LinearMath/Quaternion.h>
-#include <tf2/LinearMath/Vector3.h>
+#include <Eigen/Dense>
 
 class ControlTorque : public rclcpp::Node {
 public:
@@ -57,26 +56,40 @@ private:
 
         // Convert quaternions from LVLH to Body frame
         // tf2::Quaternion q_ref_LVLH(pose_ref_.x, pose_ref_.y, pose_ref_.z, pose_ref_.w);
-        tf2::Quaternion q_ref_LVLH(0, 0, 0, 1);
-        tf2::Quaternion q_act_LVLH(pose_act_.x, pose_act_.y, pose_act_.z, pose_act_.w);
-
+        Eigen::Quaterniond q_ref_LVLH = Eigen::Quaterniond::Identity();
+        Eigen::Quaterniond q_act_LVLH(pose_act_.w, pose_act_.x, pose_act_.y, pose_act_.z);
+        q_act_LVLH.normalize();
         // Transform from LVLH to Body frame
         // tf2::Quaternion q_LVLH_to_Body = q_act_LVLH.inverse();
         // tf2::Quaternion q_ref_Body = q_LVLH_to_Body * q_ref_LVLH;
 
         // Compute quaternion error in body frame
-        tf2::Quaternion q_error = q_ref_LVLH * q_act_LVLH.inverse();
-        tf2::Vector3 error_axis(q_error.x(), q_error.y(), q_error.z());
+        Eigen::Quaterniond q_error = q_ref_LVLH * q_act_LVLH.conjugate();
 
+        if (q_error.w() < 0) {
+            q_error = -q_error;
+        }
+
+        double theta = 2.0 * std::acos(q_error.w());
+        double sin_half_theta = std::sqrt(1- q_error.w() * q_error.w());
+
+        Eigen::Vector3d error_axis_norm;
+        if (sin_half_theta > 1e-6) {
+            error_axis_norm = q_error.vec() / sin_half_theta;
+
+        } else{
+            error_axis_norm = Eigen::Vector3d::Zero();
+        }
+        Eigen::Vector3d error_vector = theta * error_axis_norm;
         // Proportional control
-        tf2::Vector3 torque_p = kp_ * error_axis;
+        Eigen::Vector3d torque_p = kp_ * error_vector;
 
         // Derivative control using estimated angular velocity
-        tf2::Vector3 angvel(angvel_act_.x, angvel_act_.y, angvel_act_.z);
-        tf2::Vector3 torque_d = kd_ * (-angvel);
+        Eigen::Vector3d angvel(angvel_act_.x, angvel_act_.y, angvel_act_.z);
+        Eigen::Vector3d torque_d = kd_ * (-angvel);
 
         // Total torque command in body frame
-        tf2::Vector3 torque_cmd = torque_p + torque_d;
+        Eigen::Vector3d torque_cmd = torque_p + torque_d;
 
         // Publish torque command
         geometry_msgs::msg::Vector3 torque_msg;
