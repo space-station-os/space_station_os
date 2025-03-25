@@ -41,7 +41,7 @@ public:
         //omedotbcur.setValue(0.0,+0.0003 / 180.0 * M_PI,0.0);
         omedotbcur.setValue(0.0,+0.0000780,0.0);
         omedotbprv = omedotbcur;
-        attcur.setRPY(0.0,0.0,0.0);
+        attcur.setIdentity;;
         publish_attitude(attcur);
         printq(attcur);
         
@@ -120,8 +120,8 @@ private:
 
 
 
-    tf2::Quaternion attcur; // pose
-    tf2::Quaternion attprv; // pose
+    Eigen::Quaterniond attcur; // pose
+    Eigen::Quaterniond attprv; // pose
     tf2::Vector3 omebcur; //rad/sec, angular velocity of body frame
     tf2::Vector3 omebprv; //rad/sec, angular velocity of body frame
     tf2::Vector3 omedotbcur; //rad/sec^2 angular acc of body frame
@@ -150,18 +150,18 @@ private:
 
 
     //utility function
-    void printq(const tf2::Quaternion& q){
-        tf2::Matrix3x3 m(q); //r11,r21,r31 show where original x axis points
-        double r11 = m[0][0], r12 = m[0][1], r13 = m[0][2];
-        double r21 = m[1][0], r22 = m[1][1], r23 = m[1][2];
-        double r31 = m[2][0], r32 = m[2][1], r33 = m[2][2];
+    void printq(const Eigen::Quaterniond& q){
+        Eigen::Matrix<double,3,3> m = q.toRotationMatrix(); //r11,r21,r31 show where original x axis points
+        double r11 = m(0,0), r12 = m(0,1), r13 = m(0,2);
+        double r21 = m(1,0), r22 = m(1,1), r23 = m(1,2);
+        double r31 = m(2.0), r32 = m(2,1), r33 = m(2,2);
         RCLCPP_INFO(this->get_logger(),"  [%+.4f, %+.4f, %+.4f]",r11,r12,r13);
         RCLCPP_INFO(this->get_logger(),"  [%+.4f, %+.4f, %+.4f]",r21,r22,r23);
         RCLCPP_INFO(this->get_logger(),"  [%+.4f, %+.4f, %+.4f]",r31,r32,r33);
     }
 
     //utility function
-    void publish_attitude(tf2::Quaternion att){
+    void publish_attitude(Eigen::Quaterniond att){
         attitude_LVLH.x = att.x();
         attitude_LVLH.y = att.y();
         attitude_LVLH.z = att.z();
@@ -324,7 +324,7 @@ private:
             // for current 
             Eigen::Vector3d tau_inp(tau_ctlcur.x(), tau_ctlcur.y(), tau_ctlcur.z());
             Eigen::Vector3d omega_k1(omebcur.x(), omebcur.y(), omebcur.z());
-            Eigen::Quaterniond att_k1(attcur.w(), attcur.x(), attcur.y(), attcur.z());
+            Eigen::Quaterniond att_k1 = attcur;
             Eigen::Vector4d delta_k1 = deltacur;
             
             // for RK4 k1 
@@ -388,7 +388,7 @@ private:
 
             omebcur.setValue(omega_k1.x(), omega_k1.y(), omega_k1.z());
             deltacur = delta_k1;
-            attcur.setValue(att_k1.x(), att_k1.y(), att_k1.z(), att_k1.w());
+            attcur = att_k1;
                 
         }
     }
@@ -397,7 +397,7 @@ private:
 
     void callback_attitude_overwrite(const geometry_msgs::msg::Quaternion::SharedPtr msg){
         //tf2::Quaternion attcur;
-        attcur.setValue(msg->x, msg->y, msg->z, msg->w);
+        attcur = Eigen::Quaterniond(msg->w, msg->x, msg->y, msg->z);
     }
 
     void callback_angvel_overwrite(const geometry_msgs::msg::Vector3::SharedPtr msg){
@@ -418,8 +418,12 @@ private:
     {
         //compute phi(roll) and theta(pitch) from attcur
         double roll, pitch, yaw;
-        tf2::Matrix3x3(attcur).getRPY(roll, pitch, yaw); // RPY = Roll, Pitch, Yaw
-    
+
+        Eigen::Vector3d angles = attcur.toRotationMatrix().eulerAngles(2,1,0);
+        roll = angles(2);
+        pitch = angles(1);
+        yaw = angles(0);
+
        // Mean motion calculated from gravitational parameter and orbit radius
         double n = std::sqrt(mu / std::pow(rOrbit, 3));
         double srol = std::sin(roll),  crol = std::cos(roll);
