@@ -6,11 +6,11 @@
 class ControlTorque : public rclcpp::Node {
 public:
     ControlTorque()
-        : Node("control_torque"), kp_(3.0), kd_(0.1) {
+        : Node("control_torque"), kp_(300000.0), kd_(100000) {
         
         // Declare parameters for PD gains
-        this->declare_parameter("kp", 3.0);
-        this->declare_parameter("kd", 0.1);
+        this->declare_parameter("kp", 300000.0);
+        this->declare_parameter("kd", 10000.0);
 
         // Subscribers
         pose_ref_sub_ = this->create_subscription<geometry_msgs::msg::Quaternion>(
@@ -64,10 +64,10 @@ private:
         // tf2::Quaternion q_ref_Body = q_LVLH_to_Body * q_ref_LVLH;
 
         // Compute quaternion error in body frame
-        Eigen::Quaterniond q_error = q_ref_LVLH * q_act_LVLH.conjugate();
+        Eigen::Quaterniond q_error = q_act_LVLH.conjugate() * q_ref_LVLH;
 
         if (q_error.w() < 0) {
-            q_error = -q_error;
+            q_error.coeffs() *= -1;
         }
 
         double theta = 2.0 * std::acos(q_error.w());

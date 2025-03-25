@@ -41,7 +41,7 @@ public:
         //omedotbcur.setValue(0.0,+0.0003 / 180.0 * M_PI,0.0);
         omedotbcur.setValue(0.0,+0.0000780,0.0);
         omedotbprv = omedotbcur;
-        attcur.setIdentity;;
+        attcur.setIdentity();
         publish_attitude(attcur);
         printq(attcur);
         
@@ -154,7 +154,7 @@ private:
         Eigen::Matrix<double,3,3> m = q.toRotationMatrix(); //r11,r21,r31 show where original x axis points
         double r11 = m(0,0), r12 = m(0,1), r13 = m(0,2);
         double r21 = m(1,0), r22 = m(1,1), r23 = m(1,2);
-        double r31 = m(2.0), r32 = m(2,1), r33 = m(2,2);
+        double r31 = m(2,0), r32 = m(2,1), r33 = m(2,2);
         RCLCPP_INFO(this->get_logger(),"  [%+.4f, %+.4f, %+.4f]",r11,r12,r13);
         RCLCPP_INFO(this->get_logger(),"  [%+.4f, %+.4f, %+.4f]",r21,r22,r23);
         RCLCPP_INFO(this->get_logger(),"  [%+.4f, %+.4f, %+.4f]",r31,r32,r33);
@@ -444,6 +444,7 @@ private:
     //receiving control torque input
     void callback_cmg_inp(const geometry_msgs::msg::Vector3::SharedPtr msg)
     {
+        // tau_ctlcur.setValue(100,-100,100); 
         tau_ctlcur.setValue(msg->x,msg->y,msg->z); 
         
     }
