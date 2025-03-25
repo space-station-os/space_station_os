@@ -6,11 +6,11 @@
 class ControlTorque : public rclcpp::Node {
 public:
     ControlTorque()
-        : Node("control_torque"), kp_(300000.0), kd_(100000) {
+        : Node("control_torque"), kp_(300000.0), kd_(300000) {
         
         // Declare parameters for PD gains
         this->declare_parameter("kp", 300000.0);
-        this->declare_parameter("kd", 10000.0);
+        this->declare_parameter("kd", 300000.0);
 
         // Subscribers
         pose_ref_sub_ = this->create_subscription<geometry_msgs::msg::Quaternion>(
