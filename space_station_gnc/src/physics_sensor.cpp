@@ -12,7 +12,7 @@ public:
         this->declare_parameter("imu_bias_x", 0.0);
         this->declare_parameter("imu_bias_y", 0.0);
         this->declare_parameter("imu_bias_z", 0.0);
-        this->declare_parameter("imu_noise_sigma", 0.01);
+        this->declare_parameter("imu_noise_sigma", 0.002);
         
         this->declare_parameter("startracker_bias_x", 0.0);
         this->declare_parameter("startracker_bias_y", 0.0);

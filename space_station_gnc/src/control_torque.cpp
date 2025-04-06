@@ -3,15 +3,16 @@
 #include <geometry_msgs/msg/vector3.hpp>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Vector3.h>
+#include <Eigen/Dense>
 
 class ControlTorque : public rclcpp::Node {
 public:
     ControlTorque()
-        : Node("control_torque"), kp_(1.0), kd_(0.1) {
+    : Node("control_torque"), kp_(300000.0), kd_(300000) {
         
         // Declare parameters for PD gains
-        this->declare_parameter("kp", 1.0);
-        this->declare_parameter("kd", 0.1);
+        this->declare_parameter("kp", 300000.0);
+        this->declare_parameter("kd", 300000.0);
 
         // Subscribers
         pose_ref_sub_ = this->create_subscription<geometry_msgs::msg::Quaternion>(
@@ -33,7 +34,7 @@ public:
     
           
         // Publisher
-        torque_pub_ = this->create_publisher<geometry_msgs::msg::Vector3>("/gnc/torque_cmd", 10);
+        torque_pub_ = this->create_publisher<geometry_msgs::msg::Vector3>("/gnc/cmg_torque_cmd", 10);
     }
 
 private:
@@ -55,27 +56,39 @@ private:
         kp_ = this->get_parameter("kp").as_double();
         kd_ = this->get_parameter("kd").as_double();
 
-        // Convert quaternions from LVLH to Body frame
-        tf2::Quaternion q_ref_LVLH(pose_ref_.x, pose_ref_.y, pose_ref_.z, pose_ref_.w);
-        tf2::Quaternion q_est_LVLH(pose_est_.x, pose_est_.y, pose_est_.z, pose_est_.w);
 
-        // Transform from LVLH to Body frame
-        tf2::Quaternion q_LVLH_to_Body = q_est_LVLH.inverse();
-        tf2::Quaternion q_ref_Body = q_LVLH_to_Body * q_ref_LVLH;
+        // Convert quaternions from LVLH to Body frame
+        Eigen::Quaterniond q_ref_LVLH = Eigen::Quaterniond::Identity();
+        Eigen::Quaterniond q_act_LVLH(pose_est_.w, pose_est_.x, pose_est_.y, pose_est_.z);
+        q_act_LVLH.normalize();
 
         // Compute quaternion error in body frame
-        tf2::Quaternion q_error = q_ref_Body * q_LVLH_to_Body.inverse();
-        tf2::Vector3 error_axis(q_error.x(), q_error.y(), q_error.z());
+        Eigen::Quaterniond q_error = q_act_LVLH.conjugate() * q_ref_LVLH;
 
+        if (q_error.w() < 0) {
+            q_error.coeffs() *= -1;
+        }
+
+        double theta = 2.0 * std::acos(q_error.w());
+        double sin_half_theta = std::sqrt(1- q_error.w() * q_error.w());
+
+        Eigen::Vector3d error_axis_norm;
+        if (sin_half_theta > 1e-6) {
+            error_axis_norm = q_error.vec() / sin_half_theta;
+
+        } else{
+            error_axis_norm = Eigen::Vector3d::Zero();
+        }
+        Eigen::Vector3d error_vector = theta * error_axis_norm;
         // Proportional control
-        tf2::Vector3 torque_p = kp_ * error_axis;
+        Eigen::Vector3d torque_p = kp_ * error_vector;
 
         // Derivative control using estimated angular velocity
-        tf2::Vector3 angvel(angvel_est_.x, angvel_est_.y, angvel_est_.z);
-        tf2::Vector3 torque_d = kd_ * (-angvel);
+        Eigen::Vector3d angvel(angvel_est_.x, angvel_est_.y, angvel_est_.z);
+        Eigen::Vector3d torque_d = kd_ * (-angvel);
 
         // Total torque command in body frame
-        tf2::Vector3 torque_cmd = torque_p + torque_d;
+        Eigen::Vector3d torque_cmd = torque_p + torque_d;
 
         // Publish torque command
         geometry_msgs::msg::Vector3 torque_msg;
@@ -83,6 +96,7 @@ private:
         torque_msg.y = torque_cmd.y();
         torque_msg.z = torque_cmd.z();
         torque_pub_->publish(torque_msg);
+
     }
 
     rclcpp::Subscription<geometry_msgs::msg::Quaternion>::SharedPtr pose_ref_sub_;
