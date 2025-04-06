@@ -15,7 +15,6 @@ public:
     TorqueCollectorNode() : Node("torque_collector_node")
     {
         //registor PropulsionDevice
-        //prop.push_back(PropulsionDevice("nauka_mainengine",3900,       -13,-1.5,-10,0,0,+1,1.0,"stuck-on"));
         prop.push_back(PropulsionDevice("nauka_mainengine",3900,       -13,-1.5,-10,0,0,+1));
         prop.push_back(PropulsionDevice("dragon_mainengine",8000,        2,0,13,    0,0,-1));
         prop.push_back(PropulsionDevice("progress_mainengine",2950,    -13,-1,10,   0,0,-1));
@@ -28,7 +27,7 @@ public:
         //prop.push_back(PropulsionDevice("nauka_thruster_zenith",800,       -13,-1.5,-10,0,0,+1,1.0,"stuck-on"));
         prop.push_back(PropulsionDevice("nauka_thruster_zenith",800,   -13,-1.5,-10,0,0,-1));
 
-        pub_torque_control = this->create_publisher<geometry_msgs::msg::Vector3>("gnc/torque_control", 1);
+        pub_torque_control = this->create_publisher<geometry_msgs::msg::Vector3>("gnc/thr_torque_cmd", 1);
 
         did_receive_thrust = false;
 

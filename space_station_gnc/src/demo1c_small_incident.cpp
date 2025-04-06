@@ -233,16 +233,13 @@ void user_input_thread(rclcpp::Node::SharedPtr node)
 
             geometry_msgs::msg::Vector3 angvel_init;
             angvel_init.x = 0.0;
-            //angvel_init.y = +0.22 / 180.0 * M_PI;
             angvel_init.y = -0.22 / 180.0 * M_PI;
             angvel_init.z = 0.0;
             pub_angvel_overwrite->publish(angvel_init);        
 
             geometry_msgs::msg::Quaternion attitude_init;
             tf2::Quaternion attinit; // pose
-            //attinit.setRPY(0.0,1.72/180.0*M_PI,0.0);
             attinit.setRPY(0.0,-1.72/180.0*M_PI,0.0);
-            //attinit.setRPY(0.0,11.97/180.0*M_PI,0.0);
             attitude_init.x = attinit.x();
             attitude_init.y = attinit.y();
             attitude_init.z = attinit.z();
@@ -252,13 +249,12 @@ void user_input_thread(rclcpp::Node::SharedPtr node)
             msg->data = "nauka_thruster_zenith,on";
             //is_propulsion_on[0] = true;
             is_propulsion_on[9] = true; //Nauka zenith thruster
-            //msg->data = "nauka_mainengine,on";
             pub_target_thrust->publish(*msg);
             mode_demo = "100_emergency_begin";
         }
         else if(mode_demo == "100_emergency_begin"){
             printf("`Commander, misinjection from the docked module is detected, \n over...`\n");            
-            printf("`Nauka main engine with 3800N is firing unexpectedly.\n It may last for about 15 minutes.\n over...`\n");            
+            printf("`Spaceship main engine with 800N is firing unexpectedly.\n It may last for about minutes.\n over...`\n");            
             tinit = get_time_double(node);
             msg->data = "100_emergency_begin";
             pub_control_media->publish(*msg);
@@ -272,7 +268,7 @@ void user_input_thread(rclcpp::Node::SharedPtr node)
                 printf("Emergency situation.\n");
                 printf("\n");
                 printf("Nauka is forced to be commanded to bring the body to nadir, causing pitching up.");
-                //printf("The main engine of Nauka is experiencing a stuck-on failure.");
+                printf("The thruster of Spaceship is experiencing a stuck-on failure.");
                 printf("Commander, this resulting acceleration and rotation has to be stopped.\n");
                 printf("\n");
                 printf("  Can we use the engines of the docked spacecraft to remedy the situation?\n");
@@ -287,25 +283,19 @@ void user_input_thread(rclcpp::Node::SharedPtr node)
         else if(mode_demo == "102_emergency_reaction" || mode_demo == "104_emergency_reaction2"){
             if(mode_demo == "102_emergency_reaction"){
                 printf(" Nauka thrusters have 800N of force to bring the body to nadir, causing pitching up.\n");                
-                //printf(" The Nauka main engine has 3900N to bring the body to zenith, causing pitching down.\n");                
                 printf(" - Which engine should we fire?\n");                
             }
             else if(mode_demo == "104_emergency_reaction2")
                 printf(" - Which engine should we fire or stop?\n");
             printf("    1: Crew-2 Dragon, 8000N (now ");
-            //printf(is_dragon_mainengine_on ? "on)\n" : "off)\n");
             printf(is_propulsion_on[1] ? "on)\n" : "off)\n");
             printf("    2: Progress MS-17, 2950N (now ");
-            //printf(is_progress_mainengine_on ? "on)\n" : "off)\n");
             printf(is_propulsion_on[2] ? "on)\n" : "off)\n");
             printf("    3: Progress MS-17 attitude control thruster to zenith, 130N x 2 (now ");
-            //printf(is_progress_thruster_zenith_on ? "on)\n" : "off)\n");
             printf(is_propulsion_on[3] ? "on)\n" : "off)\n");
             printf("    4: Progress MS-17 attitude control thruster to nadir, 130N x 2 (now ");
-            //printf(is_progress_thruster_nadir_on ? "on)\n" : "off)\n");
             printf(is_propulsion_on[4] ? "on)\n" : "off)\n");
             printf("    5: Soyuz MS18, 2950N (now ");
-            //printf(is_soyuz_mainengine_on ? "on)\n" : "off)\n");
             printf(is_propulsion_on[5] ? "on)\n" : "off)\n");
             printf("    6: Zvezda main engine, 3000N (now ");
             printf(is_propulsion_on[6] ? "on)\n" : "off)\n");
@@ -351,11 +341,10 @@ void user_input_thread(rclcpp::Node::SharedPtr node)
                 }
                 if(!is_something_on){
                     //if here, everyting is off
-                    printf("everything is off\n");
+                    printf("Every thruster is off\n");
                     if(-angvel_th <= angvel_body.x() && angvel_body.x() <= angvel_th)
                         if(-angvel_th <= angvel_body.y() && angvel_body.y() <= angvel_th)
                             if(-angvel_th <= angvel_body.z() && angvel_body.z() <= angvel_th){
-                                printf("Body has stopped! Well done!!!\n");
                                 mode_demo = "201_bring_back_orientation";
                             }
                 }
@@ -366,11 +355,9 @@ void user_input_thread(rclcpp::Node::SharedPtr node)
             auto messagedouble = std_msgs::msg::Float64();
             double t_fwd = 0.5 * 60.0 + 10.0 - (tcur - tinit);
             messagedouble.data = t_fwd; //
-            //printf("Forwarding: %f min", messagedouble.data / 60.0);
             pub_t_fwd_sim->publish(messagedouble);
             tinit = tinit - t_fwd;
             msg->data = "nauka_thruster_zenith,off";
-            //msg->data = "nauka_mainengine,off";
             pub_target_thrust->publish(*msg);
             is_propulsion_on[9] = false; //Nauka zenith thruster
 

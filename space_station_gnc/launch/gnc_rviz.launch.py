@@ -7,8 +7,8 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     package_share_directory = get_package_share_directory('space_station_gnc')
-    # urdf_file_path = os.path.join(package_share_directory, 'urdf', 'ISS_stationaryFromNasa.urdf')
-    urdf_file_path = os.path.join(package_share_directory, 'urdf', 'SD_SpaceStation_Ver05.urdf')
+    urdf_file_path = os.path.join(package_share_directory, 'urdf', 'ISS_stationaryFromNasa.urdf')
+    # urdf_file_path = os.path.join(package_share_directory, 'urdf', 'SD_SpaceStation_Ver05.urdf')
     rviz_config_path = os.path.join(package_share_directory, 'rviz', 'your_config_file.rviz')  # TODO
 
     with open(urdf_file_path, 'r') as urdf_file:

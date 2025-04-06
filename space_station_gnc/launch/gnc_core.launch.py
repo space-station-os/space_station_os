@@ -22,8 +22,10 @@ def launch_nodes(context, *args, **kwargs):
         ),
         Node(
             package='space_station_gnc',
-            executable='control_torque_act',
-            name='control_torque_act',
+            # executable='control_torque_act',
+            # name='control_torque_act',
+            executable='control_torque',
+            name='control_torque',
             output=output_for('quiet_control'),
             arguments=arguments_for('quiet_control')
         ),

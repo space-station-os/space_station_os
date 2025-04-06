@@ -75,7 +75,7 @@ public:
             std::bind(&AttitudeDynamicsNode::callback_angvel_overwrite, this, std::placeholders::_1));
 
         sub_torque_control = this->create_subscription<geometry_msgs::msg::Vector3>(
-            "gnc/torque_control", 1, 
+            "gnc/thr_torque_cmd", 1, 
             std::bind(&AttitudeDynamicsNode::callback_attitude_dynamics, this, std::placeholders::_1));
         
         sub_cmg_torque_control = this->create_subscription<geometry_msgs::msg::Vector3>(
@@ -129,8 +129,9 @@ private:
     Eigen::Vector4d deltacur; //rad, each CMG angle around torque axis
 
     
-    tf2::Vector3 tau_ctlcur; 
-    tf2::Vector3 tau_extcur; 
+    tf2::Vector3 tau_ctlcmgcur; 
+    tf2::Vector3 tau_ctlthrcur; 
+    tf2::Vector3 tau_extgracur; 
     tf2::Vector3 tau_allcur; 
 
 
@@ -322,7 +323,7 @@ private:
 
         for(int istep = 0; istep < Nstep; istep++){
             // for current 
-            Eigen::Vector3d tau_inp(tau_ctlcur.x(), tau_ctlcur.y(), tau_ctlcur.z());
+            Eigen::Vector3d tau_inp(tau_ctlcmgcur.x(), tau_ctlcmgcur.y(), tau_ctlcmgcur.z());
             Eigen::Vector3d omega_k1(omebcur.x(), omebcur.y(), omebcur.z());
             Eigen::Quaterniond att_k1 = attcur;
             Eigen::Vector4d delta_k1 = deltacur;
@@ -444,20 +445,19 @@ private:
     //receiving control torque input
     void callback_cmg_inp(const geometry_msgs::msg::Vector3::SharedPtr msg)
     {
-        // tau_ctlcur.setValue(100,-100,100); 
-        tau_ctlcur.setValue(msg->x,msg->y,msg->z); 
+        tau_ctlcmgcur.setValue(msg->x,msg->y,msg->z); 
         
     }
 
     void callback_attitude_dynamics(const geometry_msgs::msg::Vector3::SharedPtr msg)
     {
         should_pub_att = true;
-        // tau_ctlcur.setValue(msg->x,msg->y,msg->z); 
+        tau_ctlthrcur.setValue(msg->x,msg->y,msg->z); 
 
         //TODO: Currently we assume only gravity gradient torque 
-        tau_extcur = gravityGradT();
+        tau_extgracur = gravityGradT();
 
-        tau_allcur = tau_ctlcur + tau_extcur;
+        tau_allcur = tau_ctlcmgcur + tau_ctlthrcur + tau_extgracur;
 
         //compute attitude update
         forward_attitude_dynamics(Ttorque_); //Ttorque_ is simulation time period
