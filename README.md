@@ -15,14 +15,14 @@ Common procedures for preparing Space Station OS:
     cd /path/to/place_space_station_os/
     ```
 
-For ROS beginners: The directory structure typically looks like this:
+- For ROS beginners: The directory structure typically looks like this:
 
     ```sh
     mkdir -p ~/ros2_ws/src
     cd ~/ros2_ws/src
     ```
 
-Then clone:
+- Then clone:
 
     ```sh
     git clone https://github.com/space-station-os/space_station_os.git
@@ -37,7 +37,7 @@ Then clone:
     source install/setup.bash
     ```
 
-For ROS beginners: assuming the stracture above, you can compile the Space Station OS source:
+- For ROS beginners: assuming the stracture above, you can compile the Space Station OS source:
 
     ```sh
     cd ~/ros2_ws/
