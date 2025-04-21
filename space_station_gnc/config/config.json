@@ -1,0 +1,13 @@
+{
+    "H": 1000,
+    "beta_degrees": 54.73,
+    "function_names": {
+      "pseudo_inverse": "pseudoInvFunc",
+      "height_function": "hFunc"
+    },
+    "code_generation": {
+      "enable_cpp": true,
+      "output_file": "L_p_func.cpp"
+    }
+  }
+  
