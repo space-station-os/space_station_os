@@ -22,6 +22,8 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
 
 # Include directories
 include_directories(${OpenCV_INCLUDE_DIRS} ${SDL2_INCLUDE_DIRS})
@@ -82,6 +84,19 @@ if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
+endif()
+
+set(CONFIG_PATH "${CMAKE_CURRENT_SOURCE_DIR}/config/config.json")
+set(OUTPUT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
+execute_process(
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/jacob_cmgs_casadi.py ${CONFIG_PATH} ${OUTPUT_PATH}
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  RESULT_VARIABLE result
+)
+
+if(NOT result EQUAL 0)
+  message(FATAL_ERROR "Matrix Code generation failed")
 endif()
 
 
