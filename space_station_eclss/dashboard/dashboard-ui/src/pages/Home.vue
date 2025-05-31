@@ -11,37 +11,6 @@
       </p>
     </div>
 
-    <!-- Top Telemetry Summary -->
-    <div class="telemetry-section">
-      <h2 class="section-header">Live Telemetry</h2>
-      <div class="telemetry-grid">
-        <MetricBox
-          label="Carbon Dioxide (CO₂)"
-          :value="co2"
-          unit="g"
-          delta="+1.2%"
-          color="#ffd700"
-          @click="goTo('/ars')"
-        />
-        <MetricBox
-          label="Oxygen (O₂)"
-          :value="o2"
-          unit="%"
-          delta="-0.8%"
-          color="#00ffae"
-          @click="goTo('/ogs')"
-        />
-        <MetricBox
-          label="Water (H₂O)"
-          :value="h2o"
-          unit="mL"
-          delta="+2.5%"
-          color="#3399ff"
-          @click="goTo('/water')"
-        />
-      </div>
-    </div>
-
     <!-- NEW ECLSS Flow Diagram Section -->
     <div class="eclss-layout">
       <EclssLoop :co2="co2" :o2="o2" :h2o="h2o" />
@@ -51,7 +20,7 @@
 
 <script>
 // import NavBar from "../components/NavBar.vue";
-import MetricBox from "../components/MetricBox.vue";
+// import MetricBox from "../components/MetricBox.vue";
 import EclssLoop from "../components/EclssFlow.vue";
 
 /* global ROSLIB */
@@ -59,7 +28,7 @@ export default {
   name: "HomePage",
   components: {
     // NavBar,
-    MetricBox,
+    // MetricBox,
     EclssLoop,
   },
   data() {
@@ -143,25 +112,6 @@ export default {
   font-size: 1.2rem;
   color: #c0c0c0;
   margin-bottom: 30px;
-}
-
-.telemetry-section {
-  margin-top: 40px;
-  text-align: center;
-}
-
-.section-header {
-  font-size: 1.6rem;
-  font-weight: 600;
-  margin-bottom: 20px;
-}
-
-.telemetry-grid {
-  display: flex;
-  gap: 20px;
-  margin-top: 10px;
-  justify-content: center;
-  flex-wrap: wrap;
 }
 
 .eclss-layout {

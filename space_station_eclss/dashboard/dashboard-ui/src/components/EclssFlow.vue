@@ -1,50 +1,48 @@
 <template>
-  <div class="layout-4col">
-    <!-- Column 1: Human -->
-    <div class="col human">
+  <div class="eclss-grid">
+    <!-- Column 1: Crew -->
+    <div class="column crew">
       <CrewFigure :co2="co2" :o2="o2" :h2o="h2o" />
     </div>
 
-    <!-- Column 2: Tanks -->
-    <div class="col tanks">
-      <VerticalTank
-        label="CO₂"
+    <!-- Column 2: Flow Arrows Left Side -->
+    <div class="column arrows-left">
+      <div class="drawn-arrow large">→</div>
+      <div class="drawn-arrow large">→</div>
+      <div class="drawn-arrow large">→</div>
+    </div>
+
+    <!-- Column 3: Status Cards -->
+    <div class="column cards">
+      <StatusCard
+        title="CO₂ Separator"
         :value="co2"
-        max="1000"
         unit="ppm"
-        color="#ffd700"
+        @click="goTo('/ars')"
       />
-      <VerticalTank
-        label="O₂"
-        :value="o2"
-        max="1000"
-        unit="ppm"
-        color="#00ffae"
-      />
-      <VerticalTank
-        label="H₂O"
+      <StatusCard
+        title="Pure H₂O Recycler"
         :value="h2o"
-        max="20"
         unit="L"
-        color="#3399ff"
+        @click="goTo('/water')"
+      />
+      <StatusCard
+        title="O₂ Recovery"
+        :value="o2"
+        unit="ppm"
+        @click="goTo('/ogs')"
       />
     </div>
 
-    <!-- Column 3: Arrows -->
-    <div class="col arrows">
-      <div class="arrow-wrapper" style="margin-top: 40px">
-        <FlowArrow direction="→ CO₂" :active="true" />
-      </div>
-      <div class="arrow-wrapper" style="margin-top: 80px">
-        <FlowArrow direction="→ H₂" :active="true" />
-      </div>
-      <div class="arrow-wrapper" style="margin-top: 100px">
-        <FlowArrow direction="← H₂O" :active="true" />
-      </div>
+    <!-- Column 4: Right Side Arrows -->
+    <div class="column arrows-right">
+      <div class="drawn-arrow large">→</div>
+      <div class="drawn-arrow large">←</div>
+      <div class="drawn-arrow large">↗</div>
     </div>
 
-    <!-- Column 4: Sabatier -->
-    <div class="col sabatier">
+    <!-- Column 5: Sabatier -->
+    <div class="column sabatier">
       <SabatierReactor :co2="co2" :h2="h2" />
     </div>
   </div>
@@ -52,17 +50,15 @@
 
 <script>
 import CrewFigure from "./CrewFigure.vue";
-import VerticalTank from "./VerticalTank.vue";
 import SabatierReactor from "./SabatierReactor.vue";
-import FlowArrow from "./FlowArrow.vue";
+import StatusCard from "./StatusCard.vue";
 
 export default {
   name: "EclssLoop",
   components: {
     CrewFigure,
-    VerticalTank,
     SabatierReactor,
-    FlowArrow,
+    StatusCard,
   },
   data() {
     return {
@@ -105,55 +101,42 @@ export default {
       this.h2o = msg.water?.toFixed(2) || 0;
     });
   },
+  methods: {
+    goTo(path) {
+      this.$router.push(path);
+    },
+  },
 };
 </script>
 
 <style scoped>
-.layout-4col {
+.eclss-grid {
   display: grid;
-  grid-template-columns: auto auto auto auto;
-  justify-content: center;
+  grid-template-columns: auto 60px 240px 60px 320px;
+  gap: 20px;
+  justify-items: center;
   align-items: center;
-  gap: 60px;
   padding: 60px 40px;
   font-family: "Orbitron", sans-serif;
 }
 
-.arrow-wrapper {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-}
-
-.col {
+.column {
   display: flex;
   flex-direction: column;
   align-items: center;
-}
-
-.label {
-  margin-top: 16px;
-  font-size: 1.2rem;
-  color: #90e4ff;
-}
-
-.tanks {
   gap: 30px;
 }
 
-.arrows {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 24px;
-  margin-top: 40px;
-  font-size: 1.3rem;
-  font-weight: 600;
-  height: 340px;
-  color: #00ffe0;
+.drawn-arrow {
+  font-size: 2.4rem;
+  color: #ffffff;
+  line-height: 2.5rem;
+  font-weight: bold;
 }
 
-.sabatier {
-  margin-top: 0px;
+.drawn-arrow.large {
+  font-size: 3.6rem;
+  line-height: 3.6rem;
+  font-weight: bold;
 }
 </style>
