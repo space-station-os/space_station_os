@@ -68,7 +68,7 @@ export default {
     const electrolysisSub = new ROSLIB.Topic({
       ros: this.ros,
       name: "/electrolysis_output",
-      messageType: "demo_nova_sanctum/msg/Electrolysis",
+      messageType: "space_station_eclss/msg/Electrolysis",
     });
 
     electrolysisSub.subscribe((msg) => {

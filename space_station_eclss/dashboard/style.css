@@ -44,3 +44,24 @@ h1 {
   color: #e2e8f0;
   pointer-events: none;
 }
+.title-block {
+  text-align: center;
+  margin-top: 40px;
+  margin-bottom: 20px;
+}
+
+.main-title {
+  font-size: 2rem;
+  font-weight: 600;
+  color: #ffffff;
+  font-family: 'Orbitron', sans-serif;
+}
+
+.metric-box {
+  background-color: #0d1117;
+  border: 1px solid #2a2e35;
+  border-radius: 8px;
+  padding: 20px;
+  color: white;
+  font-family: 'Orbitron', sans-serif;
+}

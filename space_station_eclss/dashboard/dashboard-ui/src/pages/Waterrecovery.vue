@@ -127,7 +127,7 @@ export default {
       const topic = new ROSLIB.Topic({
         ros: this.ros,
         name,
-        messageType: "demo_nova_sanctum/msg/WaterCrew",
+        messageType: "space_station_eclss/msg/WaterCrew",
       });
       topic.subscribe(callback);
     };
