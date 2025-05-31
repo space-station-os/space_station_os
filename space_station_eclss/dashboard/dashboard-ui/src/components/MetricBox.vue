@@ -47,14 +47,15 @@ export default {
 
 <style scoped>
 .metric-box {
-  background-color: #161b22; /* Neutral GitHub dark */
+  border: 1px solid #2a2e35;
+  background-color: #0d1117;
+  font-family: "Orbitron", sans-serif;
   border-radius: 10px;
   padding: 20px;
   width: 200px;
   color: white;
   cursor: pointer;
   user-select: none;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
   text-align: center;
   transition: transform 0.2s ease;
 }

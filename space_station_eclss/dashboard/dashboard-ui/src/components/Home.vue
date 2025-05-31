@@ -1,7 +1,6 @@
 <template>
   <div class="home-wrapper">
-    <!-- Navigation -->
-    <!-- <NavBar /> -->
+    <NavBar />
 
     <div class="hero-section">
       <img src="/assets/mars.webp" alt="Earth from Space" class="hero-image" />
@@ -9,9 +8,19 @@
       <p class="subtitle">
         Monitor and control the systems that sustain life on the space station.
       </p>
+
+      <select
+        class="system-dropdown"
+        v-model="selectedSystem"
+        @change="goToSystem"
+      >
+        <option disabled value="">🌐 Select a System</option>
+        <option value="ars">🌀 Air Revitalization</option>
+        <option value="water">💧 Water Recovery</option>
+        <option value="ogs">🧪 Oxygen Generation</option>
+      </select>
     </div>
 
-    <!-- Top Telemetry Summary -->
     <div class="telemetry-section">
       <h2 class="section-header">Live Telemetry</h2>
       <div class="telemetry-grid">
@@ -41,27 +50,17 @@
         />
       </div>
     </div>
-
-    <!-- NEW ECLSS Flow Diagram Section -->
-    <div class="eclss-layout">
-      <EclssLoop :co2="co2" :o2="o2" :h2o="h2o" />
-    </div>
   </div>
 </template>
 
 <script>
-// import NavBar from "../components/NavBar.vue";
+import NavBar from "../components/NavBar.vue";
 import MetricBox from "../components/MetricBox.vue";
-import EclssLoop from "../components/EclssFlow.vue";
 
 /* global ROSLIB */
 export default {
   name: "HomePage",
-  components: {
-    // NavBar,
-    MetricBox,
-    EclssLoop,
-  },
+  components: { NavBar, MetricBox },
   data() {
     return {
       selectedSystem: "",
@@ -74,17 +73,17 @@ export default {
   mounted() {
     this.ros = new ROSLIB.Ros({ url: "ws://localhost:9090" });
 
-    // CO₂ from Air Collector
+    // CO2 from Air Collector
     const co2Sub = new ROSLIB.Topic({
       ros: this.ros,
       name: "/collector_air_quality",
       messageType: "space_station_eclss/msg/AirData",
     });
     co2Sub.subscribe((msg) => {
-      this.co2 = msg.co2_mass?.toFixed(2) || 0;
+      this.co2 = msg.co2_mass.toFixed(2);
     });
 
-    // O₂ from Electrolysis
+    // O2 from Electrolysis
     const o2Sub = new ROSLIB.Topic({
       ros: this.ros,
       name: "/electrolysis_output",
@@ -94,17 +93,22 @@ export default {
       this.o2 = (msg.o2 || 0).toFixed(2);
     });
 
-    // H₂O from Water Tank
+    // H2O from Water Tank
     const waterSub = new ROSLIB.Topic({
       ros: this.ros,
       name: "/wpa/tank_status",
       messageType: "space_station_eclss/msg/WaterCrew",
     });
     waterSub.subscribe((msg) => {
-      this.h2o = msg.water?.toFixed(2) || 0;
+      this.h2o = msg.water.toFixed(2);
     });
   },
   methods: {
+    goToSystem() {
+      if (this.selectedSystem) {
+        this.$router.push(`/${this.selectedSystem}`);
+      }
+    },
     goTo(path) {
       this.$router.push(path);
     },
@@ -117,7 +121,7 @@ export default {
   background-color: #0d1117;
   color: white;
   min-height: 100vh;
-  padding: 40px 80px 80px;
+  padding: 40px 80px;
 }
 
 .hero-section {
@@ -145,8 +149,26 @@ export default {
   margin-bottom: 30px;
 }
 
+.system-dropdown {
+  padding: 12px 18px;
+  font-size: 1rem;
+  border-radius: 8px;
+  background-color: #161b22;
+  color: white;
+  border: 1px solid #30363d;
+  outline: none;
+  width: 260px;
+  text-align: center;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+}
+.system-dropdown:hover {
+  background-color: #1d242e;
+}
+
 .telemetry-section {
-  margin-top: 40px;
+  margin-top: 60px;
   text-align: center;
 }
 
@@ -162,11 +184,5 @@ export default {
   margin-top: 10px;
   justify-content: center;
   flex-wrap: wrap;
-}
-
-.eclss-layout {
-  margin-top: 80px;
-  display: flex;
-  justify-content: center;
 }
 </style>

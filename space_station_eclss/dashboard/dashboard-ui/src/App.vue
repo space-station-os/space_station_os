@@ -1,17 +1,5 @@
 <template>
   <div id="app">
-    <!-- Navigation Bar -->
-    <div class="top-bar">
-      <img class="mission-icon" src="/assets/mission_patch.png" alt="Patch" />
-
-      <!-- STL Live Status Badge -->
-      <div class="status-badge">
-        <span :class="'status-dot ' + statusColor"></span>
-        <span class="status-label">{{ stlSummary }}</span>
-      </div>
-    </div>
-
-    <!-- Routed View -->
     <router-view />
   </div>
 </template>
@@ -102,56 +90,10 @@ export default {
 
 <style scoped>
 #app {
-  font-family: "Inter", sans-serif;
+  font-family: "Orbitron", sans-serif;
   min-height: 100vh;
-  background-color: #0d1117;
+  background-color: #000000;
+  color: #ffffff;
   overflow-x: hidden;
-}
-
-/* Top bar layout */
-.top-bar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  background: rgba(15, 20, 30, 0.9);
-  padding: 10px 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  backdrop-filter: blur(4px);
-  z-index: 1000;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
-}
-
-.mission-icon {
-  width: 38px;
-  height: 38px;
-}
-
-.status-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.85rem;
-  color: #ccc;
-}
-
-.status-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-.status-dot.green {
-  background-color: #00ff6a;
-}
-.status-dot.yellow {
-  background-color: #ffcc00;
-}
-.status-dot.red {
-  background-color: #ff3b30;
-}
-.status-dot.gray {
-  background-color: #888;
 }
 </style>

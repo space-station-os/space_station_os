@@ -19,7 +19,7 @@ def generate_launch_description():
 
     wrs_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(get_package_share_directory('space_station_eclss'), 'launch', 'wrs_systems.launch.py')
+            os.path.join(get_package_share_directory('space_station_eclss'), 'launch', 'wrs_systems_v2.launch.py')
         )
     )
 

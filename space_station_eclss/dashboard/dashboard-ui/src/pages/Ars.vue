@@ -109,7 +109,7 @@ export default {
       const sub = new ROSLIB.Topic({
         ros: this.ros,
         name: topic,
-        messageType: "demo_nova_sanctum/msg/AirData",
+        messageType: "space_station_eclss/msg/AirData",
       });
       sub.subscribe(cb);
     };
