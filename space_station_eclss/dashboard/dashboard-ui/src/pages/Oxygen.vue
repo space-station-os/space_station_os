@@ -4,7 +4,7 @@
 
     <StatusHUD
       :status="systemStatus"
-      :mode="'Electrolysis Only'"
+      :mode="'Electrolysis + Gas Separation'"
       :temperature="temperature"
       :pressure="pressure"
       :stlStatus="stlStatus"
@@ -17,8 +17,14 @@
 
       <Pipe />
 
-      <TankCard title="Oxygen Outlet">
+      <TankCard title="Oxygen Storage Tank">
         <Tank type="ogs" :oxygen="o2" :hydrogen="0" :capacity="100" />
+      </TankCard>
+
+      <Pipe />
+
+      <TankCard title="Hydrogen Storage Tank">
+        <Tank type="ogs" :oxygen="0" :hydrogen="h2" :capacity="100" />
       </TankCard>
     </div>
   </div>
@@ -46,6 +52,7 @@ export default {
       stlStatus: {
         ELECTROLYSIS: "PASS",
         OXYGEN_OUTPUT: "PASS",
+        HYDROGEN_STORAGE: "PASS",
       },
     };
   },

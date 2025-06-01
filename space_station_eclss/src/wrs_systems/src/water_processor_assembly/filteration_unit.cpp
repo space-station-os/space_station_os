@@ -9,7 +9,7 @@ WaterProcessorAssembly::WaterProcessorAssembly() : Node("wpa_service_server") {
     waste_status_publisher_ = this->create_publisher<space_station_eclss::msg::WaterCrew>("/wpa/filteration_status", 10);
     next_stage_client_ = this->create_client<space_station_eclss::srv::Filteration>("/wpa/filtered_water");
 
-    RCLCPP_INFO(this->get_logger(), "Water Processor Assembly Server Ready...");
+    RCLCPP_INFO(this->get_logger(), "[INIT] Water Processor Assembly Server Ready.");
 }
 
 void WaterProcessorAssembly::publish_status(double water, double contaminants, double organics, double ammonia) {
@@ -33,53 +33,50 @@ void WaterProcessorAssembly::handle_water_processing(
     if (urine_volume <= 0) {
         response->message = "Invalid water volume!";
         response->success = false;
-        RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+        RCLCPP_ERROR(this->get_logger(), "[ERROR] %s", response->message.c_str());
         return;
     }
 
-    double initial_organics = 30.0;
-    double initial_ammonia = 50.0;
+    RCLCPP_INFO(this->get_logger(), "[RECEIVED] %.2f L urine water | Contaminants: %.2f%%", urine_volume, contaminants);
 
-    RCLCPP_INFO(this->get_logger(), "Received %.2f liters of urine water with %.2f%% contaminants.", urine_volume, contaminants);
-    RCLCPP_INFO(this->get_logger(), "Initial Organic Load: %.2f%% | Initial Ammonia Load: %.2f%%", initial_organics, initial_ammonia);
+    double organics = 30.0;
+    double ammonia = 50.0;
 
-    double contaminants_after_efa = contaminants * 0.75;
-    initial_organics *= 0.75;
-    initial_ammonia *= 0.85;
+    // Stage 1: External Filter Assembly
+    contaminants *= 0.75;
+    organics *= 0.75;
+    ammonia *= 0.85;
 
-    RCLCPP_INFO(this->get_logger(), "EFA Filter: Removed 25%% contaminants. Remaining: %.2f%%", contaminants_after_efa);
-    RCLCPP_INFO(this->get_logger(), "EFA Filter: Organics Remaining: %.2f%% | Ammonia Remaining: %.2f%%", initial_organics, initial_ammonia);
+    // Stage 2: Particulate Filter
+    contaminants *= 0.40;
+    organics *= 0.60;
+    ammonia *= 0.75;
 
-    double contaminants_after_particulate = contaminants_after_efa * 0.40;
-    initial_organics *= 0.60;
-    initial_ammonia *= 0.75;
+    RCLCPP_INFO(this->get_logger(), "[FILTERED] Contaminants: %.2f%% | Organics: %.2f%% | Ammonia: %.2f%%",
+                contaminants, organics, ammonia);
 
-    RCLCPP_INFO(this->get_logger(), "Particulate Filter: Removed 60%% contaminants. Remaining: %.2f%%", contaminants_after_particulate);
-    RCLCPP_INFO(this->get_logger(), "Particulate Filter: Organics Remaining: %.2f%% | Ammonia Remaining: %.2f%%", initial_organics, initial_ammonia);
-
-    
-    publish_status(urine_volume, contaminants_after_particulate, initial_organics, initial_ammonia);
+    publish_status(urine_volume, contaminants, organics, ammonia);
 
     response->success = true;
-    response->message = "Received distilled water. Onto next stage of filtration...";
+    response->message = "Filtered successfully. Passing to next stage.";
 
-    send_to_next_stage(urine_volume, contaminants_after_particulate, initial_organics, initial_ammonia);
+    send_to_next_stage(urine_volume, contaminants, organics, ammonia);
 }
 
-void WaterProcessorAssembly::send_to_next_stage(double filtered_water, double remaining_contaminants, double organics, double ammonia) {
+void WaterProcessorAssembly::send_to_next_stage(double filtered_water, double contaminants, double organics, double ammonia) {
     if (!next_stage_client_->wait_for_service(std::chrono::seconds(5))) {
-        RCLCPP_FATAL(this->get_logger(), "Next stage filtration service unavailable! Retaining processed water.");
+        RCLCPP_FATAL(this->get_logger(), "[FAIL] Next filtration stage unavailable. Holding water.");
         return;
     }
 
     auto request = std::make_shared<space_station_eclss::srv::Filteration::Request>();
     request->filtered_water = filtered_water;
-    request->contaminants = remaining_contaminants;
+    request->contaminants = contaminants;
     request->organics = organics;
     request->ammonia = ammonia;
 
-    RCLCPP_INFO(this->get_logger(), "Sending %.2f L filtered water with %.2f%% contaminants, %.2f%% organics, %.2f%% ammonia to next stage...",
-                filtered_water, remaining_contaminants, organics, ammonia);
+    RCLCPP_INFO(this->get_logger(), "[SEND] %.2f L → Next Stage | Contaminants: %.2f%% | Organics: %.2f%% | Ammonia: %.2f%%",
+                filtered_water, contaminants, organics, ammonia);
 
     auto future_result = next_stage_client_->async_send_request(request,
         std::bind(&WaterProcessorAssembly::handle_next_stage_response, this, std::placeholders::_1));
@@ -89,12 +86,12 @@ void WaterProcessorAssembly::handle_next_stage_response(rclcpp::Client<space_sta
     try {
         auto response = future.get();
         if (response->success) {
-            RCLCPP_INFO(this->get_logger(), "Next Stage Filtration successfully completed: %s", response->message.c_str());
+            RCLCPP_INFO(this->get_logger(), "[SUCCESS] Next Stage: %s", response->message.c_str());
         } else {
-            RCLCPP_WARN(this->get_logger(), "Next Stage Filtration failed: %s", response->message.c_str());
+            RCLCPP_WARN(this->get_logger(), "[REJECTED] Next Stage: %s", response->message.c_str());
         }
     } catch (const std::exception &e) {
-        RCLCPP_ERROR(this->get_logger(), "Exception while calling Next Stage Filtration service: %s", e.what());
+        RCLCPP_ERROR(this->get_logger(), "[EXCEPTION] Next Stage call: %s", e.what());
     }
 }
 
