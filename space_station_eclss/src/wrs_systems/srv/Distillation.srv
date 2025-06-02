@@ -1,0 +1,7 @@
+# Request
+float64 urine
+float64 contaminants
+---
+# Response
+bool success
+string message
