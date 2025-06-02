@@ -23,6 +23,36 @@ class AttitudeDynamicsNode : public rclcpp::Node
 public:
     AttitudeDynamicsNode() : Node("attitude_dynamics_node")
     {
+        // dynamics parameters
+        this->declare_parameter<double>("dynamics.J.xx", 280e6);
+        this->declare_parameter<double>("dynamics.J.yy", 140e6);
+        this->declare_parameter<double>("dynamics.J.zz", 420e6);
+        this->declare_parameter<double>("dynamics.mu", 3.986e14);
+        this->declare_parameter<double>("dynamics.r_orbit", 7e6);
+        
+        // timing parameters
+        this->declare_parameter<double>("timing.torque_dt", 0.1);
+        this->declare_parameter<double>("timing.pub_dt", 0.1);
+        this->declare_parameter<int>   ("timing.publish_every", 10);
+        
+        // initial state parameters
+        this->declare_parameter<std::vector<double>>("initial.attitude", {0,0,0,1});
+        this->declare_parameter<std::vector<double>>("initial.angvel", {0,0,0});
+        this->declare_parameter<std::vector<double>>("initial.angacc", {0,0,0});
+
+        Ttorque_ = this->get_parameter("timing.torque_dt").as_double();
+        Tpubatt_ = this->get_parameter("timing.pub_dt").as_double();
+        N2disp   = this->get_parameter("timing.publish_every").as_int();
+
+        auto att0 = this->get_parameter("initial.attitude").as_double_array();
+        attcur = Eigen::Quaterniond(att0[3], att0[0], att0[1], att0[2]);
+        
+        auto ang0 = this->get_parameter("initial.angvel").as_double_array();
+        omebcur.setValue(ang0[0], ang0[1], ang0[2]);
+        
+        auto acc0 = this->get_parameter("initial.angacc").as_double_array();
+        omedotbcur.setValue(acc0[0], acc0[1], acc0[2]);
+
         pub_attitude_LVLH = this->create_publisher<geometry_msgs::msg::Quaternion>("gnc/attitude_LVLH", 10);
         pub_angvel_body = this->create_publisher<geometry_msgs::msg::Vector3>("gnc/angvel_body", 10);
         pub_cmg_del = this->create_publisher<std_msgs::msg::Float64MultiArray>("gnc/cmg_del", 1);
@@ -34,14 +64,11 @@ public:
         i2disp = 0; //publish rate: Npublish * Ttorque
         should_pub_att = false;
 
-        omebcur.setValue(0.0,0.0,0.0);
         //omebcur.setValue(0.0,+0.22 / 180.0 * M_PI,0.0);
         omebprv = omebcur;
-        omedotbcur.setValue(0.0,0.0,0.0);
         //omedotbcur.setValue(0.0,+0.0003 / 180.0 * M_PI,0.0);
         omedotbcur.setValue(0.0,+0.0000780,0.0);
         omedotbprv = omedotbcur;
-        attcur.setIdentity();
         publish_attitude(attcur);
         printq(attcur);
         
@@ -50,15 +77,15 @@ public:
         attprv = attcur;
         
         //TODO: handled by parameter surver?
-        double J11 =  280.0 * 1000.0 * 1000.0;
-        double J22 =  140.0 * 1000.0 * 1000.0;
-        double J33 =  420.0 * 1000.0 * 1000.0;
+        double J11 = this->get_parameter("dynamics.J.xx").as_double();
+        double J22 = this->get_parameter("dynamics.J.yy").as_double();
+        double J33 = this->get_parameter("dynamics.J.zz").as_double();
         J123 << J11, 0.0, 0.0,
                 0.0, J22, 0.0,
                 0.0, 0.0, J33;
         J123inv = J123.inverse();
-        mu = 3.986004418e14;
-        rOrbit = 7.0e6;
+        mu = this->get_parameter("dynamics.mu").as_double();
+        rOrbit = this->get_parameter("dynamics.r_orbit").as_double();
 
         deltacur << 0.0, 0.0, 0.0, 0.0;
 
@@ -138,12 +165,12 @@ private:
 
     //define parameters for simulation
     double Tstep_rk; // in seconds
-    const double Ttorque_ = 0.1; //same as T_callback
+    double Ttorque_; //same as T_callback
     //int Nstep; // number of steps for simulation, Ttorque_/Tstep_
 
-    const int N2disp = 10; // publish rate: Npublish * Ttorque
+    int N2disp; // publish rate: Npublish * Ttorque
     int i2disp; // index for i2disp
-    const double Tpubatt_ = 0.1; 
+    double Tpubatt_; 
 
     bool should_pub_att; // true then publish attitude for display purpose
 
