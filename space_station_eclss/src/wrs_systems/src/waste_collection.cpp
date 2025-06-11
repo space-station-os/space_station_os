@@ -29,14 +29,13 @@ WHCWasteTank::WHCWasteTank()
         std::chrono::seconds(1),
         std::bind(&WHCWasteTank::publish_status, this));
 
-        
     waste_status_pub_ = this->create_publisher<space_station_eclss::msg::WaterCrew>("/whc/collector_status", 10);
 
-    sabatier_water_sub_ = this->create_subscription<std_msgs::msg::Float64>(
-        "/sabatier_output_water", 10,
-        std::bind(&WHCWasteTank::receive_sabatier_water, this, std::placeholders::_1));
+    grey_water_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+        "/grey_water", 10,
+        std::bind(&WHCWasteTank::receive_grey_water, this, std::placeholders::_1));
 
-    RCLCPP_INFO(this->get_logger(), "WHC Waste Tank Node Initialized");
+    RCLCPP_INFO(this->get_logger(), "[INIT] WHC Waste Tank Node Initialized");
 }
 
 void WHCWasteTank::publish_status() {
@@ -49,49 +48,48 @@ void WHCWasteTank::publish_status() {
     msg.temperature = 22.5;        
     waste_status_pub_->publish(msg);
 }
+
 void WHCWasteTank::simulate_urine_collection() {
     if (!upa_available_) {
-        RCLCPP_WARN(this->get_logger(), "[WHC] Urine collection paused! UPA is unavailable.");
+        RCLCPP_WARN(this->get_logger(), "[BLOCKED] UPA unavailable. Holding urine.");
         return;
     }
 
     double new_waste = urine_volume_ + pretreatment_volume_ + flush_volume_;
     total_water_volume_ += new_waste;
 
-    RCLCPP_INFO(this->get_logger(), "[WHC] Urination cycle complete. New waste: %.2f liters. Total waste collected: %.2f liters",
-                new_waste, total_water_volume_);
-
     if (total_water_volume_ >= processing_threshold_) {
+        RCLCPP_INFO(this->get_logger(), "[THRESHOLD] Total waste reached %.2f L. Sending to UPA.", total_water_volume_);
         process_waste_transfer();
     }
 }
 
-void WHCWasteTank::receive_sabatier_water(const std_msgs::msg::Float64::SharedPtr msg) {
+void WHCWasteTank::receive_grey_water(const std_msgs::msg::Float64::SharedPtr msg) {
     total_water_volume_ += msg->data;
-    RCLCPP_INFO(this->get_logger(), "[WHC] Received %.2f L from Sabatier reactor. New total: %.2f L",
-                msg->data, total_water_volume_);
+    RCLCPP_INFO(this->get_logger(), "[INPUT] +%.2f L from Grey Water Tank → Total: %.2f L", msg->data, total_water_volume_);
 
     if (total_water_volume_ >= processing_threshold_) {
+        RCLCPP_INFO(this->get_logger(), "[THRESHOLD] Total waste reached %.2f L. Sending to UPA.", total_water_volume_);
         process_waste_transfer();
     }
 }
 
 void WHCWasteTank::process_waste_transfer() {
     if (!upa_client_->wait_for_service(std::chrono::seconds(5))) {
-        RCLCPP_FATAL(this->get_logger(), "UPA service unavailable! Cannot process waste. Retrying in 5 seconds...");
+        RCLCPP_FATAL(this->get_logger(), "[FAIL] UPA service not reachable. Will retry...");
         upa_available_ = false;
         return;
     }
 
     if (!upa_available_) {
-        RCLCPP_INFO(this->get_logger(), "UPA service restored! Resuming urine collection...");
+        RCLCPP_INFO(this->get_logger(), "[RECOVERY] UPA service back online. Resuming urine transfer.");
         upa_available_ = true;
     }
 
     auto request = std::make_shared<space_station_eclss::srv::Upa::Request>();
     request->urine = total_water_volume_;
 
-    RCLCPP_INFO(this->get_logger(), "Sending %.2f liters of waste to UPA...", total_water_volume_);
+    RCLCPP_INFO(this->get_logger(), "[SEND] Dispatching %.2f L of waste to UPA...", total_water_volume_);
 
     auto future_result = upa_client_->async_send_request(
         request, std::bind(&WHCWasteTank::process_urine_response, this, std::placeholders::_1));
@@ -101,19 +99,19 @@ void WHCWasteTank::process_urine_response(rclcpp::Client<space_station_eclss::sr
     try {
         auto response = future.get();
         if (response->success) {
-            RCLCPP_INFO(this->get_logger(), "UPA processed urine successfully: %s", response->message.c_str());
+            RCLCPP_INFO(this->get_logger(), "[UPA] Success: %s", response->message.c_str());
             total_water_volume_ = 0.0;
         } else {
-            RCLCPP_WARN(this->get_logger(), "UPA failed to process waste: %s. Retrying in 5 seconds...", response->message.c_str());
+            RCLCPP_WARN(this->get_logger(), "[UPA] Failed: %s. Will retry...", response->message.c_str());
         }
     } catch (const std::exception &e) {
-        RCLCPP_ERROR(this->get_logger(), "Exception while calling UPA service: %s", e.what());
+        RCLCPP_ERROR(this->get_logger(), "[ERROR] Exception during UPA call: %s", e.what());
     }
 }
 
 void WHCWasteTank::retry_process_waste_transfer() {
     if (total_water_volume_ >= processing_threshold_) {
-        RCLCPP_INFO(this->get_logger(), "Retrying waste transfer to UPA...");
+        RCLCPP_WARN(this->get_logger(), "[RETRY] Attempting waste resend to UPA...");
         process_waste_transfer();
     }
 }

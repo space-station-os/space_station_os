@@ -10,18 +10,39 @@ class ISSParameterSimulator(Node):
     def __init__(self):
         super().__init__('iss_parameter_simulator')
         self.get_logger().info("🚀 ISS Parameter Simulator Initialized (System-wide Parameters)")
+
         self.target_nodes = [
+            # ARS subsystem
             'adsorbent_bed_1',
             'adsorbent_bed_2',
-            'air_collector',
             'desiccant_bed_1',
-            'desiccant_bed_2'
+            'desiccant_bed_2',
+            'air_collector',
+
+            # WRS subsystem
+            'whc_controller',
+            'whc_waste_tank',
+            'upa_service_server',
+            'wpa_service_server',
+            'wpa_multi_filtration_server',
+            'wpa_catalytic_reactor_server',
+            'wpa_product_water_tank_server',
+            'ionization_bed',
+            'electrolysis_node',
+            'water_service'
         ]
 
+        self.failed_nodes = set()
+
     def set_parameter_on_node(self, node_name, param_name, param_value, param_type):
+        # Simulate failure for select nodes
+        if node_name in self.failed_nodes:
+            self.get_logger().warn(f"[FAILURE SIM] Skipping {node_name} (simulated failure).")
+            return
+
         client = self.create_client(SetParameters, f'/{node_name}/set_parameters')
         if not client.wait_for_service(timeout_sec=2.0):
-            self.get_logger().warn(f"❌ {node_name} service unavailable.")
+            self.get_logger().warn(f"[TIMEOUT] {node_name} service unavailable.")
             return
 
         request = SetParameters.Request()
@@ -61,6 +82,9 @@ class ISSParameterSimulator(Node):
                 "desired_temperature": (440.0, ParameterType.PARAMETER_DOUBLE),
                 "co2_desorption_rate_constant": (0.06, ParameterType.PARAMETER_DOUBLE),
             }
+
+            # Clear failure set during day cycle
+            self.failed_nodes.clear()
             self.update_all(day_params)
             time.sleep(15)
 
@@ -78,6 +102,15 @@ class ISSParameterSimulator(Node):
                 "desired_temperature": (410.0, ParameterType.PARAMETER_DOUBLE),
                 "co2_desorption_rate_constant": (0.045, ParameterType.PARAMETER_DOUBLE),
             }
+
+            # Simulate node failures during Night 3
+            if cycle == 2:
+                self.get_logger().warn("[SIMULATION] Injecting failure into UPA and WPA...")
+                self.failed_nodes = {
+                    'upa_service_server',
+                    'wpa_service_server'
+                }
+
             self.update_all(night_params)
             time.sleep(15)
 

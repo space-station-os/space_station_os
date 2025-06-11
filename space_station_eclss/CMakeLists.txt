@@ -19,7 +19,7 @@ find_package(visualization_msgs REQUIRED)
 # find_package(<dependency> REQUIRED)
 
 set(msg_files
-  
+
   "src/ars_systems/msg/AirData.msg"
   "src/ars_systems/srv/CrewQuarters.srv"
 
@@ -146,6 +146,7 @@ rosidl_target_interfaces(safety ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 
 install(TARGETS
+ 
   collector
   desiccant1
   desiccant2

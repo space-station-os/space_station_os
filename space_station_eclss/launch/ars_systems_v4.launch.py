@@ -53,6 +53,14 @@ def generate_launch_description():
             emulate_tty=True
         ),
 
+        Node(
+            package='space_station_eclss',
+            executable='safety',
+            name='stl_monitor',
+            output='screen',
+            parameters=[params_file],
+            emulate_tty=True
+        ),
        
         # Node(
         #     package='rosbridge_server',

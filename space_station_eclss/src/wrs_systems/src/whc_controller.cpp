@@ -21,7 +21,7 @@ WasteHygieneCompartment::WasteHygieneCompartment()
     water_volume_publisher_ = this->create_publisher<std_msgs::msg::Float64>("/whc/water_volume", 10);
     waste_status_publisher_ = this->create_publisher<space_station_eclss::msg::WaterCrew>("/whc_controller_water", 10);
 
-    RCLCPP_INFO(this->get_logger(), "Waste Hygiene Compartment Node Initialized");
+    RCLCPP_INFO(this->get_logger(), "[INIT] WHC Controller Node Initialized");
 }
 
 void WasteHygieneCompartment::urine_callback(const sensor_msgs::msg::Range::SharedPtr msg) {
@@ -32,9 +32,10 @@ void WasteHygieneCompartment::urine_callback(const sensor_msgs::msg::Range::Shar
             urination_detected = true;
             last_urine_time = this->now();
 
-            // Start one-shot timer for 2 seconds
             timer_ = this->create_wall_timer(
                 2s, std::bind(&WasteHygieneCompartment::complete_urination_cycle, this));
+            
+            RCLCPP_INFO(this->get_logger(), "[DETECTED] Urination started.");
         }
         return;
     }
@@ -45,13 +46,13 @@ void WasteHygieneCompartment::urine_callback(const sensor_msgs::msg::Range::Shar
 }
 
 void WasteHygieneCompartment::complete_urination_cycle() {
-    RCLCPP_INFO(this->get_logger(), "[whc] Urination completed. Adding pretreatment and flushing...");
+    RCLCPP_INFO(this->get_logger(), "[CYCLE] Urination complete. Adding pretreatment and flushing.");
 
     add_pretreatment();
     flush();
     publish_total_water();
 
-    if (timer_) timer_->cancel();  // Stop timer after one-shot
+    if (timer_) timer_->cancel();
     urination_detected = false;
 }
 
@@ -66,12 +67,10 @@ void WasteHygieneCompartment::flush() {
 void WasteHygieneCompartment::publish_total_water() {
     total_water_volume += urine_volume;
 
-    // Legacy Float64 publication
     std_msgs::msg::Float64 msg;
     msg.data = total_water_volume;
     water_volume_publisher_->publish(msg);
 
-    // WaterCrew message for dashboard
     space_station_eclss::msg::WaterCrew status;
     status.water = total_water_volume;
     status.gas_bubbles = 0.01 * total_water_volume;
@@ -81,7 +80,7 @@ void WasteHygieneCompartment::publish_total_water() {
     status.temperature = 22.0;
     waste_status_publisher_->publish(status);
 
-    RCLCPP_INFO(this->get_logger(), "[whc] Total accumulated water: %.2f liters", total_water_volume);
+    RCLCPP_INFO(this->get_logger(), "[PUBLISH] Total WHC water volume: %.2f L", total_water_volume);
 
     total_water_volume = 0.0;
 }

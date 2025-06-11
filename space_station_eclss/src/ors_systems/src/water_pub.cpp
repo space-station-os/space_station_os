@@ -1,4 +1,4 @@
-#include "space_station_eclss/water_status.h"
+#include "space_station_eclss/ors_system/water_req.h"
 
 using namespace std::chrono_literals;
 
@@ -10,98 +10,96 @@ WaterService::WaterService()
       gas_bubbles_(0.0),
       pressure_(14.7),
       temperature_(25.0),
-      max_tank_capacity_(this->declare_parameter<double>("max_tank_capacity", 20.0)),  // Reduced tank capacity
-      accumulation_rate_(this->declare_parameter<double>("accumulation_rate", 10.0)),
-      threshold_level_(this->declare_parameter<double>("threshold_level", 15.0)) {
+      ready_for_next_request_(true),
+      max_tank_capacity_(this->declare_parameter<double>("max_tank_capacity", 2000.0)),
+      accumulation_rate_(this->declare_parameter<double>("accumulation_rate", 100.0)),
+      threshold_level_(this->declare_parameter<double>("threshold_level", 1000.0)) {
 
-    // Subscribe to tank status updates
     tank_status_subscriber_ = this->create_subscription<space_station_eclss::msg::WaterCrew>(
-        "/wpa/tank_status", 10, std::bind(&WaterService::tank_status_callback, this, std::placeholders::_1)
+        "/wpa/tank_status", 10,
+        std::bind(&WaterService::tank_status_callback, this, std::placeholders::_1)
     );
 
-    // Service to provide water when requested
     water_service_ = this->create_service<space_station_eclss::srv::Water>(
         "/water_request",
         std::bind(&WaterService::handle_water_request, this, std::placeholders::_1, std::placeholders::_2)
     );
 
-    // Client to send water to deionization chamber
     deionization_client_ = this->create_client<space_station_eclss::srv::Water>("/deionization_chamber");
 
-    // Timer to simulate water accumulation over time
     accumulation_timer_ = this->create_wall_timer(
         2s, std::bind(&WaterService::water_accumulation, this)
     );
 
-    RCLCPP_INFO(this->get_logger(), "Water service node initialized. Monitoring tank levels...");
+    RCLCPP_INFO(this->get_logger(), "[INIT] Water Service Node Initialized. Awaiting water from Product Tank...");
 }
 
 void WaterService::tank_status_callback(const space_station_eclss::msg::WaterCrew::SharedPtr msg) {
-    RCLCPP_INFO(this->get_logger(), "Received tank status update.");
-
-    // Extract only 20% of the total water contents from the message
-    double extracted_water = msg->water * 0.2;
-    double extracted_contaminants = msg->contaminants * 0.2;
-    double extracted_iodine = msg->iodine_level * 0.2;
-    double extracted_gas_bubbles = msg->gas_bubbles * 0.2;
-
-    if (water_level_ + extracted_water > max_tank_capacity_) {
-        RCLCPP_WARN(this->get_logger(), "Cannot extract more water. Tank is nearing capacity.");
+    double extracted = msg->water * 0.2;
+    if (water_level_ + extracted > max_tank_capacity_) {
+        RCLCPP_WARN(this->get_logger(), "[SKIP] Tank at capacity (%.2f L).", water_level_);
         return;
     }
 
-    // Update water storage levels
-    water_level_ += extracted_water;
-    contaminants_level_ += extracted_contaminants;
-    iodine_level_ += extracted_iodine;
-    gas_bubbles_ += extracted_gas_bubbles;
+    water_level_ += extracted;
+    contaminants_level_ += msg->contaminants * 0.2;
+    iodine_level_ += msg->iodine_level * 0.2;
+    gas_bubbles_ += msg->gas_bubbles * 0.2;
 
-    RCLCPP_INFO(this->get_logger(), "Extracted %.2fL from the main tank. Current water level: %.2fL",
-                extracted_water, water_level_);
+    RCLCPP_INFO(this->get_logger(), "[INTAKE] +%.2f L from Product Tank → Total = %.2f L", extracted, water_level_);
+
+    if (water_level_ >= threshold_level_ && ready_for_next_request_) {
+        RCLCPP_INFO(this->get_logger(), "[THRESHOLD] %.2f L reached. Triggering deionization...", water_level_);
+        send_deionization_request();
+        ready_for_next_request_ = false;
+    }
 }
 
 void WaterService::water_accumulation() {
     if (water_level_ >= max_tank_capacity_) {
-        RCLCPP_WARN(this->get_logger(), "Tank full (%.2f L)! Sending request to deionization chamber.", water_level_);
-        send_deionization_request();
+        RCLCPP_WARN(this->get_logger(), "[BLOCK] Simulated tank full (%.2f L).", water_level_);
         return;
     }
 
-    // Increment water level, contaminants, and iodine concentration
     water_level_ += accumulation_rate_;
     contaminants_level_ += accumulation_rate_ * 0.2;
     iodine_level_ += accumulation_rate_ * 0.05;
 
-    if (water_level_ > max_tank_capacity_) {
+    if (water_level_ > max_tank_capacity_)
         water_level_ = max_tank_capacity_;
-    }
-    RCLCPP_INFO(this->get_logger(), "===========================");
-    RCLCPP_INFO(this->get_logger(), "Tank filling: Water = %.2f L, Contaminants = %.2f ppm, Iodine = %.2f ppm",
+
+    RCLCPP_INFO(this->get_logger(), "[FILL] Simulated fill → Water = %.2f L, Contaminants = %.2f, Iodine = %.2f",
                 water_level_, contaminants_level_, iodine_level_);
-    RCLCPP_INFO(this->get_logger(), "===========================");
+
+    if (water_level_ >= threshold_level_ && ready_for_next_request_) {
+        RCLCPP_INFO(this->get_logger(), "[THRESHOLD] %.2f L reached. Triggering deionization...", water_level_);
+        send_deionization_request();
+        ready_for_next_request_ = false;
+    }
 }
 
 void WaterService::handle_water_request(
     const std::shared_ptr<space_station_eclss::srv::Water::Request> request,
     std::shared_ptr<space_station_eclss::srv::Water::Response> response) {
 
-    RCLCPP_INFO(this->get_logger(), "Received external water request for %.2f L", request->water);
+    RCLCPP_INFO(this->get_logger(), "[REQ] Received external water request: %.2f L", request->water);
 
     if (water_level_ < request->water) {
         response->success = false;
-        response->message = "Not enough water available!";
-        RCLCPP_ERROR(this->get_logger(), "Request failed: Insufficient water.");
+        response->message = "Not enough water available.";
+        RCLCPP_ERROR(this->get_logger(), "[FAIL] Insufficient water.");
         return;
     }
 
     send_deionization_request();
     response->success = true;
-    response->message = "Water successfully transferred to deionization chamber.";
+    response->message = "Water transferred to Deionization Chamber.";
+    ready_for_next_request_ = false;
 }
 
 void WaterService::send_deionization_request() {
     if (!deionization_client_->wait_for_service(5s)) {
-        RCLCPP_ERROR(this->get_logger(), "Deionization chamber service is not available!");
+        RCLCPP_ERROR(this->get_logger(), "[ERROR] Deionization service unavailable!");
         return;
     }
 
@@ -110,31 +108,39 @@ void WaterService::send_deionization_request() {
     request->contaminants = contaminants_level_;
     request->iodine_level = iodine_level_;
     request->gas_bubbles = gas_bubbles_;
-    request->pressure = 14.7;
-    request->temperature = 25.0;
+    request->pressure = pressure_;
+    request->temperature = temperature_;
 
-    RCLCPP_INFO(this->get_logger(), "Sending water to deionization chamber: Water = %.2f L, Contaminants = %.2f ppm, Iodine = %.2f ppm",
-                request->water, request->contaminants, request->iodine_level);
+    RCLCPP_INFO(this->get_logger(), "[SEND] Dispatching %.2f L to Deionization Chamber", water_level_);
 
-    auto future = deionization_client_->async_send_request(request,
-        std::bind(&WaterService::process_deionization_response, this, std::placeholders::_1));
+    auto future = deionization_client_->async_send_request(
+        request, std::bind(&WaterService::process_deionization_response, this, std::placeholders::_1));
 }
 
 void WaterService::process_deionization_response(rclcpp::Client<space_station_eclss::srv::Water>::SharedFuture future) {
     try {
         auto response = future.get();
         if (response->success) {
-            RCLCPP_INFO(this->get_logger(), "Deionization successful. Emptying tank...");
+            RCLCPP_INFO(this->get_logger(), "[SUCCESS] Water transferred. Tank emptied.");
+            RCLCPP_DEBUG(this->get_logger(), "[DEBUG] Resetting internal tank values to 0.");
             water_level_ = 0.0;
             contaminants_level_ = 0.0;
             iodine_level_ = 0.0;
             gas_bubbles_ = 0.0;
-            RCLCPP_INFO(this->get_logger(), "Tank emptied successfully.");
-        } else {
-            RCLCPP_ERROR(this->get_logger(), "Deionization failed: %s", response->message.c_str());
+            ready_for_next_request_ = true;
+
+            accumulation_timer_->cancel();
+            rclcpp::sleep_for(5s);
+            accumulation_timer_ = this->create_wall_timer(
+                2s, std::bind(&WaterService::water_accumulation, this));
+        }
+        else {
+            RCLCPP_ERROR(this->get_logger(), "[FAIL] Deionization error: %s", response->message.c_str());
+            ready_for_next_request_ = true;
         }
     } catch (const std::exception &e) {
-        RCLCPP_ERROR(this->get_logger(), "Exception while calling deionization service: %s", e.what());
+        RCLCPP_ERROR(this->get_logger(), "[EXCEPTION] While sending to deionization: %s", e.what());
+        ready_for_next_request_ = true;
     }
 }
 

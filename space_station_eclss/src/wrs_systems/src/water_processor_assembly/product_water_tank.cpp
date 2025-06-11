@@ -20,7 +20,7 @@ ProductWaterTank::ProductWaterTank() : Node("wpa_product_water_tank_server"), cu
         std::bind(&ProductWaterTank::publish_tank_status, this)
     );
 
-    RCLCPP_INFO(this->get_logger(), "Product Water Tank Server Ready...");
+    RCLCPP_INFO(this->get_logger(), "[INIT] Product Water Tank Server Ready.");
 }
 
 void ProductWaterTank::handle_water_tank(
@@ -28,13 +28,13 @@ void ProductWaterTank::handle_water_tank(
     std::shared_ptr<space_station_eclss::srv::Water::Response> response) 
 {
     double incoming_water = request->water;
-    double available_space = 100.0 - current_water_volume_;
+    double available_space = 2000 - current_water_volume_;
 
     if (incoming_water > available_space) {
         response->success = false;
         response->message = "Tank full! Can only accept " + std::to_string(available_space) + "L more.";
-        RCLCPP_WARN(this->get_logger(), "Water tank near full! Accepting %.2fL and rejecting %.2fL.", available_space, incoming_water - available_space);
-        incoming_water = available_space;  // Accept only available space
+        RCLCPP_WARN(this->get_logger(), "[LIMIT] Accepting %.2fL, rejecting %.2fL", available_space, incoming_water - available_space);
+        incoming_water = available_space;
     }
 
     current_water_volume_ += incoming_water;
@@ -45,9 +45,9 @@ void ProductWaterTank::handle_water_tank(
     current_temperature_ = request->temperature;
 
     response->success = true;
-    response->message = "Water successfully stored in tank.";
+    response->message = "Water successfully stored.";
 
-    RCLCPP_INFO(this->get_logger(), "Tank filled with %.2f liters. Current volume: %.2fL", incoming_water, current_water_volume_);
+    RCLCPP_INFO(this->get_logger(), "[STORE] +%.2fL stored. New total: %.2fL", incoming_water, current_water_volume_);
 }
 
 void ProductWaterTank::handle_dispense_water(
@@ -59,37 +59,36 @@ void ProductWaterTank::handle_dispense_water(
     if (requested_water > current_water_volume_) {
         response->success = false;
         response->message = "Not enough water available.";
-        RCLCPP_WARN(this->get_logger(), "Water request exceeds available amount. Request: %.2fL, Available: %.2fL",
-                    requested_water, current_water_volume_);
+        RCLCPP_WARN(this->get_logger(), "[BLOCK] Request %.2fL exceeds available %.2fL", requested_water, current_water_volume_);
         return;
     }
 
     if (current_iodine_level_ < 0.2) {
         response->success = false;
-        response->message = "Water iodine level too low for safe consumption!";
-        RCLCPP_WARN(this->get_logger(), "Water cannot be dispensed! Iodine level (%.2f mg/L) is below safe threshold.", current_iodine_level_);
+        response->message = "Iodine level too low for safe consumption.";
+        RCLCPP_WARN(this->get_logger(), "[BLOCK] Iodine %.2f mg/L below threshold.", current_iodine_level_);
         return;
     }
 
     current_water_volume_ -= requested_water;
     response->success = true;
-    response->message = "Water successfully dispensed.";
+    response->message = "Water dispensed.";
 
-    RCLCPP_INFO(this->get_logger(), "Dispensed %.2f liters of water. Remaining in tank: %.2fL", requested_water, current_water_volume_);
+    RCLCPP_INFO(this->get_logger(), "[DISPENSE] %.2fL dispensed. Remaining: %.2fL", requested_water, current_water_volume_);
 }
 
 void ProductWaterTank::publish_tank_status() {
     space_station_eclss::msg::WaterCrew msg;
     msg.water = current_water_volume_;
-    msg.gas_bubbles = current_gas_bubbles_ * 0.9;  // Gas bubbles reduce over time
+    msg.gas_bubbles = current_gas_bubbles_ * 0.9;
     msg.contaminants = current_contaminants_;
     msg.iodine_level = current_iodine_level_;
     msg.pressure = current_pressure_;
     msg.temperature = current_temperature_;
 
     tank_status_publisher_->publish(msg);
-    RCLCPP_INFO(this->get_logger(), "Tank Status Published: Water = %.2fL | Iodine = %.2fmg/L", 
-                current_water_volume_, current_iodine_level_);
+
+    RCLCPP_INFO(this->get_logger(), "[STATUS] Tank: %.2fL | Iodine: %.2f mg/L", current_water_volume_, current_iodine_level_);
 }
 
 int main(int argc, char **argv) {
