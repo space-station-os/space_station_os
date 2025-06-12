@@ -21,7 +21,7 @@
 class AttitudeDynamicsNode : public rclcpp::Node
 {
 public:
-    AttitudeDynamicsNode() : Node("attitude_dynamics_node")
+    AttitudeDynamicsNode() : Node("physics_motion")
     {
         // dynamics parameters
         this->declare_parameter<double>("dynamics.J.xx", 280e6);
@@ -57,6 +57,7 @@ public:
         pub_angvel_body = this->create_publisher<geometry_msgs::msg::Vector3>("gnc/angvel_body", 10);
         pub_cmg_del = this->create_publisher<std_msgs::msg::Float64MultiArray>("gnc/cmg_del", 1);
         pub_pose_all = this->create_publisher<geometry_msgs::msg::PoseStamped>("gnc/pose_all", 10);
+        pub_ang_acc = this->create_publisher<geometry_msgs::msg::Vector3>("gnc/ang_acc", 10);
         //pub_pose_marker = this->create_publisher<visualization_msgs::msg::Marker>("pose_marker", 10);
         broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
@@ -113,6 +114,10 @@ public:
             std::chrono::milliseconds((int)(Tpubatt_*1000.0)), 
             std::bind(&AttitudeDynamicsNode::callback_timer_pub_att, this));
 
+        timer_acc_ = this->create_wall_timer(
+            std::chrono::milliseconds((int)(Tpubatt_*1000.0)), 
+            std::bind(&AttitudeDynamicsNode::callback_timer_pub_acc, this));
+
 
     }
 
@@ -129,12 +134,15 @@ private:
     rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr pub_angvel_body;
     rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr pub_cmg_del;
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pub_pose_all;
+    rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr pub_ang_acc;
     // rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr pub_pose_marker;
     geometry_msgs::msg::Quaternion attitude_LVLH;
     geometry_msgs::msg::Vector3 angvel_body;
+    geometry_msgs::msg::Vector3 ang_acc;
     std_msgs::msg::Float64MultiArray cmg_del;
     std::shared_ptr<tf2_ros::TransformBroadcaster> broadcaster_;
     rclcpp::TimerBase::SharedPtr timer_;
+    rclcpp::TimerBase::SharedPtr timer_acc_;
 
 
     //define parameters for dynamics
@@ -274,6 +282,24 @@ private:
         
         cmg_del.data = {deltacur(0), deltacur(1), deltacur(2), deltacur(3)};
         pub_cmg_del->publish(cmg_del);
+    }
+
+    void callback_timer_pub_acc() {
+        // Calculate angular acceleration in body frame
+        Eigen::Vector3d tau_allcure(tau_allcur.x(), tau_allcur.y(), tau_allcur.z());
+        // for current 
+        Eigen::Vector3d tau_inp(tau_ctlcmgcur.x(), tau_ctlcmgcur.y(), tau_ctlcmgcur.z());
+        Eigen::Vector3d omega_inp(omebcur.x(), omebcur.y(), omebcur.z());
+            
+        Eigen::Vector3d rhs1 = J123 * omega_inp;
+        Eigen::Vector3d tau_eff = tau_allcure - omega_inp.cross(rhs1);
+        Eigen::Vector3d omega_dot_acc = J123inv * tau_eff;
+
+        ang_acc.x = omega_dot_acc.x();
+        ang_acc.y = omega_dot_acc.y();
+        ang_acc.z = omega_dot_acc.z();
+
+        pub_ang_acc->publish(ang_acc);
     }
 
     //forcing the simulation forward
@@ -516,7 +542,9 @@ double get_time_double(rclcpp::Node::SharedPtr node) {
 int main(int argc, char *argv[])
 {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<AttitudeDynamicsNode>();
+    rclcpp::NodeOptions options;
+    options.automatically_declare_parameters_from_overrides(true);
+    auto node = std::make_shared<AttitudeDynamicsNode>(options);
     rclcpp::spin(node);
 
     rclcpp::shutdown();
