@@ -32,7 +32,7 @@ jobs:
 
       - name: Clone documentation site
         run: |
-          git clone https://x-access-token:${{ secrets.GITHUB_DOC_REPO_TOKEN }}@github.com/space-station-os/space-station-os.github.io.git site
+          git clone https://x-access-token:${{ secrets.DOC_SITE_PUSH_TOKEN }}@github.com/space-station-os/space-station-os.github.io.git site
 
       - name: Ensure news directory exists
         run: mkdir -p site/auto_astro/src/content/news
