@@ -2,6 +2,7 @@
 #include <geometry_msgs/msg/vector3.hpp>
 #include <geometry_msgs/msg/quaternion.hpp>
 #include <random>
+#include <Eigen/Dense>
 
 class PhysicsSensor : public rclcpp::Node {
 public:
@@ -56,9 +57,9 @@ public:
             std::chrono::milliseconds(10), // 100Hz = 10ms interval
             std::bind(&PhysicsSensor::timer_callback_process_imu, this));
         
-        imu_timer_raw_ = this->create_wall_timer(
-            std::chrono::milliseconds(10), // 100Hz = 10ms interval
-            std::bind(&PhysicsSensor::timer_callback_process_imu_raw_, this));
+        // imu_timer_raw_ = this->create_wall_timer(
+        //     std::chrono::milliseconds(10), // 100Hz = 10ms interval
+        //     std::bind(&PhysicsSensor::timer_callback_process_imu_raw_, this));
 
         // TODO: International Celestial Reference Frame (ICRF)
         // TODO: Star tracker algorithm using star catalog and camera images
@@ -133,7 +134,7 @@ private:
         // bias_axis.normalized() - axis of rotation
         double bias_angle = bias_axis.norm();
         // constructor Eigen::Quaterniond q(AngleAxisd(..,..));
-        Eigen::Quaterniond q_bias = bias_angle > 1e-12 ? Eigen::AngleAxisd(bias_angle, bias_axis.normalized()) : Eigen::Quaterniond::Identity();
+        Eigen::Quaterniond q_bias = bias_angle > 1e-12 ? Eigen::Quaterniond(Eigen::AngleAxisd(bias_angle, bias_axis.normalized())) : Eigen::Quaterniond::Identity();
 
         // noise quat (small random rot vec)
         double noise_sigma = this->get_parameter("startracker_noise_sigma").as_double();
@@ -144,7 +145,7 @@ private:
         );
 
         double noise_angle = noise_vec.norm();
-        Eigen::Quaterniond q_noise = noise_angle > 1e-12 ? Eigen::AngleAxisd(noise_angle, noise_vec.normalized()) : Eigen::Quaterniond::Identity();
+        Eigen::Quaterniond q_noise = noise_angle > 1e-12 ? Eigen::Quaterniond(Eigen::AngleAxisd(noise_angle, noise_vec.normalized())) : Eigen::Quaterniond::Identity();
 
         Eigen::Quaterniond q_measured = q_true * q_bias * q_noise;
         q_measured.normalize(); 
@@ -172,6 +173,7 @@ private:
     }
 
     rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr imu_sub_;
+    rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr imu_raw_sub_;
     rclcpp::Subscription<geometry_msgs::msg::Quaternion>::SharedPtr startracker_sub_;
     rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr gps_sub_;
 

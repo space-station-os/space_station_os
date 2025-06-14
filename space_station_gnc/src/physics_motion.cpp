@@ -22,7 +22,7 @@
 class AttitudeDynamicsNode : public rclcpp::Node
 {
 public:
-    AttitudeDynamicsNode() : Node("physics_motion")
+    AttitudeDynamicsNode(const rclcpp::NodeOptions & options) : Node("physics_motion", options)
     {
         // dynamics parameters
         this->declare_parameter<double>("dynamics.J.xx", 280e6);
@@ -121,14 +121,11 @@ public:
             std::chrono::milliseconds((int)(Tpubatt_*1000.0)), 
             std::bind(&AttitudeDynamicsNode::callback_timer_pub_att, this));
 
-<<<<<<< Updated upstream
         timer_acc_ = this->create_wall_timer(
             std::chrono::milliseconds((int)(Tpubatt_*1000.0)), 
             std::bind(&AttitudeDynamicsNode::callback_timer_pub_acc, this));
 
 
-=======
->>>>>>> Stashed changes
     }
 
 private:
