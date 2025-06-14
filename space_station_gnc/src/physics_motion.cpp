@@ -16,6 +16,7 @@
 #include <Eigen/Dense>
 #include <vector>
 #include "L_p_func.cpp"
+#include "space_station_gnc/action/unloading.hpp"
 //std::string mode_demo;
 
 class AttitudeDynamicsNode : public rclcpp::Node
@@ -52,6 +53,8 @@ public:
         
         auto acc0 = this->get_parameter("initial.angacc").as_double_array();
         omedotbcur.setValue(acc0[0], acc0[1], acc0[2]);
+
+        H_th << 0.3,0.3,0.3;
 
         pub_attitude_LVLH = this->create_publisher<geometry_msgs::msg::Quaternion>("gnc/attitude_LVLH", 10);
         pub_angvel_body = this->create_publisher<geometry_msgs::msg::Vector3>("gnc/angvel_body", 10);
@@ -109,16 +112,23 @@ public:
         sub_cmg_torque_control = this->create_subscription<geometry_msgs::msg::Vector3>(
             "gnc/cmg_torque_cmd", 1, 
             std::bind(&AttitudeDynamicsNode::callback_cmg_inp, this, std::placeholders::_1));
+        
+        sub_bias_torque_control = this->create_subscription<geometry_msgs::msg::Vector3>(
+            "gnc/bias_torque_cmd", 1, 
+            std::bind(&AttitudeDynamicsNode::callback_bias_inp, this, std::placeholders::_1));
             
         timer_ = this->create_wall_timer(
             std::chrono::milliseconds((int)(Tpubatt_*1000.0)), 
             std::bind(&AttitudeDynamicsNode::callback_timer_pub_att, this));
 
+<<<<<<< Updated upstream
         timer_acc_ = this->create_wall_timer(
             std::chrono::milliseconds((int)(Tpubatt_*1000.0)), 
             std::bind(&AttitudeDynamicsNode::callback_timer_pub_acc, this));
 
 
+=======
+>>>>>>> Stashed changes
     }
 
 private:
@@ -126,6 +136,7 @@ private:
     //ros2 stuff
     rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr sub_torque_control;
     rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr sub_cmg_torque_control;
+    rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr sub_bias_torque_control;
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr sub_t_fwd_sim;
     rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr sub_angvel_overwrite;
     rclcpp::Subscription<geometry_msgs::msg::Quaternion>::SharedPtr sub_attitude_overwrite;
@@ -168,6 +179,7 @@ private:
     tf2::Vector3 tau_ctlthrcur; 
     tf2::Vector3 tau_extgracur; 
     tf2::Vector3 tau_allcur; 
+    tf2::Vector3 tau_ctlbiascur;
 
 
 
@@ -179,6 +191,7 @@ private:
     int N2disp; // publish rate: Npublish * Ttorque
     int i2disp; // index for i2disp
     double Tpubatt_; 
+    Eigen::Vector3d H_th;
 
     bool should_pub_att; // true then publish attitude for display purpose
 
@@ -359,6 +372,15 @@ private:
         return qf;
     }
 
+    bool checkCMGThresh(const Eigen::Vector3d& hState)
+    {
+        bool exceed = (std::abs(hState.x()) > H_th.x()) 
+                    || (std::abs(hState.y()) > H_th.y())
+                    || (std::abs(hState.z()) > H_th.z());
+
+        return exceed;
+    }
+
     void forward_attitude_dynamics(double Tfwd_sec){
         double thetab = omebcur.length();
         if (0.5 < thetab)
@@ -501,6 +523,11 @@ private:
         tau_ctlcmgcur.setValue(msg->x,msg->y,msg->z); 
         
     }
+    
+    void callback_bias_inp(const geometry_msgs::msg::Vector3::SharedPtr msg)
+    {
+        tau_ctlbiascur.setValue(msg->x,msg->y,msg->z);
+    }
 
     void callback_attitude_dynamics(const geometry_msgs::msg::Vector3::SharedPtr msg)
     {
@@ -510,7 +537,7 @@ private:
         //TODO: Currently we assume only gravity gradient torque 
         tau_extgracur = gravityGradT();
 
-        tau_allcur = tau_ctlcmgcur + tau_ctlthrcur + tau_extgracur;
+        tau_allcur = tau_ctlcmgcur + tau_ctlthrcur + tau_extgracur + tau_ctlbiascur;
 
         //compute attitude update
         forward_attitude_dynamics(Ttorque_); //Ttorque_ is simulation time period
