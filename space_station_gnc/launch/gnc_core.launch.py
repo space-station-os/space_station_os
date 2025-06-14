@@ -4,6 +4,8 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+import os
+from ament_index_python.packages import get_package_share_directory
 
 def launch_nodes(context, *args, **kwargs):
     def output_for(flag_name):
@@ -34,14 +36,16 @@ def launch_nodes(context, *args, **kwargs):
             executable='physics_motion',
             name='physics_motion',
             output=output_for('quiet_motion'),
-            arguments=arguments_for('quiet_motion')
+            arguments=arguments_for('quiet_motion'),
+            parameters=[os.path.join(get_package_share_directory("space_station_gnc"), 'config', 'ros_config.yaml'), ],
         ),
         Node(
             package='space_station_gnc',
             executable='physics_sensor',
             name='physics_sensor',
             output=output_for('quiet_sensor'),
-            arguments=arguments_for('quiet_sensor')
+            arguments=arguments_for('quiet_sensor'),
+            parameters=[os.path.join(get_package_share_directory("space_station_gnc"), 'config', 'ros_config.yaml'), ],
         ),
         Node(
             package='space_station_gnc',

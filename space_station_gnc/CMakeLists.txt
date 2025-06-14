@@ -23,10 +23,20 @@ find_package(visualization_msgs REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+find_package(rosidl_default_generators REQUIRED)
+find_package(rosidl_default_runtime REQUIRED)
+find_package(action_msgs REQUIRED)
 
-
+# Generate interfaces
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "action/Unloading.action"
+  DEPENDENCIES action_msgs std_msgs
+)
 # Include directories
-include_directories(${OpenCV_INCLUDE_DIRS} ${SDL2_INCLUDE_DIRS})
+include_directories(
+  ${OpenCV_INCLUDE_DIRS}
+  ${SDL2_INCLUDE_DIRS}
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp>)
 
 add_executable(space_station_gnc_node src/space_station_gnc.cpp)
 add_executable(demo1a_nauka_incident_estimate src/demo1a_nauka_incident_estimate.cpp)
@@ -46,6 +56,9 @@ ament_target_dependencies(physics_motion rclcpp std_msgs tf2 tf2_ros tf2_geometr
 ament_target_dependencies(physics_sensor rclcpp std_msgs tf2 tf2_ros tf2_geometry_msgs visualization_msgs)
 ament_target_dependencies(sense_estimate rclcpp std_msgs tf2 tf2_ros nav_msgs tf2_geometry_msgs visualization_msgs)
 ament_target_dependencies(control_torque rclcpp std_msgs tf2 tf2_ros nav_msgs tf2_geometry_msgs visualization_msgs)
+rosidl_get_typesupport_target(cpp_typesupport_target
+  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(control_torque ${cpp_typesupport_target})
 
 # Link OpenCV libraries
 target_link_libraries(demo1a_nauka_incident_estimate ${OpenCV_LIBRARIES} ${SDL2_LIBRARIES})

@@ -9,7 +9,7 @@
       enable_cpp: true
       output_file: "L_p_func.cpp"
 
-attitude_dynamics_node:
+physics_motion:
   ros__parameters:
     dynamics:
       J:
@@ -28,3 +28,22 @@ attitude_dynamics_node:
       attitude: [0.0, 0.0, 0.0, 1.0]
       angvel:   [0.0, 0.0, 0.0]
       angacc:   [0.0, 0.0, 0.0]
+
+physics_sensor:
+  ros__parameters:
+    imu_bias_x: 0.0
+    imu_bias_y: 0.0
+    imu_bias_z: 0.0
+    imu_noise_sigma: 0.002
+    bias_drift_sigma: 1e-5
+
+    startracker_bias_x: 0.0
+    startracker_bias_y: 0.0
+    startracker_bias_z: 0.0
+    startracker_bias_w: 0.0
+    startracker_noise_sigma: 0.001
+
+    gps_bias_x: 0.0
+    gps_bias_y: 0.0
+    gps_bias_z: 0.0
+    gps_noise_sigma: 0.1
