@@ -1,0 +1,57 @@
+name: Post News to Docs Site
+
+on:
+  push:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+jobs:
+  post-news:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source repo (space_station_os)
+        uses: actions/checkout@v3
+
+      - name: Get release data
+        id: release
+        if: github.event_name == 'release'
+        run: |
+          echo "title=${{ github.event.release.name }}" >> $GITHUB_OUTPUT
+          echo "body=${{ github.event.release.body }}" >> $GITHUB_OUTPUT
+          echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      - name: Fallback commit-based post (if no release)
+        id: fallback
+        if: github.event_name == 'push'
+        run: |
+          echo "title=Update from push at $(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+          echo "body=Automatic update triggered by push to main." >> $GITHUB_OUTPUT
+          echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      - name: Clone documentation site
+        run: |
+          git clone https://x-access-token:${{ secrets.GITHUB_DOC_REPO_TOKEN }}@github.com/space-station-os/space-station-os.github.io.git site
+
+      - name: Create markdown news file
+        run: |
+          FILE=site/auto_astro/src/content/news/${{ steps.release.outputs.date || steps.fallback.outputs.date }}-${{ github.sha }}.md
+          echo "---" > $FILE
+          echo "title: \"${{ steps.release.outputs.title || steps.fallback.outputs.title }}\"" >> $FILE
+          echo "pubDate: ${{ steps.release.outputs.date || steps.fallback.outputs.date }}" >> $FILE
+          echo "description: \"${{ steps.release.outputs.title || steps.fallback.outputs.title }}\"" >> $FILE
+          echo "tags: [automated, release]" >> $FILE
+          echo "image: /images/default.jpg" >> $FILE
+          echo "---" >> $FILE
+          echo "${{ steps.release.outputs.body || steps.fallback.outputs.body }}" >> $FILE
+
+      - name: Commit and push to docs site
+        run: |
+          cd site
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add auto_astro/src/content/news/
+          git commit -m "📰 Auto post news from ${{ github.event_name }} ${{ github.sha }}"
+          git push
+
