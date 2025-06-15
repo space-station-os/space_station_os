@@ -281,7 +281,7 @@ static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   /* #2: @2 = 1000 */
   w2 = 1000.;
   /* #3: @3 = -0.57743 */
-  w3 = -5.7743021654867288e-01;
+  w3 = -5.7743021654867299e-01;
   /* #4: @4 = input[0][0] */
   w4 = arg[0] ? arg[0][0] : 0;
   /* #5: @5 = cos(@4) */
@@ -301,7 +301,7 @@ static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   /* #12: @5 = (-@5) */
   w5 = (- w5 );
   /* #13: @6 = 0.81644 */
-  w6 = 8.1644004373655799e-01;
+  w6 = 8.1644004373655787e-01;
   /* #14: @4 = cos(@4) */
   w4 = cos( w4 );
   /* #15: @4 = (@4*@7) */
@@ -328,7 +328,7 @@ static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   /* #24: @5 = (@5*@4) */
   w5 *= w4;
   /* #25: @6 = -0.57743 */
-  w6 = -5.7743021654867288e-01;
+  w6 = -5.7743021654867299e-01;
   /* #26: @7 = cos(@3) */
   w7 = cos( w3 );
   /* #27: @7 = (@7*@4) */
@@ -336,7 +336,7 @@ static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   /* #28: @6 = (@6*@7) */
   w6 *= w7;
   /* #29: @7 = 0.81644 */
-  w7 = 8.1644004373655799e-01;
+  w7 = 8.1644004373655787e-01;
   /* #30: @3 = cos(@3) */
   w3 = cos( w3 );
   /* #31: @3 = (@3*@4) */
@@ -353,7 +353,7 @@ static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   /* #35: (@1[1:13:4] = @8) */
   for (rr=w1+1, ss=w8; rr!=w1+13; rr+=4) *rr = *ss++;
   /* #36: @5 = 0.57743 */
-  w5 = 5.7743021654867288e-01;
+  w5 = 5.7743021654867299e-01;
   /* #37: @6 = input[2][0] */
   w6 = arg[2] ? arg[2][0] : 0;
   /* #38: @7 = cos(@6) */
@@ -371,7 +371,7 @@ static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   /* #44: @7 = (@7*@4) */
   w7 *= w4;
   /* #45: @3 = 0.81644 */
-  w3 = 8.1644004373655799e-01;
+  w3 = 8.1644004373655787e-01;
   /* #46: @6 = cos(@6) */
   w6 = cos( w6 );
   /* #47: @6 = (@6*@4) */
@@ -400,7 +400,7 @@ static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   /* #57: @7 = (-@7) */
   w7 = (- w7 );
   /* #58: @3 = 0.57743 */
-  w3 = 5.7743021654867288e-01;
+  w3 = 5.7743021654867299e-01;
   /* #59: @4 = cos(@5) */
   w4 = cos( w5 );
   /* #60: @4 = (@4*@6) */
@@ -408,7 +408,7 @@ static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   /* #61: @3 = (@3*@4) */
   w3 *= w4;
   /* #62: @4 = 0.81644 */
-  w4 = 8.1644004373655799e-01;
+  w4 = 8.1644004373655787e-01;
   /* #63: @5 = cos(@5) */
   w5 = cos( w5 );
   /* #64: @5 = (@5*@6) */
@@ -548,7 +548,7 @@ static int casadi_f1(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   /* #0: @0 = 1000 */
   w0 = 1000.;
   /* #1: @1 = -0.57743 */
-  w1 = -5.7743021654867288e-01;
+  w1 = -5.7743021654867299e-01;
   /* #2: @2 = input[0][0] */
   w2 = arg[0] ? arg[0][0] : 0;
   /* #3: @3 = sin(@2) */
@@ -558,7 +558,7 @@ static int casadi_f1(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   /* #5: @3 = cos(@2) */
   w3 = cos( w2 );
   /* #6: @4 = 0.81644 */
-  w4 = 8.1644004373655799e-01;
+  w4 = 8.1644004373655787e-01;
   /* #7: @2 = sin(@2) */
   w2 = sin( w2 );
   /* #8: @4 = (@4*@2) */
@@ -575,13 +575,13 @@ static int casadi_f1(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   /* #12: @3 = (-@3) */
   w3 = (- w3 );
   /* #13: @4 = -0.57743 */
-  w4 = -5.7743021654867288e-01;
+  w4 = -5.7743021654867299e-01;
   /* #14: @2 = sin(@1) */
   w2 = sin( w1 );
   /* #15: @4 = (@4*@2) */
   w4 *= w2;
   /* #16: @2 = 0.81644 */
-  w2 = 8.1644004373655799e-01;
+  w2 = 8.1644004373655787e-01;
   /* #17: @1 = sin(@1) */
   w1 = sin( w1 );
   /* #18: @2 = (@2*@1) */
@@ -594,7 +594,7 @@ static int casadi_f1(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   /* #20: @5 = (@5+@6) */
   for (i=0, rr=w5, cs=w6; i<3; ++i) (*rr++) += (*cs++);
   /* #21: @3 = 0.57743 */
-  w3 = 5.7743021654867288e-01;
+  w3 = 5.7743021654867299e-01;
   /* #22: @4 = input[2][0] */
   w4 = arg[2] ? arg[2][0] : 0;
   /* #23: @2 = sin(@4) */
@@ -606,7 +606,7 @@ static int casadi_f1(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   /* #26: @2 = (-@2) */
   w2 = (- w2 );
   /* #27: @1 = 0.81644 */
-  w1 = 8.1644004373655799e-01;
+  w1 = 8.1644004373655787e-01;
   /* #28: @4 = sin(@4) */
   w4 = sin( w4 );
   /* #29: @1 = (@1*@4) */
@@ -623,13 +623,13 @@ static int casadi_f1(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   /* #33: @2 = cos(@3) */
   w2 = cos( w3 );
   /* #34: @1 = 0.57743 */
-  w1 = 5.7743021654867288e-01;
+  w1 = 5.7743021654867299e-01;
   /* #35: @4 = sin(@3) */
   w4 = sin( w3 );
   /* #36: @1 = (@1*@4) */
   w1 *= w4;
   /* #37: @4 = 0.81644 */
-  w4 = 8.1644004373655799e-01;
+  w4 = 8.1644004373655787e-01;
   /* #38: @3 = sin(@3) */
   w3 = sin( w3 );
   /* #39: @4 = (@4*@3) */

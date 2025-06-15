@@ -1,18 +1,23 @@
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp_action/rclcpp_action.hpp>
 #include <geometry_msgs/msg/quaternion.hpp>
 #include <geometry_msgs/msg/vector3.hpp>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Vector3.h>
 #include <Eigen/Dense>
+#include "space_station_gnc/action/unloading.hpp"
 
 class ControlTorque : public rclcpp::Node {
 public:
+    using unloading =  space_station_gnc::action::Unloading;
+    using GoalHandleUnloading = rclcpp_action::ServerGoalHandle<unloading>;
     ControlTorque()
     : Node("control_torque"), kp_(300000.0), kd_(300000) {
         
         // Declare parameters for PD gains
         this->declare_parameter("kp", 300000.0);
         this->declare_parameter("kd", 300000.0);
+        this->declare_parameter("k", 10.0);
 
         // Subscribers
         pose_ref_sub_ = this->create_subscription<geometry_msgs::msg::Quaternion>(
@@ -26,7 +31,11 @@ public:
         angvel_est_sub_ = this->create_subscription<geometry_msgs::msg::Vector3>(
             "/gnc/angvel_est", rclcpp::QoS(10),
             std::bind(&ControlTorque::callback_angvel_est, this, std::placeholders::_1));
-    
+        
+        cmg_h_sub_ = this->create_subscription<geometry_msgs::msg::Vector3>(
+            "/gnc/cmg_h", rclcpp::QoS(10),
+            std::bind(&ControlTorque::callback_cmg_h, this, std::placeholders::_1));
+        
             pose_ref_.x = 0.0;
             pose_ref_.y = 0.0;
             pose_ref_.z = 0.0;
@@ -35,6 +44,16 @@ public:
           
         // Publisher
         torque_pub_ = this->create_publisher<geometry_msgs::msg::Vector3>("/gnc/cmg_torque_cmd", 10);
+        torque_thr_pub_ = this->create_publisher<geometry_msgs::msg::Vector3>("/gnc/bias_torque_cmd", 10);
+
+        // Action server for unloading
+        unloading_server_ = rclcpp_action::create_server<unloading>(
+            this,
+            "gnc/unloading",
+            std::bind(&ControlTorque::handle_goal, this, std::placeholders::_1, std::placeholders::_2),
+            std::bind(&ControlTorque::handle_cancel, this, std::placeholders::_1),
+            std::bind(&ControlTorque::handle_accepted, this, std::placeholders::_1));
+        RCLCPP_INFO(this->get_logger(), "Control Torque Node Initialized");
     }
 
 private:
@@ -50,11 +69,16 @@ private:
     void callback_angvel_est(const geometry_msgs::msg::Vector3::SharedPtr msg) {
         angvel_est_ = *msg;
     }
+    void callback_cmg_h(const geometry_msgs::msg::Vector3::SharedPtr msg) {
+        cmg_pos_ = Eigen::Vector3d(msg->x, msg->y, msg->z);
+    }
 
     void compute_control() {
         // Load gains from parameters
         kp_ = this->get_parameter("kp").as_double();
         kd_ = this->get_parameter("kd").as_double();
+        k = this->get_parameter("k").as_double();
+        k_.setConstant(k);
 
 
         // Convert quaternions from LVLH to Body frame
@@ -89,26 +113,98 @@ private:
 
         // Total torque command in body frame
         Eigen::Vector3d torque_cmd = torque_p + torque_d;
+        Eigen::Vector3d torque_thr_cmd = Eigen::Vector3d::Zero();
 
         // Publish torque command
+        if (unload) {
+            t_bias = (-1) * k_.asDiagonal() * cmg_pos_;
+            t_bias_norm = t_bias.normalized();
+            N = Eigen::Matrix3d::Identity() - t_bias_norm * t_bias_norm.transpose();
+            t_att = N * torque_cmd;
+            torque_thr_cmd = t_bias + (torque_cmd - t_att);
+            torque_cmd = t_att;
+        }
+
         geometry_msgs::msg::Vector3 torque_msg;
+        geometry_msgs::msg::Vector3 torque_thr_msg;
+
         torque_msg.x = torque_cmd.x();
         torque_msg.y = torque_cmd.y();
         torque_msg.z = torque_cmd.z();
         torque_pub_->publish(torque_msg);
 
+        torque_thr_msg.x = torque_thr_cmd.x();
+        torque_thr_msg.y = torque_thr_cmd.y();
+        torque_thr_msg.z = torque_thr_cmd.z();
+        torque_thr_pub_->publish(torque_thr_msg);
+
+    }
+
+    void handleUnloading(const std::shared_ptr<GoalHandleUnloading> goal_handle) {
+        RCLCPP_INFO(this->get_logger(), "Handling unloading request");
+        rclcpp::Rate rate(1);
+        const auto goal = goal_handle->get_goal();
+        auto feedback = std::make_shared<unloading::Feedback>();
+        auto &status = feedback->rem;
+        auto result = std::make_shared<unloading::Result>();
+        unload = goal->unload;
+
+        while(rclcpp::ok() && t_bias.norm() > 0.01) {
+            if(goal_handle->is_canceling()) {
+                result->success = false;
+                goal_handle->canceled(result);
+                RCLCPP_INFO(this->get_logger(), "Unloading stopped");
+                return;
+            }
+            status = t_bias.norm(); // TODO: Needs better feedback
+            goal_handle->publish_feedback(feedback);
+            rate.sleep();
+        }
+
+        if(rclcpp::ok()) {
+            result->success = true;
+            goal_handle->succeed(result);
+            RCLCPP_INFO(this->get_logger(), "Unloading completed");   
+        }
     }
 
     rclcpp::Subscription<geometry_msgs::msg::Quaternion>::SharedPtr pose_ref_sub_;
     rclcpp::Subscription<geometry_msgs::msg::Quaternion>::SharedPtr pose_est_sub_;
     rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr angvel_est_sub_;
+    rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr cmg_h_sub_;
     rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr torque_pub_;
+    rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr torque_thr_pub_;
+    rclcpp_action::Server<unloading>::SharedPtr unloading_server_;
+
+    rclcpp_action::GoalResponse handle_goal(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const unloading::Goal> goal) 
+    {
+        RCLCPP_INFO(this->get_logger(), "Received unloading request, unload: %i", goal->unload);
+        (void)uuid;
+        return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+    }
+
+    rclcpp_action::CancelResponse handle_cancel(const std::shared_ptr<GoalHandleUnloading> goal_handle)
+    {
+        RCLCPP_INFO(this->get_logger(), "Received cancel request");
+        (void)goal_handle;
+        return rclcpp_action::CancelResponse::ACCEPT;
+    }
+    void handle_accepted(const std::shared_ptr<GoalHandleUnloading> goal_handle)
+    {
+        std::thread(std::bind(&ControlTorque::handleUnloading, this, std::placeholders::_1), goal_handle).detach();
+    }
 
     geometry_msgs::msg::Quaternion pose_ref_;
     geometry_msgs::msg::Quaternion pose_est_;
     geometry_msgs::msg::Vector3 angvel_est_;
+    Eigen::Vector3d cmg_pos_;
 
-    double kp_, kd_;
+    double kp_, kd_, k;
+    Eigen::Vector3d k_; // Bias factor for unloading CMG
+    Eigen::Vector3d t_bias, t_bias_norm, t_att;
+    Eigen::Matrix<double,3,3> N;
+
+    std::atomic<bool> unload = false; // Flag to indicate if unloading is required
 };
 
 int main(int argc, char **argv) {

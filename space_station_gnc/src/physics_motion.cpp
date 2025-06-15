@@ -1,4 +1,5 @@
 #include <rclcpp/rclcpp.hpp>
+#include "rclcpp_action/rclcpp_action.hpp"
 #include <iostream>
 #include <string>
 #include <cmath>
@@ -16,12 +17,15 @@
 #include <Eigen/Dense>
 #include <vector>
 #include "L_p_func.cpp"
+#include "space_station_gnc/action/unloading.hpp"
 //std::string mode_demo;
 
 class AttitudeDynamicsNode : public rclcpp::Node
 {
 public:
-    AttitudeDynamicsNode() : Node("attitude_dynamics_node")
+    using unloading =  space_station_gnc::action::Unloading;
+    using GoalHandleUnloading = rclcpp_action::ClientGoalHandle<unloading>;
+    AttitudeDynamicsNode(const rclcpp::NodeOptions & options) : Node("physics_motion", options)
     {
         // dynamics parameters
         this->declare_parameter<double>("dynamics.J.xx", 280e6);
@@ -53,10 +57,15 @@ public:
         auto acc0 = this->get_parameter("initial.angacc").as_double_array();
         omedotbcur.setValue(acc0[0], acc0[1], acc0[2]);
 
+        H_th << 0.3,0.3,0.3;
+
         pub_attitude_LVLH = this->create_publisher<geometry_msgs::msg::Quaternion>("gnc/attitude_LVLH", 10);
         pub_angvel_body = this->create_publisher<geometry_msgs::msg::Vector3>("gnc/angvel_body", 10);
         pub_cmg_del = this->create_publisher<std_msgs::msg::Float64MultiArray>("gnc/cmg_del", 1);
         pub_pose_all = this->create_publisher<geometry_msgs::msg::PoseStamped>("gnc/pose_all", 10);
+        pub_cmg_h = this->create_publisher<geometry_msgs::msg::Vector3>("gnc/cmg_h", 1);
+
+        pub_ang_acc = this->create_publisher<geometry_msgs::msg::Vector3>("gnc/ang_acc", 10);
         //pub_pose_marker = this->create_publisher<visualization_msgs::msg::Marker>("pose_marker", 10);
         broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
@@ -108,12 +117,35 @@ public:
         sub_cmg_torque_control = this->create_subscription<geometry_msgs::msg::Vector3>(
             "gnc/cmg_torque_cmd", 1, 
             std::bind(&AttitudeDynamicsNode::callback_cmg_inp, this, std::placeholders::_1));
+        
+        sub_bias_torque_control = this->create_subscription<geometry_msgs::msg::Vector3>(
+            "gnc/bias_torque_cmd", 1, 
+            std::bind(&AttitudeDynamicsNode::callback_bias_inp, this, std::placeholders::_1));
             
         timer_ = this->create_wall_timer(
             std::chrono::milliseconds((int)(Tpubatt_*1000.0)), 
             std::bind(&AttitudeDynamicsNode::callback_timer_pub_att, this));
 
+        timer_acc_ = this->create_wall_timer(
+            std::chrono::milliseconds((int)(Tpubatt_*1000.0)), 
+            std::bind(&AttitudeDynamicsNode::callback_timer_pub_acc, this));
+        
+        timer_unload_ = this->create_wall_timer(
+            std::chrono::milliseconds((int)(Tpubatt_*1000.0)), 
+            std::bind(&AttitudeDynamicsNode::callback_timer_pub_unload, this));
 
+        unloading_client_ = rclcpp_action::create_client<unloading>(
+            this, "gnc/unloading");
+
+        if (!unloading_client_->wait_for_action_server(std::chrono::seconds(5))) {
+            RCLCPP_ERROR(this->get_logger(), "Unloading action server not available");
+            rclcpp::shutdown();
+        }
+
+        goal_msg.unload = false;
+        send_goal_options.goal_response_callback = std::bind(&AttitudeDynamicsNode::goal_response_callback, this, std::placeholders::_1);
+        send_goal_options.feedback_callback = std::bind(&AttitudeDynamicsNode::feedback_callback, this, std::placeholders::_1, std::placeholders::_2);
+        send_goal_options.result_callback = std::bind(&AttitudeDynamicsNode::result_callback, this, std::placeholders::_1);
     }
 
 private:
@@ -121,6 +153,7 @@ private:
     //ros2 stuff
     rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr sub_torque_control;
     rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr sub_cmg_torque_control;
+    rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr sub_bias_torque_control;
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr sub_t_fwd_sim;
     rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr sub_angvel_overwrite;
     rclcpp::Subscription<geometry_msgs::msg::Quaternion>::SharedPtr sub_attitude_overwrite;
@@ -129,13 +162,19 @@ private:
     rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr pub_angvel_body;
     rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr pub_cmg_del;
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pub_pose_all;
+    rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr pub_cmg_h;
+    rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr pub_ang_acc;
     // rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr pub_pose_marker;
     geometry_msgs::msg::Quaternion attitude_LVLH;
     geometry_msgs::msg::Vector3 angvel_body;
+    geometry_msgs::msg::Vector3 ang_acc;
     std_msgs::msg::Float64MultiArray cmg_del;
+    geometry_msgs::msg::Vector3 cmg_h;
     std::shared_ptr<tf2_ros::TransformBroadcaster> broadcaster_;
     rclcpp::TimerBase::SharedPtr timer_;
-
+    rclcpp::TimerBase::SharedPtr timer_acc_;
+    rclcpp::TimerBase::SharedPtr timer_unload_;
+    rclcpp_action::Client<unloading>::SharedPtr unloading_client_;
 
     //define parameters for dynamics
     //TODO: Jall, dynamic change of J, 
@@ -160,6 +199,7 @@ private:
     tf2::Vector3 tau_ctlthrcur; 
     tf2::Vector3 tau_extgracur; 
     tf2::Vector3 tau_allcur; 
+    tf2::Vector3 tau_ctlbiascur;
 
 
 
@@ -171,10 +211,52 @@ private:
     int N2disp; // publish rate: Npublish * Ttorque
     int i2disp; // index for i2disp
     double Tpubatt_; 
+    Eigen::Vector3d H_th;
+    rclcpp_action::ClientGoalHandle<unloading>::SharedPtr goal_handle;
+    unloading::Goal goal_msg;
+    rclcpp_action::Client<unloading>::SendGoalOptions send_goal_options;
+    // rclcpp_action::Client<unloading>::CancelGoalOptions cancel_goal_options;
 
     bool should_pub_att; // true then publish attitude for display purpose
 
+    std::atomic<bool> unload = false; // Flag to indicate if unloading is required
+    std::atomic<bool> prevUnload = false;
 
+    void goal_response_callback(
+        const GoalHandleUnloading::SharedPtr &future)
+    {
+        goal_handle = future;
+        if (!goal_handle) {
+            RCLCPP_ERROR(this->get_logger(), "Goal was rejected by the unloading server");
+        } else {
+            RCLCPP_INFO(this->get_logger(), "Goal accepted by the unloading server");
+        }
+    }
+
+    void feedback_callback(
+        GoalHandleUnloading::SharedPtr,
+        const std::shared_ptr<const unloading::Feedback> feedback)
+    {
+        RCLCPP_INFO(this->get_logger(), "Feedback received: %f", feedback->rem);
+    }
+
+    void result_callback(const GoalHandleUnloading::WrappedResult & result)
+    {
+        switch (result.code) {
+            case rclcpp_action::ResultCode::SUCCEEDED:
+                RCLCPP_INFO(this->get_logger(), "Successfully Unloaded");
+                break;
+            case rclcpp_action::ResultCode::ABORTED:
+                RCLCPP_ERROR(this->get_logger(), "Unloading action aborted");
+                break;
+            case rclcpp_action::ResultCode::CANCELED:
+                RCLCPP_WARN(this->get_logger(), "Action canceled");
+                break;
+            default:
+                RCLCPP_ERROR(this->get_logger(), "Unknown action result code");
+                break;
+        }
+    }
 
 
     //utility function
@@ -274,6 +356,45 @@ private:
         
         cmg_del.data = {deltacur(0), deltacur(1), deltacur(2), deltacur(3)};
         pub_cmg_del->publish(cmg_del);
+
+    }
+
+    void callback_timer_pub_acc() {
+        // Calculate angular acceleration in body frame
+        Eigen::Vector3d tau_allcure(tau_allcur.x(), tau_allcur.y(), tau_allcur.z());
+        // for current 
+        Eigen::Vector3d tau_inp(tau_ctlcmgcur.x(), tau_ctlcmgcur.y(), tau_ctlcmgcur.z());
+        Eigen::Vector3d omega_inp(omebcur.x(), omebcur.y(), omebcur.z());
+            
+        Eigen::Vector3d rhs1 = J123 * omega_inp;
+        Eigen::Vector3d tau_eff = tau_allcure - omega_inp.cross(rhs1);
+        Eigen::Vector3d omega_dot_acc = J123inv * tau_eff;
+
+        ang_acc.x = omega_dot_acc.x();
+        ang_acc.y = omega_dot_acc.y();
+        ang_acc.z = omega_dot_acc.z();
+
+        pub_ang_acc->publish(ang_acc);
+    }
+
+    void callback_timer_pub_unload() {
+        Eigen::Vector3d h = compute_h(deltacur);
+        cmg_h.x = h.x();
+        cmg_h.y = h.y();
+        cmg_h.z = h.z();
+        pub_cmg_h->publish(cmg_h);
+
+        unload = checkCMGThresh(h);
+        if (unload && !prevUnload) {
+            RCLCPP_INFO(this->get_logger(), "CMG threshold exceeded, unloading initiated.");
+            goal_msg.unload = unload;
+            unloading_client_->async_send_goal(goal_msg,send_goal_options);
+        }
+        else if (!unload && prevUnload) {
+            RCLCPP_INFO(this->get_logger(), "Unloading stopped.");
+            unloading_client_->async_cancel_goal(goal_handle);
+        }
+        prevUnload = unload.load();
     }
 
     //forcing the simulation forward
@@ -331,6 +452,15 @@ private:
         tf2::Quaternion qf = q_omega_world * qi;
         qf = qf.normalize();
         return qf;
+    }
+
+    bool checkCMGThresh(const Eigen::Vector3d& hState)
+    {
+        bool exceed = (std::abs(hState.x()) > H_th.x()) 
+                    || (std::abs(hState.y()) > H_th.y())
+                    || (std::abs(hState.z()) > H_th.z());
+
+        return exceed;
     }
 
     void forward_attitude_dynamics(double Tfwd_sec){
@@ -475,6 +605,11 @@ private:
         tau_ctlcmgcur.setValue(msg->x,msg->y,msg->z); 
         
     }
+    
+    void callback_bias_inp(const geometry_msgs::msg::Vector3::SharedPtr msg)
+    {
+        tau_ctlbiascur.setValue(msg->x,msg->y,msg->z);
+    }
 
     void callback_attitude_dynamics(const geometry_msgs::msg::Vector3::SharedPtr msg)
     {
@@ -484,7 +619,7 @@ private:
         //TODO: Currently we assume only gravity gradient torque 
         tau_extgracur = gravityGradT();
 
-        tau_allcur = tau_ctlcmgcur + tau_ctlthrcur + tau_extgracur;
+        tau_allcur = tau_ctlcmgcur + tau_ctlthrcur + tau_extgracur + tau_ctlbiascur;
 
         //compute attitude update
         forward_attitude_dynamics(Ttorque_); //Ttorque_ is simulation time period
@@ -516,7 +651,9 @@ double get_time_double(rclcpp::Node::SharedPtr node) {
 int main(int argc, char *argv[])
 {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<AttitudeDynamicsNode>();
+    rclcpp::NodeOptions options;
+    options.automatically_declare_parameters_from_overrides(true);
+    auto node = std::make_shared<AttitudeDynamicsNode>(options);
     rclcpp::spin(node);
 
     rclcpp::shutdown();
