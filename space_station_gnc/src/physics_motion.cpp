@@ -1,4 +1,5 @@
 #include <rclcpp/rclcpp.hpp>
+#include "rclcpp_action/rclcpp_action.hpp"
 #include <iostream>
 #include <string>
 #include <cmath>
@@ -22,6 +23,8 @@
 class AttitudeDynamicsNode : public rclcpp::Node
 {
 public:
+    using unloading =  space_station_gnc::action::Unloading;
+    using GoalHandleUnloading = rclcpp_action::ClientGoalHandle<unloading>;
     AttitudeDynamicsNode(const rclcpp::NodeOptions & options) : Node("physics_motion", options)
     {
         // dynamics parameters
@@ -60,6 +63,8 @@ public:
         pub_angvel_body = this->create_publisher<geometry_msgs::msg::Vector3>("gnc/angvel_body", 10);
         pub_cmg_del = this->create_publisher<std_msgs::msg::Float64MultiArray>("gnc/cmg_del", 1);
         pub_pose_all = this->create_publisher<geometry_msgs::msg::PoseStamped>("gnc/pose_all", 10);
+        pub_cmg_h = this->create_publisher<geometry_msgs::msg::Vector3>("gnc/cmg_h", 1);
+
         pub_ang_acc = this->create_publisher<geometry_msgs::msg::Vector3>("gnc/ang_acc", 10);
         //pub_pose_marker = this->create_publisher<visualization_msgs::msg::Marker>("pose_marker", 10);
         broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
@@ -124,8 +129,23 @@ public:
         timer_acc_ = this->create_wall_timer(
             std::chrono::milliseconds((int)(Tpubatt_*1000.0)), 
             std::bind(&AttitudeDynamicsNode::callback_timer_pub_acc, this));
+        
+        timer_unload_ = this->create_wall_timer(
+            std::chrono::milliseconds((int)(Tpubatt_*1000.0)), 
+            std::bind(&AttitudeDynamicsNode::callback_timer_pub_unload, this));
 
+        unloading_client_ = rclcpp_action::create_client<unloading>(
+            this, "gnc/unloading");
 
+        if (!unloading_client_->wait_for_action_server(std::chrono::seconds(5))) {
+            RCLCPP_ERROR(this->get_logger(), "Unloading action server not available");
+            rclcpp::shutdown();
+        }
+
+        goal_msg.unload = false;
+        send_goal_options.goal_response_callback = std::bind(&AttitudeDynamicsNode::goal_response_callback, this, std::placeholders::_1);
+        send_goal_options.feedback_callback = std::bind(&AttitudeDynamicsNode::feedback_callback, this, std::placeholders::_1, std::placeholders::_2);
+        send_goal_options.result_callback = std::bind(&AttitudeDynamicsNode::result_callback, this, std::placeholders::_1);
     }
 
 private:
@@ -142,16 +162,19 @@ private:
     rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr pub_angvel_body;
     rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr pub_cmg_del;
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pub_pose_all;
+    rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr pub_cmg_h;
     rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr pub_ang_acc;
     // rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr pub_pose_marker;
     geometry_msgs::msg::Quaternion attitude_LVLH;
     geometry_msgs::msg::Vector3 angvel_body;
     geometry_msgs::msg::Vector3 ang_acc;
     std_msgs::msg::Float64MultiArray cmg_del;
+    geometry_msgs::msg::Vector3 cmg_h;
     std::shared_ptr<tf2_ros::TransformBroadcaster> broadcaster_;
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::TimerBase::SharedPtr timer_acc_;
-
+    rclcpp::TimerBase::SharedPtr timer_unload_;
+    rclcpp_action::Client<unloading>::SharedPtr unloading_client_;
 
     //define parameters for dynamics
     //TODO: Jall, dynamic change of J, 
@@ -189,10 +212,51 @@ private:
     int i2disp; // index for i2disp
     double Tpubatt_; 
     Eigen::Vector3d H_th;
+    rclcpp_action::ClientGoalHandle<unloading>::SharedPtr goal_handle;
+    unloading::Goal goal_msg;
+    rclcpp_action::Client<unloading>::SendGoalOptions send_goal_options;
+    // rclcpp_action::Client<unloading>::CancelGoalOptions cancel_goal_options;
 
     bool should_pub_att; // true then publish attitude for display purpose
 
+    std::atomic<bool> unload = false; // Flag to indicate if unloading is required
+    std::atomic<bool> prevUnload = false;
 
+    void goal_response_callback(
+        const GoalHandleUnloading::SharedPtr &future)
+    {
+        goal_handle = future;
+        if (!goal_handle) {
+            RCLCPP_ERROR(this->get_logger(), "Goal was rejected by the unloading server");
+        } else {
+            RCLCPP_INFO(this->get_logger(), "Goal accepted by the unloading server");
+        }
+    }
+
+    void feedback_callback(
+        GoalHandleUnloading::SharedPtr,
+        const std::shared_ptr<const unloading::Feedback> feedback)
+    {
+        RCLCPP_INFO(this->get_logger(), "Feedback received: %f", feedback->rem);
+    }
+
+    void result_callback(const GoalHandleUnloading::WrappedResult & result)
+    {
+        switch (result.code) {
+            case rclcpp_action::ResultCode::SUCCEEDED:
+                RCLCPP_INFO(this->get_logger(), "Successfully Unloaded");
+                break;
+            case rclcpp_action::ResultCode::ABORTED:
+                RCLCPP_ERROR(this->get_logger(), "Unloading action aborted");
+                break;
+            case rclcpp_action::ResultCode::CANCELED:
+                RCLCPP_WARN(this->get_logger(), "Action canceled");
+                break;
+            default:
+                RCLCPP_ERROR(this->get_logger(), "Unknown action result code");
+                break;
+        }
+    }
 
 
     //utility function
@@ -292,6 +356,7 @@ private:
         
         cmg_del.data = {deltacur(0), deltacur(1), deltacur(2), deltacur(3)};
         pub_cmg_del->publish(cmg_del);
+
     }
 
     void callback_timer_pub_acc() {
@@ -310,6 +375,26 @@ private:
         ang_acc.z = omega_dot_acc.z();
 
         pub_ang_acc->publish(ang_acc);
+    }
+
+    void callback_timer_pub_unload() {
+        Eigen::Vector3d h = compute_h(deltacur);
+        cmg_h.x = h.x();
+        cmg_h.y = h.y();
+        cmg_h.z = h.z();
+        pub_cmg_h->publish(cmg_h);
+
+        unload = checkCMGThresh(h);
+        if (unload && !prevUnload) {
+            RCLCPP_INFO(this->get_logger(), "CMG threshold exceeded, unloading initiated.");
+            goal_msg.unload = unload;
+            unloading_client_->async_send_goal(goal_msg,send_goal_options);
+        }
+        else if (!unload && prevUnload) {
+            RCLCPP_INFO(this->get_logger(), "Unloading stopped.");
+            unloading_client_->async_cancel_goal(goal_handle);
+        }
+        prevUnload = unload.load();
     }
 
     //forcing the simulation forward

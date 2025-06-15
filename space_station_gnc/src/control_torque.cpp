@@ -32,9 +32,9 @@ public:
             "/gnc/angvel_est", rclcpp::QoS(10),
             std::bind(&ControlTorque::callback_angvel_est, this, std::placeholders::_1));
         
-        cmg_pos_sub_ = this->create_subscription<geometry_msgs::msg::Vector3>(
-            "/gnc/cmg_del", rclcpp::QoS(10),
-            std::bind(&ControlTorque::callback_cmg_pos, this, std::placeholders::_1));
+        cmg_h_sub_ = this->create_subscription<geometry_msgs::msg::Vector3>(
+            "/gnc/cmg_h", rclcpp::QoS(10),
+            std::bind(&ControlTorque::callback_cmg_h, this, std::placeholders::_1));
         
             pose_ref_.x = 0.0;
             pose_ref_.y = 0.0;
@@ -69,7 +69,7 @@ private:
     void callback_angvel_est(const geometry_msgs::msg::Vector3::SharedPtr msg) {
         angvel_est_ = *msg;
     }
-    void callback_cmg_pos(const geometry_msgs::msg::Vector3::SharedPtr msg) {
+    void callback_cmg_h(const geometry_msgs::msg::Vector3::SharedPtr msg) {
         cmg_pos_ = Eigen::Vector3d(msg->x, msg->y, msg->z);
     }
 
@@ -171,7 +171,7 @@ private:
     rclcpp::Subscription<geometry_msgs::msg::Quaternion>::SharedPtr pose_ref_sub_;
     rclcpp::Subscription<geometry_msgs::msg::Quaternion>::SharedPtr pose_est_sub_;
     rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr angvel_est_sub_;
-    rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr cmg_pos_sub_;
+    rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr cmg_h_sub_;
     rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr torque_pub_;
     rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr torque_thr_pub_;
     rclcpp_action::Server<unloading>::SharedPtr unloading_server_;
@@ -204,7 +204,7 @@ private:
     Eigen::Vector3d t_bias, t_bias_norm, t_att;
     Eigen::Matrix<double,3,3> N;
 
-    bool unload = false; // Flag to indicate if unloading is required
+    std::atomic<bool> unload = false; // Flag to indicate if unloading is required
 };
 
 int main(int argc, char **argv) {
