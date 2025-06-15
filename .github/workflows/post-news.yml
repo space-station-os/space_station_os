@@ -1,4 +1,4 @@
-name: Post News to Docs Site
+name: Auto Post News to Docs Site
 
 on:
   push:
@@ -11,50 +11,52 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout source repo (space_station_os)
+      - name: Checkout source repo
         uses: actions/checkout@v3
 
-      - name: Get release data
-        id: release
-        if: github.event_name == 'release'
+      - name: Get commit info
+        id: commitinfo
         run: |
-          echo "title=${{ github.event.release.name }}" >> $GITHUB_OUTPUT
-          echo "body=${{ github.event.release.body }}" >> $GITHUB_OUTPUT
-          echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+          echo "title=Update by ${{ github.actor }} on $(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+          echo "pubDate=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+          echo "description=$(git log -1 --pretty=%s)" >> $GITHUB_OUTPUT
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          git log -1 --pretty=format:'%h by %an on %ad%n%n%s%n%n%b' >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Fallback commit-based post (if no release)
-        id: fallback
-        if: github.event_name == 'push'
+      - name: Find image (if any)
+        id: image
         run: |
-          echo "title=Update from push at $(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
-          echo "body=Automatic update triggered by push to main." >> $GITHUB_OUTPUT
-          echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+          IMAGE=$(git diff-tree --no-commit-id --name-only -r ${{ github.sha }} | grep -Ei '\.(png|jpg|jpeg|gif|webp)$' | head -n 1 || true)
+          if [ -n "$IMAGE" ]; then
+            echo "image=/$IMAGE" >> $GITHUB_OUTPUT
+          else
+            echo "image=" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Clone documentation site
+      - name: Clone docs repo
         run: |
-          git clone https://x-access-token:${{ secrets.DOC_SITE_PUSH_TOKEN }}@github.com/space-station-os/space-station-os.github.io.git site
+          git clone https://x-access-token:${{ secrets.DOC_SITE_TOKEN1 }}@github.com/space-station-os/space-station-os.github.io.git site
 
-      - name: Ensure news directory exists
-        run: mkdir -p site/auto_astro/src/content/news
-
-      - name: Create markdown news file
+      - name: Create markdown file
         run: |
-          FILE=site/auto_astro/src/content/news/${{ steps.release.outputs.date || steps.fallback.outputs.date }}-${{ github.sha }}.md
+          FILE=site/auto_astro/src/content/news/${{ steps.commitinfo.outputs.pubDate }}-${{ github.sha }}.md
           echo "---" > $FILE
-          echo "title: \"${{ steps.release.outputs.title || steps.fallback.outputs.title }}\"" >> $FILE
-          echo "pubDate: ${{ steps.release.outputs.date || steps.fallback.outputs.date }}" >> $FILE
-          echo "description: \"${{ steps.release.outputs.title || steps.fallback.outputs.title }}\"" >> $FILE
-          echo "tags: [automated, release]" >> $FILE
-          echo "image: /images/default.jpg" >> $FILE
+          echo "title: \"${{ steps.commitinfo.outputs.title }}\"" >> $FILE
+          echo "pubDate: ${{ steps.commitinfo.outputs.pubDate }}" >> $FILE
+          echo "description: \"${{ steps.commitinfo.outputs.description }}\"" >> $FILE
+          echo "tags: [automated, push]" >> $FILE
+          if [ -n \"${{ steps.image.outputs.image }}\" ]; then
+            echo "image: ${{ steps.image.outputs.image }}" >> $FILE
+          fi
           echo "---" >> $FILE
-          echo "${{ steps.release.outputs.body || steps.fallback.outputs.body }}" >> $FILE
+          echo "${{ steps.commitinfo.outputs.body }}" >> $FILE
 
-      - name: Commit and push to docs site
+      - name: Commit and push
         run: |
           cd site
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add auto_astro/src/content/news/
-          git commit -m "📰 Auto post news from ${{ github.event_name }} ${{ github.sha }}"
+          git commit -m "📰 Auto post detailed news from ${{ github.sha }}"
           git push
-
