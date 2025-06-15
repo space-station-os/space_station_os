@@ -36,7 +36,7 @@ jobs:
 
       - name: Clone docs repo
         run: |
-          git clone https://x-access-token:${{ secrets.DOC_SITE_TOKEN1 }}@github.com/space-station-os/space-station-os.github.io.git site
+          git clone https://x-access-token:${{ secrets.DOC_SITE_PUSH_TOKEN }}@github.com/space-station-os/space-station-os.github.io.git site
 
       - name: Create markdown file
         run: |
