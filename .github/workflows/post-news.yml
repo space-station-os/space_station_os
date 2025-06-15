@@ -34,10 +34,9 @@ jobs:
             echo "image=" >> $GITHUB_OUTPUT
           fi
 
-      - name: Clone docs repo
+      - name: Clone docs repo with classic token (correct format)
         run: |
-          git clone https://github-actions:${{ secrets.DOC_SITE_PUSH_TOKEN }}@github.com/space-station-os/space-station-os.github.io.git site
-
+          git clone https://${{ secrets.DOC_SITE_PUSH_TOKEN }}@github.com/space-station-os/space-station-os.github.io.git site
 
       - name: Create markdown file
         run: |
