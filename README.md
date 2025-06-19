@@ -1,114 +1,170 @@
-# Space Station OS source
+# **Space Station OS – Setup & Demo Guide**
 
-## Prerequisites
-- Ubuntu 22.04
-- ROS 2 Humble (desktop install)
+##  Prerequisites
 
-## Installation
-Common procedures for preparing Space Station OS:
-- Install Ubuntu 22.04
-- Install ROS 2 Humble (desktop install):
-  https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html
-- Clone Space Station OS source
+Before starting, make sure you have the following:
 
-    ```sh
-    cd /path/to/place_space_station_os/
-    ```
+* **Operating System:** Ubuntu 22.04
+* **ROS 2 Distribution:** ROS 2 Humble (Desktop Install)
+  [→ Official ROS 2 Installation Guide](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html)
 
-- For ROS beginners: The directory structure typically looks like this:
+---
 
-    ```sh
-    mkdir -p ~/ros2_ws/src
-    cd ~/ros2_ws/src
-    ```
+##  Installation Steps
 
-- Then clone:
+### 1. Prepare a ROS 2 workspace
 
-    ```sh
-    git clone https://github.com/space-station-os/space_station_os.git
-    ```
+If you’re new to ROS 2, the typical workspace structure is:
+
+```bash
+mkdir -p ~/ros2_ws/src
+cd ~/ros2_ws/src
+```
+
+### 2. Clone the Space Station OS repository
+
+```bash
+git clone https://github.com/space-station-os/space_station_os.git
+```
+
+### 3. Build the workspace
+
+```bash
+cd ~/ros2_ws
+colcon build --symlink-install
+source install/setup.bash
+```
+
+>  Tip: Always source your workspace before running ROS 2 nodes:
+>
+> ```bash
+> source ~/ros2_ws/install/setup.bash
+> ```
+
+---
+
+##  Running Demo 1: ISS Incident Simulation (Nauka & Others)
+
+This demo shows the attitude control and fault management systems of a space station through three different crisis scenarios.
+
+###  Terminal Setup Overview
+
+You’ll need **3 terminals** for full functionality:
+
+---
+
+###  Terminal 1: Run the Incident Scenario
+
+Choose one of the following scenarios:
+
+* **Demo 1a:** Nauka incident simulation (July 2021)
+  *(moderate severity, real-world based)*
+
+  ```bash
+  ros2 run space_station_gnc demo1a_nauka_incident_estimate
+  ```
+
+* **Demo 1b:** Hypothetical engine crisis
+  *(high severity test case)*
+
+  ```bash
+  ros2 run space_station_gnc demo1b_crisis_mainengine
+  ```
+
+* **Demo 1c:** Minor perturbation
+  *(ideal for testing CMG control logic)*
+
+  ```bash
+  ros2 run space_station_gnc demo1c_small_incident
+  ```
+
+---
+
+###  Terminal 2: Launch the GNC Core System
+
+This runs the core control logic and dynamics for all scenarios:
+
+```bash
+ros2 launch space_station_gnc gnc_core.launch.py
+```
+
+No interaction is needed in this terminal once launched.
+
+---
+
+###  Terminal 3: Launch RViz for Visualization
+
+```bash
+ros2 launch space_station_gnc gnc_rviz.launch.py
+```
+
+#### RViz Setup:
+
+1. Set `Fixed Frame` to `world`
+2. Click `Add` → Select `RobotModel`
+3. Set `Description Topic` to `/robot_description`
+4. Zoom out if needed to see the ISS or your custom model
+
+#### Optional: Use Your Own URDF
+
+To view a custom space station model:
+
+* Place your URDF in:
+  `~/ros2_ws/src/space_station_os/space_station_gnc/urdf`
+* Example provided: `SD_SpaceStation_Ver05.urdf`
+
+To configure which URDF to use:
+
+* Modify:
+  `~/ros2_ws/src/space_station_os/space_station_gnc/launch/gnc_core.launch.py`
+
+---
+
+###  Running the Scenario
+
+Return to **Terminal 1**, follow the on-screen scenario instructions, and observe the response in **RViz** as the space station reacts dynamically to simulated faults or perturbations.
+
+---
 
 
-- Compile the Space Station OS source:
 
-    ```sh
-    cd /path/to/placed_space_station_os/
-    colcon build --symlink-install
-    source install/setup.bash
-    ```
+### **Environmental Control and Life Support Systems (ECLSS)**
+Environmental Control and Life Support Systems (ECLSS) are essential for sustaining human life in space by providing a controlled environment that includes air revitalization, water recovery, and waste management. This document serves as an overview of ECLSS and provides links to specific subsystems implemented as part of this project.
 
-- For ROS beginners: assuming the stracture above, you can compile the Space Station OS source:
+## **Overview of ECLSS Subsystems**
+ECLSS consists of multiple interconnected subsystems to maintain habitable conditions for astronauts:
 
-    ```sh
-    cd ~/ros2_ws/
-    colcon build --symlink-install
-    source install/setup.bash
-    ```
+- **Air Revitalization System (ARS):** Handles **CO₂ removal, moisture control, and contaminant filtration** to maintain breathable air.
+- **Oxygen Recovery System (ORS):** Converts **water into oxygen** through electrolysis and uses **hydrogen recovery** to form a closed-loop system.
+- **Water Recovery and Balance Systems:** Processes crew urine, atmospheric condensation, and Sabatier-produced water for reuse.
+- **Temperature and Humidity Control:** Regulates cabin conditions to ensure thermal comfort and moisture control.
 
+## **Available Subsystem Implementations**
+Below are the specific subsystems implemented as part of this project. Click on the links to access their respective documentation.
 
-## Demo1: Estimates of Nauka incident on ISS in July 2021 and more
-Demo1 focuses on space station GNC features.
+### **1. Air Revitalization System (ARS)**
+The ARS is responsible for maintaining breathable air by removing CO₂, moisture, and contaminants from the cabin environment. The system consists of multiple ROS2 nodes working together to simulate air purification onboard the **International Space Station (ISS)**.
 
-In Demo 1a, we estimate what happened and how the system and people reacted in the Nauka incident that occurred on the ISS in July 2021.
-https://www.nasaspaceflight.com/2021/07/nauka-docking/
-In Demo 1b, we prepared for an imaginary difficult case.
+🔗 [Read the full ARS documentation](https://github.com/space-station-os/space_station_os/blob/main/space_station_eclss/src/ars_systems/README.md)
 
-Through these cases, we will study the importance of determining fault detection, isolation and recovery (FDIR).
+### **2. Oxygen Recovery System (ORS)**
+The ORS simulates the oxygen generation process used on the ISS. It leverages **electrolysis, Sabatier reaction, and deionization** to create a closed-loop system that efficiently recycles oxygen from water.
 
-### Procedures to run Demo 1a/1b/1c
-1. Terminal 1: handles scenario description and user input.
-    - for Demo 1a
+🔗 [Read the full ORS documentation](https://github.com/space-station-os/space_station_os/blob/main/space_station_eclss/src/ors_systems/README.md)
 
-        ```sh
-        ros2 run space_station_gnc demo1a_nauka_incident_estimate
-        ```
+### **2. Water Recovery And Purification Systems (WRPS)**
+The WRS system purifies the waste accumulated from the crew and converts it into potable water that is fit for consumption. Some amount of water is also used to get oxygen by electrolysis
 
-    - for Demo 1b -- more agressive incident. 
-
-        ```sh
-        ros2 run space_station_gnc demo1b_crisis_mainengine
-        ```
-
-    - for Demo 1c -- less agressive incident, good for testing the CMG control
-
-        ```sh
-        ros2 run space_station_gnc demo1c_small_incident 
-        ```
+🔗 [Read the full WRS documentation](https://github.com/space-station-os/space_station_os/blob/main/space_station_eclss/src/wrs_systems/README.md)
 
 
-2. Terminal 2: handles space station actuation system and attitude control dynamics, where the user (you) do not need to touch thereafter.
-    - common for Demo 1a/1b/1c
 
-        ```sh
-        ros2 launch space_station_gnc gnc_core.launch.py 
-        ```
+#### To launch the Systems:
 
-3. Terminal 3: Visualization in RViz
-    - We use RViz, a common tool for visualization in ROS 2.
-    - common for Demo 1a/1b/1c
+```sh
+ros2 launch space_station_eclss eclss.launch.py
+```
 
-        ```sh
-        ros2 launch space_station_gnc gnc_rviz.launch.py
-        ```
-
-    - Choose `Fixed Frame`, change from `map` to `world`
-    - Add a robot visualization : `Add` -> `RobotModel`
-    - Choose the  `Description Topic` of the `RobotModel`: use `/robot_description`
-    - You should now see the ISS model in rviz (you may need to zoom out)
-
-    - You can also choose your own space station by placing urdf file in 
-
-          /path/to/placed_space_station_os/space_station_os/space_station_gnc/urdf
-     
-      where we prepared SD_SpaceStation_Ver05.urdf.
-
-
-    - To configure the space station for RViz, modify the launch file in
-
-          /path/to/placed_space_station_os/space_station_os/space_station_gnc/launch/gnc_core.launch.py
-
-4. Then you go back to Terminal 1 and follow the scenario in the console as the attitude of ISS is displayed in rviz2.
-
-## TODOs
+## Interested to contribute? 
 See the project backlog https://github.com/orgs/space-station-os/projects/2/views/1 
 

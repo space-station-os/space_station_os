@@ -11,8 +11,6 @@
       <div class="bar-shell">
         <div class="bar-fill h2" :style="{ width: h2Fill + '%' }"></div>
       </div>
-<<<<<<< HEAD
-=======
 
       <div class="bar-label">Gray Water</div>
       <div class="bar-shell">
@@ -29,7 +27,6 @@
           :style="{ width: methaneFill + '%' }"
         ></div>
       </div>
->>>>>>> 4ff73ce2306d293b53e29e6e93e5c7a3ee237ace
     </div>
   </div>
 </template>
@@ -39,11 +36,8 @@ export default {
   props: {
     co2: Number,
     h2: Number,
-<<<<<<< HEAD
-=======
     grayWater: Number,
     methane: Number,
->>>>>>> 4ff73ce2306d293b53e29e6e93e5c7a3ee237ace
   },
   computed: {
     co2Fill() {
@@ -52,15 +46,12 @@ export default {
     h2Fill() {
       return Math.min(100, this.h2);
     },
-<<<<<<< HEAD
-=======
     grayWaterFill() {
       return Math.min(100, this.grayWater);
     },
     methaneFill() {
       return Math.min(100, this.methane);
     },
->>>>>>> 4ff73ce2306d293b53e29e6e93e5c7a3ee237ace
   },
 };
 </script>
@@ -98,13 +89,10 @@ export default {
 .bar-fill.h2 {
   background: #4fdc74;
 }
-<<<<<<< HEAD
-=======
 .bar-fill.gray {
   background: #a0a0a0;
 }
 .bar-fill.methane {
   background: #ffaa00;
 }
->>>>>>> 4ff73ce2306d293b53e29e6e93e5c7a3ee237ace
 </style>

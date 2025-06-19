@@ -11,43 +11,6 @@
       </p>
     </div>
 
-<<<<<<< HEAD
-    <!-- Top Telemetry Summary -->
-    <div class="telemetry-section">
-      <h2 class="section-header">Live Telemetry</h2>
-      <div class="telemetry-grid">
-        <MetricBox
-          label="Carbon Dioxide (CO₂)"
-          :value="co2"
-          unit="g"
-          delta="+1.2%"
-          color="#ffd700"
-          @click="goTo('/ars')"
-        />
-        <MetricBox
-          label="Oxygen (O₂)"
-          :value="o2"
-          unit="%"
-          delta="-0.8%"
-          color="#00ffae"
-          @click="goTo('/ogs')"
-        />
-        <MetricBox
-          label="Water (H₂O)"
-          :value="h2o"
-          unit="mL"
-          delta="+2.5%"
-          color="#3399ff"
-          @click="goTo('/water')"
-        />
-      </div>
-=======
-    <!-- NEW ECLSS Flow Diagram Section -->
-    <div class="eclss-layout">
-      <EclssLoop :co2="co2" :o2="o2" :h2o="h2o" />
->>>>>>> 4ff73ce2306d293b53e29e6e93e5c7a3ee237ace
-    </div>
-
     <!-- NEW ECLSS Flow Diagram Section -->
     <div class="eclss-layout">
       <EclssLoop :co2="co2" :o2="o2" :h2o="h2o" />
@@ -57,11 +20,7 @@
 
 <script>
 // import NavBar from "../components/NavBar.vue";
-<<<<<<< HEAD
-import MetricBox from "../components/MetricBox.vue";
-=======
 // import MetricBox from "../components/MetricBox.vue";
->>>>>>> 4ff73ce2306d293b53e29e6e93e5c7a3ee237ace
 import EclssLoop from "../components/EclssFlow.vue";
 
 /* global ROSLIB */
@@ -69,11 +28,7 @@ export default {
   name: "HomePage",
   components: {
     // NavBar,
-<<<<<<< HEAD
-    MetricBox,
-=======
     // MetricBox,
->>>>>>> 4ff73ce2306d293b53e29e6e93e5c7a3ee237ace
     EclssLoop,
   },
   data() {
@@ -157,27 +112,6 @@ export default {
   font-size: 1.2rem;
   color: #c0c0c0;
   margin-bottom: 30px;
-}
-
-<<<<<<< HEAD
-.telemetry-section {
-  margin-top: 40px;
-  text-align: center;
-}
-
-.section-header {
-  font-size: 1.6rem;
-  font-weight: 600;
-  margin-bottom: 20px;
-}
-
-.telemetry-grid {
-=======
-.eclss-layout {
-  margin-top: 80px;
->>>>>>> 4ff73ce2306d293b53e29e6e93e5c7a3ee237ace
-  display: flex;
-  justify-content: center;
 }
 
 .eclss-layout {
