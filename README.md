@@ -187,19 +187,9 @@ ros2 launch space_station_eclss eclss.launch.py
 ```
 # SPACE STATION GAZEBO 
 
-Haven-1 Model (downgraded)
-
-[spacestation_full.webm](https://github.com/user-attachments/assets/39a9498a-2918-42c6-84a6-8373325f9fbe)
-
----
-
-HAVEN-2 Model 
-<p align="center">
-  <video controls width="80%">
-    <source src="https://github.com/user-attachments/assets/3a8192e6-1982-4684-8276-a00e9de465c0/Haven-2.webm" type="video/webm">
-  </video>
-</p>
-
+HAVEN-2 Model
+ 
+[Haven-2.webm](https://github.com/user-attachments/assets/3a8192e6-1982-4684-8276-a00e9de465c0)
 
 ```sh
 ros2 launch space_station_description gazebo.launch.py
