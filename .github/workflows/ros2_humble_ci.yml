@@ -23,37 +23,15 @@ jobs:
         run: |
           apt update
           apt install -y python3-colcon-common-extensions python3-pip git
+          apt install -y python3-ament-python libsdl2-dev
           apt install -y build-essential
-          apt install -y build-essential libopencv-dev
           rosdep update
-          rosdep install --from-paths . --ignore-src -r -y
+          rosdep install --from-paths src --ignore-src -r -y
 
       - name: Build the workspace
         run: |
-          bash -c "source /opt/ros/humble/setup.bash && colcon build --event-handlers console_direct+"
+          source /opt/ros/humble/setup.bash
+          colcon build --event-handlers console_direct+
 
-
-
-  docker-publish:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push Docker image to GHCR
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ghcr.io/space-station-os/space_station_os:latest
+      
+          
