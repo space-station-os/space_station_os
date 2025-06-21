@@ -160,10 +160,35 @@ The WRS system purifies the waste accumulated from the crew and converts it into
 
 
 #### To launch the Systems:
+---
 
 ```sh
 ros2 launch space_station_eclss eclss.launch.py
 ```
+# SPACE STATION GAZEBO 
+
+Haven-1 Model (downgraded)
+
+[spacestation_full.webm](https://github.com/user-attachments/assets/39a9498a-2918-42c6-84a6-8373325f9fbe)
+
+---
+
+HAVEN-2 Model 
+[haven-2](https://github.com/user-attachments/assets/4ecce540-28c3-49aa-9bdf-c3e04952523b)
+
+```sh
+ros2 launch space_station_description gazebo.launch.py
+```
+
+#### To run the teleoperation 
+---
+
+```sh
+ros2 run space_station_description mux
+ros2 run space_station_description teleop
+```
+
+
 
 ## Interested to contribute? 
 See the project backlog https://github.com/orgs/space-station-os/projects/2/views/1 

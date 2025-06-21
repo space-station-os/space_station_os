@@ -1,0 +1,862 @@
+<?xml version="1.0" ?>
+<robot name="space_station" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+<xacro:include filename="$(find space_station_description)/urdf/materials.xacro" />
+<xacro:include filename="$(find space_station_description)/urdf/space_station.trans" />
+<xacro:include filename="$(find space_station_description)/urdf/space_station.gazebo" />
+<link name="base_link">
+  <inertial>
+    <origin xyz="0.000574324589074325 0.030373043905383902 0.008402956067706836" rpy="0 0 0"/>
+    <mass value="15000.0"/>
+    <inertia ixx="367106180.976249" iyy="95256060.656933" izz="366784605.89785" ixy="32671.823244" iyz="420616.843653" ixz="-4413.413957"/>
+  </inertial>
+  <visual>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="th2_1">
+  <inertial>
+    <origin xyz="-0.011407106149771806 -0.09999999999999964 0.00605200870657896" rpy="0 0 0"/>
+    <mass value="212.70545760211388"/>
+    <inertia ixx="9.63613" iyy="17.820615" izz="9.602522" ixy="0.0" iyz="-0.0" ixz="-0.024814"/>
+  </inertial>
+  <visual>
+    <origin xyz="-2.007871 10.0 -2.495824" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-2.007871 10.0 -2.495824" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="th1_1">
+  <inertial>
+    <origin xyz="-0.02972025496014319 -0.09999999999999964 0.005554958615336503" rpy="0 0 0"/>
+    <mass value="212.7054576021139"/>
+    <inertia ixx="9.638203" iyy="17.551943" izz="9.331777" ixy="-0.0" iyz="0.0" ixz="-0.059344"/>
+  </inertial>
+  <visual>
+    <origin xyz="-2.020507 10.0 2.503833" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-2.020507 10.0 2.503833" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="camera_front_1">
+  <inertial>
+    <origin xyz="0.0041090989999844965 -0.05000000000000071 -0.0004997698338091716" rpy="0 0 0"/>
+    <mass value="125.89847784256487"/>
+    <inertia ixx="0.308196" iyy="18.365409" izz="18.267044" ixy="0.0" iyz="0.0" ixz="-0.000259"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.0 10.1 -3.15" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/camera_front_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.0 10.1 -3.15" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/camera_front_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="th4_1">
+  <inertial>
+    <origin xyz="-0.0230030327810804 -0.20000000000005436 0.002243586799012043" rpy="0 0 0"/>
+    <mass value="212.70545760211388"/>
+    <inertia ixx="9.647485" iyy="17.688527" izz="9.459079" ixy="0.0" iyz="-0.0" ixz="-0.018554"/>
+  </inertial>
+  <visual>
+    <origin xyz="1.984128 9.9 -2.498452" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th4_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="1.984128 9.9 -2.498452" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th4_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="docking_port_back_1">
+  <inertial>
+    <origin xyz="0.044966206089208094 -1.8355220724311785 -0.011434572980852235" rpy="0 0 0"/>
+    <mass value="233731.50121118044"/>
+    <inertia ixx="681356.265853" iyy="594986.526547" izz="679924.980351" ixy="-898.843224" iyz="228.573731" ixz="-389.136998"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.100631 10.0 -0.02559" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/docking_port_back_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.100631 10.0 -0.02559" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/docking_port_back_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="th3_1">
+  <inertial>
+    <origin xyz="-0.012369628789436371 -0.09999999999999609 0.013267970266699791" rpy="0 0 0"/>
+    <mass value="212.70545760211388"/>
+    <inertia ixx="9.586016" iyy="17.762271" izz="9.594291" ixy="-0.0" iyz="-0.0" ixz="-0.058996"/>
+  </inertial>
+  <visual>
+    <origin xyz="1.991465 10.0 2.509155" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="1.991465 10.0 2.509155" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="th9_1">
+  <inertial>
+    <origin xyz="0.14999999999999858 0.0015750680123911565 0.002185974817124674" rpy="0 0 0"/>
+    <mass value="485.5233271352601"/>
+    <inertia ixx="35.34286" iyy="21.311382" izz="21.314328" ixy="0.0" iyz="0.004414" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-4.5 9.0 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th9_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-4.5 9.0 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th9_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="rsa_1_1">
+  <inertial>
+    <origin xyz="4.395937349552122 0.0 -0.019796867477606176" rpy="0 0 0"/>
+    <mass value="37917.93074581755"/>
+    <inertia ixx="78986.901098" iyy="152360.306972" izz="231068.964489" ixy="-0.0" iyz="0.0" ixz="78.115279"/>
+  </inertial>
+  <visual>
+    <origin xyz="-4.5 6.0 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/rsa_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-4.5 6.0 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/rsa_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="rsa_2_1">
+  <inertial>
+    <origin xyz="4.395937349552122 0.0 -0.019796867477606204" rpy="0 0 0"/>
+    <mass value="37917.93074581756"/>
+    <inertia ixx="78986.901098" iyy="152360.306972" izz="231068.964489" ixy="0.0" iyz="0.0" ixz="78.115279"/>
+  </inertial>
+  <visual>
+    <origin xyz="-4.5 -0.0 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/rsa_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-4.5 -0.0 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/rsa_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="rsa_3_1">
+  <inertial>
+    <origin xyz="4.395937349552122 8.881784197001252e-16 -0.019796867477606176" rpy="0 0 0"/>
+    <mass value="37917.93074581755"/>
+    <inertia ixx="78986.901098" iyy="152360.306972" izz="231068.964489" ixy="0.0" iyz="0.0" ixz="78.115279"/>
+  </inertial>
+  <visual>
+    <origin xyz="-4.5 -6.0 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/rsa_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-4.5 -6.0 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/rsa_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="th10_1">
+  <inertial>
+    <origin xyz="0.14999999999999858 0.0140756566068454 0.004128165376782233" rpy="0 0 0"/>
+    <mass value="485.5233271352601"/>
+    <inertia ixx="35.076306" iyy="21.29566" izz="21.063497" ixy="0.0" iyz="0.074498" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-4.5 -9.0 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th10_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-4.5 -9.0 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th10_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="camera_right_1">
+  <inertial>
+    <origin xyz="0.04619425833027524 2.4912674780400157e-07 0.01913383550365877" rpy="0 0 0"/>
+    <mass value="565.2000000000029"/>
+    <inertia ixx="274.983189" iyy="4.71" izz="272.318811" ixy="0.0" iyz="0.0" ixz="1.332189"/>
+  </inertial>
+  <visual>
+    <origin xyz="-4.299176 0.020923 -1.144756" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/camera_right_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-4.299176 0.020923 -1.144756" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/camera_right_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="th14_1">
+  <inertial>
+    <origin xyz="0.016385047452796484 -0.002269094695383167 0.09999999999999787" rpy="0 0 0"/>
+    <mass value="323.68221809017336"/>
+    <inertia ixx="12.858594" iyy="12.633517" izz="23.334229" ixy="-0.031785" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.026882 7.996277 -4.4" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th14_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.026882 7.996277 -4.4" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th14_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="th13_1">
+  <inertial>
+    <origin xyz="3.029459121478274e-17 1.7763568394002505e-15 0.09999999999999698" rpy="0 0 0"/>
+    <mass value="212.70545760211388"/>
+    <inertia ixx="9.649294" iyy="9.649294" izz="17.880553" ixy="-0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.0 -8.0 -4.4" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th13_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.0 -8.0 -4.4" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th13_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="canada_arm_base_1">
+  <inertial>
+    <origin xyz="0.035355244091976434 -4.085620730620576e-14 0.03535524409192714" rpy="0 0 0"/>
+    <mass value="1387.2095061007365"/>
+    <inertia ixx="293.192509" iyy="196.232345" izz="293.192509" ixy="-0.0" iyz="-0.0" ixz="96.960164"/>
+  </inertial>
+  <visual>
+    <origin xyz="-3.118341 -5.0 -3.118341" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/canada_arm_base_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-3.118341 -5.0 -3.118341" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/canada_arm_base_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="th11_1">
+  <inertial>
+    <origin xyz="-0.15000000000000124 0.0 5.728486622729424e-17" rpy="0 0 0"/>
+    <mass value="319.058186403171"/>
+    <inertia ixx="26.820829" iyy="15.803351" izz="15.803351" ixy="0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="4.5 9.0 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th11_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="4.5 9.0 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th11_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="lsa_1_1">
+  <inertial>
+    <origin xyz="-4.395937349552124 8.881784197001252e-16 -0.019796867477606176" rpy="0 0 0"/>
+    <mass value="37917.93074581755"/>
+    <inertia ixx="78986.901098" iyy="152360.306972" izz="231068.964489" ixy="-0.0" iyz="-0.0" ixz="-78.115279"/>
+  </inertial>
+  <visual>
+    <origin xyz="4.5 6.0 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/lsa_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="4.5 6.0 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/lsa_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="camera_left_1">
+  <inertial>
+    <origin xyz="-0.04619425833027346 2.4912674780400157e-07 0.01913383550365877" rpy="0 0 0"/>
+    <mass value="565.2000000000025"/>
+    <inertia ixx="274.983189" iyy="4.71" izz="272.318811" ixy="-0.0" iyz="-0.0" ixz="-1.332189"/>
+  </inertial>
+  <visual>
+    <origin xyz="4.299176 0.020923 -1.144756" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/camera_left_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="4.299176 0.020923 -1.144756" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/camera_left_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="lsa_2_1">
+  <inertial>
+    <origin xyz="-4.395937349552122 0.0 -0.019796867477606204" rpy="0 0 0"/>
+    <mass value="37917.93074581756"/>
+    <inertia ixx="78986.901098" iyy="152360.306972" izz="231068.964489" ixy="-0.0" iyz="0.0" ixz="-78.115279"/>
+  </inertial>
+  <visual>
+    <origin xyz="4.5 -0.0 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/lsa_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="4.5 -0.0 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/lsa_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="th12_1">
+  <inertial>
+    <origin xyz="-0.15000000000000124 0.01431200139042943 0.005829799887012026" rpy="0 0 0"/>
+    <mass value="319.058186403171"/>
+    <inertia ixx="26.692055" iyy="15.785025" izz="15.692903" ixy="-0.0" iyz="0.044989" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="4.5 -9.0 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th12_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="4.5 -9.0 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th12_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="lsa_3_1">
+  <inertial>
+    <origin xyz="-4.395937349552124 8.881784197001252e-16 -0.019796867477606176" rpy="0 0 0"/>
+    <mass value="37917.93074581755"/>
+    <inertia ixx="78986.901098" iyy="152360.306972" izz="231068.964489" ixy="-0.0" iyz="0.0" ixz="-78.115279"/>
+  </inertial>
+  <visual>
+    <origin xyz="4.5 -6.0 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/lsa_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="4.5 -6.0 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/lsa_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="th16_1">
+  <inertial>
+    <origin xyz="-0.009695745153111699 -0.003034617655115923 -0.09999999999999876" rpy="0 0 0"/>
+    <mass value="212.70545760211388"/>
+    <inertia ixx="9.645985" iyy="9.6155" izz="17.843448" ixy="0.010576" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.00669 7.997906 4.4" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th16_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.00669 7.997906 4.4" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th16_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="th15_1">
+  <inertial>
+    <origin xyz="-0.0017984688940079069 -0.004427691520348276 -0.09999999999999876" rpy="0 0 0"/>
+    <mass value="212.70545760211388"/>
+    <inertia ixx="9.642246" iyy="9.648132" izz="17.872342" ixy="0.002862" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.001241 -8.003055 4.4" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th15_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.001241 -8.003055 4.4" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th15_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="th8_1">
+  <inertial>
+    <origin xyz="2.220446049250313e-16 0.09999999999999964 -4.440892098500626e-16" rpy="0 0 0"/>
+    <mass value="212.7054576021139"/>
+    <inertia ixx="9.649294" iyy="17.880553" izz="9.649294" ixy="0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="2.0 -10.0 -2.5" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th8_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="2.0 -10.0 -2.5" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th8_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="th7_1">
+  <inertial>
+    <origin xyz="-0.025539251025601617 0.09999999999999964 0.010049332143581502" rpy="0 0 0"/>
+    <mass value="212.7054576021139"/>
+    <inertia ixx="9.612991" iyy="17.609777" izz="9.414823" ixy="0.0" iyz="0.0" ixz="-0.092262"/>
+  </inertial>
+  <visual>
+    <origin xyz="1.982378 -10.0 2.506934" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th7_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="1.982378 -10.0 2.506934" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th7_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="th6_1">
+  <inertial>
+    <origin xyz="-1.3719873859230347e-07 0.09999999999999964 -1.0421835394680556e-07" rpy="0 0 0"/>
+    <mass value="212.7054576021139"/>
+    <inertia ixx="9.649294" iyy="17.880553" izz="9.649294" ixy="0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-2.000104 -10.0 2.503617" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th6_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-2.000104 -10.0 2.503617" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th6_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="camera_back_1">
+  <inertial>
+    <origin xyz="0.0041090989999844965 0.05000000000000071 -0.0004997698338091716" rpy="0 0 0"/>
+    <mass value="125.89847784256487"/>
+    <inertia ixx="0.308196" iyy="18.365409" izz="18.267044" ixy="-0.0" iyz="0.0" ixz="-0.000259"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.0 -10.1 -3.15" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/camera_back_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.0 -10.1 -3.15" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/camera_back_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="th5_1">
+  <inertial>
+    <origin xyz="-0.00015052579892915752 0.09999999999999964 0.005242180026600707" rpy="0 0 0"/>
+    <mass value="212.7054576021139"/>
+    <inertia ixx="9.639416" iyy="17.870666" izz="9.649286" ixy="-0.0" iyz="0.0" ixz="-0.000284"/>
+  </inertial>
+  <visual>
+    <origin xyz="-2.0 -10.0 -2.5" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th5_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-2.0 -10.0 -2.5" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/th5_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="docking_port_front_1">
+  <inertial>
+    <origin xyz="-0.0011701302631783206 1.6938550352951953 0.0023416593849563145" rpy="0 0 0"/>
+    <mass value="308332.545761487"/>
+    <inertia ixx="762245.424635" iyy="641725.412691" izz="762259.800532" ixy="471.243053" iyz="-943.049464" ixz="-9.574394"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.0 -10.0 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/docking_port_front_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.0 -10.0 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find space_station_description)/meshes/docking_port_front_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<joint name="xp_th_1" type="continuous">
+  <origin xyz="2.007871 -10.0 2.495824" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="th2_1"/>
+  <axis xyz="0.0 1.0 0.0"/>
+  
+</joint>
+
+<joint name="xp_th_2" type="continuous">
+  <origin xyz="2.020507 -10.0 -2.503833" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="th1_1"/>
+  <axis xyz="0.0 1.0 0.0"/>
+  
+</joint>
+
+<joint name="camera_b" type="fixed">
+  <origin xyz="0.0 -10.1 3.15" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="camera_front_1"/>
+  <axis xyz="0.0 -1.0 0.0"/>
+  <limit upper="0.0" lower="0.0" effort="100" velocity="100"/>
+</joint>
+
+<joint name="xp_th_3" type="continuous">
+  <origin xyz="-1.984128 -9.9 2.498452" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="th4_1"/>
+  <axis xyz="0.0 -1.0 0.0"/>
+  
+</joint>
+
+<joint name="docking_port_b" type="revolute">
+  <origin xyz="-0.100631 -10.0 0.02559" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="docking_port_back_1"/>
+  <axis xyz="0.0 1.0 0.0"/>
+  <limit upper="0.0" lower="0.0" effort="100" velocity="100"/>
+</joint>
+
+<joint name="xp_th_4" type="continuous">
+  <origin xyz="-1.991465 -10.0 -2.509155" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="th3_1"/>
+  <axis xyz="0.0 1.0 0.0"/>
+  
+</joint>
+
+<joint name="yn_th_1" type="continuous">
+  <origin xyz="4.5 -9.0 0.0" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="th9_1"/>
+  <axis xyz="1.0 0.0 0.0"/>
+  
+</joint>
+
+<joint name="rsa_1" type="continuous">
+  <origin xyz="4.5 -6.0 0.0" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="rsa_1_1"/>
+  <axis xyz="1.0 0.0 0.0"/>
+</joint>
+
+<joint name="rsa_2" type="continuous">
+  <origin xyz="4.5 0.0 0.0" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="rsa_2_1"/>
+  <axis xyz="1.0 0.0 0.0"/>
+</joint>
+
+<joint name="rsa_3" type="continuous">
+  <origin xyz="4.5 6.0 0.0" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="rsa_3_1"/>
+  <axis xyz="1.0 0.0 0.0"/>
+</joint>
+
+<joint name="yn_th_2" type="continuous">
+  <origin xyz="4.5 9.0 0.0" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="th10_1"/>
+  <axis xyz="1.0 0.0 0.0"/>
+  
+</joint>
+
+<joint name="camera_r" type="fixed">
+  <origin xyz="4.299176 -0.020923 1.144756" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="camera_right_1"/>
+  <axis xyz="0.92388 0.0 0.382683"/>
+  
+</joint>
+
+<joint name="zn_th_1" type="continuous">
+  <origin xyz="-0.026882 -7.996277 4.4" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="th14_1"/>
+  <axis xyz="0.0 0.0 -1.0"/>
+  
+</joint>
+
+<joint name="zn_th_2" type="continuous">
+  <origin xyz="0.0 8.0 4.4" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="th13_1"/>
+  <axis xyz="0.0 0.0 -1.0"/>
+  
+</joint>
+
+<joint name="canada_arm_ss_base" type="revolute">
+  <origin xyz="3.118341 5.0 3.118341" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="canada_arm_base_1"/>
+  <axis xyz="0.707107 0.0 0.707107"/>
+  <limit upper="0.0" lower="0.0" effort="100" velocity="100"/>
+</joint>
+
+<joint name="yp_th_1" type="continuous">
+  <origin xyz="-4.5 -9.0 0.0" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="th11_1"/>
+  <axis xyz="-1.0 0.0 0.0"/>
+  
+</joint>
+
+<joint name="lsa_1" type="continuous">
+  <origin xyz="-4.5 -6.0 0.0" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="lsa_1_1"/>
+  <axis xyz="-1.0 0.0 0.0"/>
+</joint>
+
+<joint name="camera_l" type="fixed">
+  <origin xyz="-4.299176 -0.020923 1.144756" rpy="0 0 3.14"/>
+  <parent link="base_link"/>
+  <child link="camera_left_1"/>
+  <axis xyz="-0.92388 0.0 0.382683"/>
+  <limit upper="0.0" lower="0.0" effort="100" velocity="100"/>
+</joint>
+
+<joint name="lsa_2" type="continuous">
+  <origin xyz="-4.5 0.0 0.0" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="lsa_2_1"/>
+  <axis xyz="-1.0 0.0 0.0"/>
+</joint>
+
+<joint name="yp_th_2" type="continuous">
+  <origin xyz="-4.5 9.0 0.0" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="th12_1"/>
+  <axis xyz="-1.0 0.0 0.0"/>
+  
+</joint>
+
+<joint name="lsa_3" type="continuous">
+  <origin xyz="-4.5 6.0 0.0" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="lsa_3_1"/>
+  <axis xyz="-1.0 0.0 0.0"/>
+  
+</joint>
+
+<joint name="zp_th_1" type="continuous">
+  <origin xyz="0.00669 -7.997906 -4.4" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="th16_1"/>
+  <axis xyz="0.0 0.0 1.0"/>
+  
+</joint>
+
+<joint name="zp_th_2" type="continuous">
+  <origin xyz="0.001241 8.003055 -4.4" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="th15_1"/>
+  <axis xyz="0.0 0.0 1.0"/>
+  
+</joint>
+
+<joint name="xn_th_1" type="continuous">
+  <origin xyz="-2.0 10.0 2.5" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="th8_1"/>
+  <axis xyz="0.0 -1.0 0.0"/>
+  
+</joint>
+
+<joint name="xn_th_2" type="continuous">
+  <origin xyz="-1.982378 10.0 -2.506934" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="th7_1"/>
+  <axis xyz="0.0 -1.0 0.0"/>
+  
+</joint>
+
+<joint name="xn_th_3" type="continuous">
+  <origin xyz="2.000104 10.0 -2.503617" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="th6_1"/>
+  <axis xyz="0.0 -1.0 0.0"/>
+  
+</joint>
+
+<joint name="camera_f" type="fixed">
+  <origin xyz="0.0 10.1 3.15" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="camera_back_1"/>
+  <axis xyz="0.0 1.0 0.0"/>
+</joint>
+
+<joint name="xn_th_4" type="continuous">
+  <origin xyz="2.0 10.0 2.5" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="th5_1"/>
+  <axis xyz="0.0 -1.0 0.0"/>
+</joint>
+
+<joint name="docking_port_f" type="revolute">
+  <origin xyz="0.0 10.0 0.0" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="docking_port_front_1"/>
+  <axis xyz="0.0 1.0 0.0"/>
+  <limit upper="0.0" lower="0.0" effort="100" velocity="100"/>
+</joint>
+
+</robot>

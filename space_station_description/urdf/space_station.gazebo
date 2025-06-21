@@ -1,0 +1,572 @@
+<?xml version="1.0" ?>
+<robot name="ssos_new" xmlns:xacro="http://www.ros.org/wiki/xacro" >
+
+  <xacro:property name="body_color" value="Gazebo/White" />
+  <xacro:property name="solar_panel" value="Gazebo/Blue" />
+  <xacro:property name="thruster_panel" value="Gazebo/Black" />
+  <xacro:property name="docking" value="Gazebo/Silver"/>
+  <xacro:property name="camera" value="Gazebo/Red"/>
+
+<gazebo reference="base_link">
+  <material>${body_color}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+  <gravity>true</gravity>
+</gazebo>
+
+<gazebo reference="th2_1">
+  <material>${thruster_panel}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="th1_1">
+  <material>${thruster_panel}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="camera_front_1">
+  <material>${camera}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="th4_1">
+  <material>${thruster_panel}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="docking_port_back_1">
+  <material>${docking}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="th3_1">
+  <material>${thruster_panel}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="th9_1">
+  <material>${thruster_panel}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="rsa_1_1">
+  <material>${solar_panel}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="rsa_2_1">
+  <material>${solar_panel}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="rsa_3_1">
+  <material>${solar_panel}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="th10_1">
+  <material>${thruster_panel}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="camera_right_1">
+  <material>${camera}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="th14_1">
+  <material>${thruster_panel}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="th13_1">
+  <material>${thruster_panel}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="canada_arm_base_1">
+  <material>${thruster_panel}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="th11_1">
+  <material>${thruster_panel}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="lsa_1_1">
+  <material>${solar_panel}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="camera_left_1">
+  <material>${camera}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="lsa_2_1">
+  <material>${solar_panel}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="th12_1">
+  <material>${thruster_panel}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="lsa_3_1">
+  <material>${solar_panel}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="th16_1">
+  <material>${thruster_panel}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="th15_1">
+  <material>${thruster_panel}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="th8_1">
+  <material>${thruster_panel}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="th7_1">
+  <material>${thruster_panel}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="th6_1">
+  <material>${thruster_panel}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="camera_back_1">
+  <material>${camera}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="th5_1">
+  <material>${thruster_panel}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+<gazebo reference="docking_port_front_1">
+  <material>${docking}</material>
+ <mu1>100</mu1>
+ <mu1>100</mu1>
+  <self_collide>true</self_collide>
+</gazebo>
+
+
+ <!-- Thruster Plugins -->
+  <gazebo>
+    <plugin filename="gz-sim-thruster-system" name="gz::sim::systems::Thruster">
+      <joint_name>xp_th_1</joint_name>
+      <thrust_coefficient>0.004</thrust_coefficient>
+      <fluid_density>1000</fluid_density>
+     <propeller_diameter>0.2</propeller_diameter>
+      <max_thrust_cmd>10000</max_thrust_cmd>
+      <min_thrust_cmd>100</min_thrust_cmd>
+    </plugin>
+  </gazebo>
+
+  <gazebo>
+    <plugin filename="gz-sim-thruster-system" name="gz::sim::systems::Thruster">
+      <joint_name>xp_th_2</joint_name>
+      <thrust_coefficient>0.004</thrust_coefficient>
+      <fluid_density>1000</fluid_density>
+     <propeller_diameter>0.2</propeller_diameter>
+      <max_thrust_cmd>10000</max_thrust_cmd>
+      <min_thrust_cmd>100</min_thrust_cmd>
+    </plugin>
+  </gazebo>
+
+  <gazebo>
+    <plugin filename="gz-sim-thruster-system" name="gz::sim::systems::Thruster">
+      <joint_name>xp_th_3</joint_name>
+      <thrust_coefficient>0.004</thrust_coefficient>
+      <fluid_density>1000</fluid_density>
+     <propeller_diameter>0.2</propeller_diameter>
+      <max_thrust_cmd>10000</max_thrust_cmd>
+      <min_thrust_cmd>100</min_thrust_cmd>
+    </plugin>
+  </gazebo>
+
+  <gazebo>
+    <plugin filename="gz-sim-thruster-system" name="gz::sim::systems::Thruster">
+      <joint_name>xp_th_4</joint_name>
+      <thrust_coefficient>0.004</thrust_coefficient>
+      <fluid_density>1000</fluid_density>
+     <propeller_diameter>0.2</propeller_diameter>
+      <max_thrust_cmd>10000</max_thrust_cmd>
+      <min_thrust_cmd>100</min_thrust_cmd>
+    </plugin>
+  </gazebo>
+
+  <!-- Negative X -->
+  <gazebo>
+    <plugin filename="gz-sim-thruster-system" name="gz::sim::systems::Thruster">
+      <joint_name>xn_th_1</joint_name>
+      <thrust_coefficient>0.004</thrust_coefficient>
+      <fluid_density>1000</fluid_density>
+     <propeller_diameter>0.2</propeller_diameter>
+      <max_thrust_cmd>10000</max_thrust_cmd>
+      <min_thrust_cmd>100</min_thrust_cmd>
+    </plugin>
+  </gazebo>
+
+  <gazebo>
+    <plugin filename="gz-sim-thruster-system" name="gz::sim::systems::Thruster">
+      <joint_name>xn_th_2</joint_name>
+      <thrust_coefficient>0.004</thrust_coefficient>
+      <fluid_density>1000</fluid_density>
+     <propeller_diameter>0.2</propeller_diameter>
+      <max_thrust_cmd>10000</max_thrust_cmd>
+      <min_thrust_cmd>100</min_thrust_cmd>
+    </plugin>
+  </gazebo>
+
+  <gazebo>
+    <plugin filename="gz-sim-thruster-system" name="gz::sim::systems::Thruster">
+      <joint_name>xn_th_3</joint_name>
+      <thrust_coefficient>0.004</thrust_coefficient>
+      <fluid_density>1000</fluid_density>
+     <propeller_diameter>0.2</propeller_diameter>
+      <max_thrust_cmd>10000</max_thrust_cmd>
+      <min_thrust_cmd>100</min_thrust_cmd>
+    </plugin>
+  </gazebo>
+
+  <gazebo>
+    <plugin filename="gz-sim-thruster-system" name="gz::sim::systems::Thruster">
+      <joint_name>xn_th_4</joint_name>
+      <thrust_coefficient>0.004</thrust_coefficient>
+      <fluid_density>1000</fluid_density>
+     <propeller_diameter>0.2</propeller_diameter>
+      <max_thrust_cmd>10000</max_thrust_cmd>
+      <min_thrust_cmd>100</min_thrust_cmd>
+    </plugin>
+  </gazebo>
+
+  <!-- Positive Y -->
+  <gazebo>
+    <plugin filename="gz-sim-thruster-system" name="gz::sim::systems::Thruster">
+      <joint_name>yp_th_1</joint_name>
+      <thrust_coefficient>0.004</thrust_coefficient>
+      <fluid_density>1000</fluid_density>
+     <propeller_diameter>0.2</propeller_diameter>
+      <max_thrust_cmd>10000</max_thrust_cmd>
+      <min_thrust_cmd>100</min_thrust_cmd>
+    </plugin>
+  </gazebo>
+
+  <gazebo>
+    <plugin filename="gz-sim-thruster-system" name="gz::sim::systems::Thruster">
+      <joint_name>yp_th_2</joint_name>
+      <thrust_coefficient>0.004</thrust_coefficient>
+      <fluid_density>1000</fluid_density>
+     <propeller_diameter>0.2</propeller_diameter>
+      <max_thrust_cmd>10000</max_thrust_cmd>
+      <min_thrust_cmd>100</min_thrust_cmd>
+    </plugin>
+  </gazebo>
+
+  <!-- Negative Y -->
+  <gazebo>
+    <plugin filename="gz-sim-thruster-system" name="gz::sim::systems::Thruster">
+      <joint_name>yn_th_1</joint_name>
+      <thrust_coefficient>0.004</thrust_coefficient>
+      <fluid_density>1000</fluid_density>
+     <propeller_diameter>0.2</propeller_diameter>
+      <max_thrust_cmd>10000</max_thrust_cmd>
+      <min_thrust_cmd>100</min_thrust_cmd>
+    </plugin>
+  </gazebo>
+
+  <gazebo>
+    <plugin filename="gz-sim-thruster-system" name="gz::sim::systems::Thruster">
+      <joint_name>yn_th_2</joint_name>
+      <thrust_coefficient>0.004</thrust_coefficient>
+      <fluid_density>1000</fluid_density>
+     <propeller_diameter>0.2</propeller_diameter>
+      <max_thrust_cmd>10000</max_thrust_cmd>
+      <min_thrust_cmd>100</min_thrust_cmd>
+    </plugin>
+  </gazebo>
+
+  <!-- Positive Z -->
+  <gazebo>
+    <plugin filename="gz-sim-thruster-system" name="gz::sim::systems::Thruster">
+      <joint_name>zp_th_1</joint_name>
+      <thrust_coefficient>0.004</thrust_coefficient>
+      <fluid_density>1000</fluid_density>
+     <propeller_diameter>0.2</propeller_diameter>
+      <max_thrust_cmd>10000</max_thrust_cmd>
+      <min_thrust_cmd>100</min_thrust_cmd>
+    </plugin>
+  </gazebo>
+
+  <gazebo>
+    <plugin filename="gz-sim-thruster-system" name="gz::sim::systems::Thruster">
+      <joint_name>zp_th_2</joint_name>
+      <thrust_coefficient>0.004</thrust_coefficient>
+      <fluid_density>1000</fluid_density>
+     <propeller_diameter>0.2</propeller_diameter>
+      <max_thrust_cmd>10000</max_thrust_cmd>
+      <min_thrust_cmd>100</min_thrust_cmd>
+    </plugin>
+  </gazebo>
+
+  <!-- Negative Z -->
+  <gazebo>
+    <plugin filename="gz-sim-thruster-system" name="gz::sim::systems::Thruster">
+      <joint_name>zn_th_1</joint_name>
+      <thrust_coefficient>0.004</thrust_coefficient>
+      <fluid_density>1000</fluid_density>
+     <propeller_diameter>0.2</propeller_diameter>
+      <max_thrust_cmd>10000</max_thrust_cmd>
+      <min_thrust_cmd>100</min_thrust_cmd>
+    </plugin>
+  </gazebo>
+
+  <gazebo>
+    <plugin filename="gz-sim-thruster-system" name="gz::sim::systems::Thruster">
+      <joint_name>zn_th_2</joint_name>
+      <thrust_coefficient>0.004</thrust_coefficient>
+      <fluid_density>1000</fluid_density>
+     <propeller_diameter>0.2</propeller_diameter>
+      <max_thrust_cmd>10000</max_thrust_cmd>
+      <min_thrust_cmd>100</min_thrust_cmd>
+    </plugin>
+  </gazebo>
+
+  <!-- ROS2 Control Plugin -->
+  <gazebo>
+    <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+      <parameters>$(find space_station_description)/config/controller.yaml</parameters>
+      <controller_manager_prefix_node_name>controller_manager</controller_manager_prefix_node_name>
+    </plugin>
+  </gazebo>
+
+  <ros2_control name="GazeboSystem" type="system">
+    <hardware>
+      <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+    </hardware>
+
+    <!-- Radiator / Solar Array Control Joints -->
+    <joint name="lsa_1">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+    <joint name="lsa_2">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+    <joint name="lsa_3">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+    <joint name="rsa_1">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+    <joint name="rsa_2">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+    <joint name="rsa_3">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+  </ros2_control>
+
+  <!-- Camera Plugins -->
+  <gazebo reference="camera_back_1">
+    <sensor name="front_camera" type="rgbd_camera">
+      <pose>1.0 0 0 0 0 1.5708</pose>
+      <camera>
+        <horizontal_fov>2.09</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>480</height>
+        </image>
+        <clip>
+          <near>0.3</near>
+          <far>15000</far>
+        </clip>
+        <optical_frame_id>camera_front_optical</optical_frame_id>
+      </camera>
+      <always_on>1</always_on>
+      <update_rate>15</update_rate>
+      <visualize>true</visualize>
+      <topic>front_camera</topic>
+      <gz_frame_id>camera_back_1</gz_frame_id>
+    </sensor>
+  </gazebo>
+
+
+
+  <gazebo reference="camera_front_1">
+    <sensor name="back_camera" type="rgbd_camera">
+    <pose>1.0 0 0 0 0 -1.5708</pose>
+      <camera>
+        <horizontal_fov>2.09</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>480</height>
+        </image>
+        <clip>
+          <near>0.3</near>
+          <far>15000</far>
+        </clip>
+        <optical_frame_id>camera_back_optical</optical_frame_id>
+      </camera>
+      <always_on>1</always_on>
+      <update_rate>15</update_rate>
+      <visualize>true</visualize>
+      <topic>back_camera</topic>
+      <gz_frame_id>camera_front_1</gz_frame_id>
+    </sensor>
+  </gazebo>
+
+
+  <gazebo reference="camera_right_1">
+    <sensor name="right_camera" type="rgbd_camera">
+      <camera>
+        <horizontal_fov>1.25</horizontal_fov>
+        <image>
+          <width>320</width>
+          <height>240</height>
+        </image>
+        <clip>
+          <near>0.3</near>
+          <far>15000</far>
+        </clip>
+        <optical_frame_id>camera_right_optical</optical_frame_id>
+      </camera>
+      <always_on>1</always_on>
+      <update_rate>15</update_rate>
+      <visualize>true</visualize>
+      <topic>right_camera</topic>
+      <gz_frame_id>camera_right_1</gz_frame_id>
+    </sensor>
+  </gazebo>
+
+
+
+  <gazebo reference="camera_left_1">
+    <sensor name="left_camera" type="rgbd_camera">
+      <pose>0 0 0 0 0 0</pose>
+      <camera>
+        <horizontal_fov>2.09</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>480</height>
+        </image>
+        <clip>
+          <near>0.3</near>
+          <far>15000</far>
+        </clip>
+        <optical_frame_id>camera_left_optical</optical_frame_id>
+      </camera>
+      <always_on>1</always_on>
+      <update_rate>15</update_rate>
+      <visualize>true</visualize>
+      <topic>left_camera</topic>
+      <gz_frame_id>camera_left_1</gz_frame_id>
+    </sensor>
+  </gazebo>
+
+
+
+
+  <gazebo reference="base_link">
+    <sensor name="imu" type="imu">
+      <always_on>1</always_on>
+      <update_rate>50</update_rate>
+      <visualize>true</visualize>
+      <topic>imu</topic>
+      <enable_metrics>true</enable_metrics>
+      <gz_frame_id>base_link</gz_frame_id>
+    </sensor>
+  </gazebo>
+
+  <gazebo reference="base_link">
+    <sensor name="navsat" type="navsat">
+      <always_on>1</always_on>
+      <update_rate>1</update_rate>
+      <topic>navsat</topic>
+      <gz_frame_id>base_link</gz_frame_id>
+    </sensor>
+  </gazebo>
+
+
+
+</robot>
