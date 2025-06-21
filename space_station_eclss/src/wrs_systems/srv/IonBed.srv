@@ -1,0 +1,7 @@
+# Request
+float64 filtered_water
+float64 contaminants  # Remaining 10%
+---
+# Response
+bool success
+string message

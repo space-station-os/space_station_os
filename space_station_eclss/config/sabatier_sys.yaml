@@ -1,0 +1,10 @@
+/sabatier:
+  ros__parameters:
+    reactor_temperature: 300 #celcius
+    h2/co2_ration: 4
+    ghsv : 40000 #hr^-1 
+    reactor_pressure: 11.5 #psi 
+    total_inlet_flow: 7 #slpm 
+
+    catalyst_id : "Ru-Microlith"
+    

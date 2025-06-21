@@ -1,0 +1,6 @@
+[submodule "space_station_gazebo"]
+	path = space_station_gazebo
+	url = git@github.com:space-station-os/space_station_gazebo.git
+[submodule "space_station_groundstation"]
+	path = space_station_groundstation
+	url = git@github.com:space-station-os/space_station_groundstation.git
