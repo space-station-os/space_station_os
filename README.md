@@ -194,7 +194,7 @@ Haven-1 Model (downgraded)
 ---
 
 HAVEN-2 Model 
-[haven-2](https://github.com/user-attachments/assets/4ecce540-28c3-49aa-9bdf-c3e04952523b)
+https://github.com/user-attachments/assets/3a8192e6-1982-4684-8276-a00e9de465c0
 
 ```sh
 ros2 launch space_station_description gazebo.launch.py
