@@ -1,0 +1,35 @@
+name: ROS 2 Humble CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    container:
+      image: ros:humble
+      options: --user root
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v3
+
+      - name: Install colcon and dependencies
+        run: |
+          apt update
+          apt install -y python3-colcon-common-extensions python3-pip git
+          apt install -y build-essential
+          rosdep update
+          rosdep install --from-paths src --ignore-src -r -y
+
+      - name: Build the workspace
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon build --event-handlers console_direct+
+
+      
+          

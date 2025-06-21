@@ -10,30 +10,45 @@ Before starting, make sure you have the following:
 
 ---
 
+Yes — now that you've modularized the `space_station_os` repository by turning its subfolders (`space_station_control`, `space_station_gazebo`, etc.) into **individual Git submodules**, the **installation steps need to reflect that**. Here's the **updated `README` installation section**:
+
+---
+
 ##  Installation Steps
 
 ### 1. Prepare a ROS 2 workspace
 
-If you’re new to ROS 2, the typical workspace structure is:
+If you're new to ROS 2, create a workspace:
 
 ```bash
-mkdir -p ~/ros2_ws/src
-cd ~/ros2_ws/src
+mkdir -p ~/ssos_ws/src
+cd ~/ssos_ws/src
 ```
 
-### 2. Clone the Space Station OS repository
+### 2. Clone the `space_station_os` super-repository with submodules
 
 ```bash
-git clone https://github.com/space-station-os/space_station_os.git
+git clone --recurse-submodules https://github.com/space-station-os/space_station_os.git
+cd space_station_os
+```
+
+> If you've already cloned it, initialize submodules manually:
+
+```bash
+git submodule update --init --recursive
 ```
 
 ### 3. Build the workspace
 
+Go back to the workspace root and build everything:
+
 ```bash
-cd ~/ros2_ws
+cd ~/ssos_ws
 colcon build --symlink-install
 source install/setup.bash
 ```
+
+---
 
 >  Tip: Always source your workspace before running ROS 2 nodes:
 >
