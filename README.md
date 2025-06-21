@@ -194,7 +194,12 @@ Haven-1 Model (downgraded)
 ---
 
 HAVEN-2 Model 
-[Haven-2.webm](https://github.com/user-attachments/assets/3a8192e6-1982-4684-8276-a00e9de465c0)
+<p align="center">
+  <video controls width="80%">
+    <source src="https://github.com/user-attachments/assets/3a8192e6-1982-4684-8276-a00e9de465c0/Haven-2.webm" type="video/webm">
+  </video>
+</p>
+
 
 ```sh
 ros2 launch space_station_description gazebo.launch.py
