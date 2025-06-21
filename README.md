@@ -1,5 +1,14 @@
 # **Space Station OS – Setup & Demo Guide**
 
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/4cfe5156-7282-4c26-aa7b-324bb8c1196b" width="100%" />
+</p>
+
+
+[![ROS 2 Humble CI](https://github.com/space-station-os/space_station_os/actions/workflows/ros2_humble_ci.yml/badge.svg)](https://github.com/space-station-os/space_station_os/actions/workflows/ros2_humble_ci.yml)
+
+
 ##  Prerequisites
 
 Before starting, make sure you have the following:
@@ -7,10 +16,6 @@ Before starting, make sure you have the following:
 * **Operating System:** Ubuntu 22.04
 * **ROS 2 Distribution:** ROS 2 Humble (Desktop Install)
   [→ Official ROS 2 Installation Guide](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html)
-
----
-
-Yes — now that you've modularized the `space_station_os` repository by turning its subfolders (`space_station_control`, `space_station_gazebo`, etc.) into **individual Git submodules**, the **installation steps need to reflect that**. Here's the **updated `README` installation section**:
 
 ---
 
