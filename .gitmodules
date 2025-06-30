@@ -7,6 +7,7 @@
 [submodule "space_station_eclss"]
 	path = space_station_eclss
 	url = git@github.com:space-station-os/space_station_eclss.git
+	branch = main
 [submodule "space_station_gnc"]
 	path = space_station_gnc
 	url = git@github.com:space-station-os/space_station_gnc.git
