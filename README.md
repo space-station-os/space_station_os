@@ -204,6 +204,70 @@ ros2 run space_station_description teleop
 ```
 
 
+Here's the updated **README** section you can append at the end of your file, under a new header:
+
+---
+
+##  Using the Prebuilt Docker Image (Recommended)
+
+You can skip building everything from source by pulling the **official Docker image** from [GitHub Container Registry](https://ghcr.io).
+
+### Pull the image
+
+```bash
+docker pull ghcr.io/space-station-os/space_station_os:latest
+```
+
+> Note: Make sure Docker is installed and running on your system.
+> You don’t need ROS 2 installed locally to use the image.
+
+--
+###  Run a container
+
+```bash
+docker run -it --rm ghcr.io/space-station-os/space_station_os:latest
+```
+
+This drops you into a full ROS 2 Humble + Space Station OS environment with everything already built and sourced.
+
+---
+
+##  If the Prebuilt Image Doesn’t Work
+
+You can always **build the Docker image locally**:
+
+### 1. Clone the repository with submodules:
+
+```bash
+git clone --recurse-submodules https://github.com/space-station-os/space_station_os.git
+cd space_station_os
+```
+
+### 2. Build the Docker image
+
+```bash
+docker build -t space_station_os:latest .
+```
+
+> This builds a Docker image with all ROS 2 packages, dependencies, and your code inside.
+
+---
+
+### 3. Run the image
+
+```bash
+docker run -it --rm space_station_os:latest
+```
+
+---
+
+##  Docker Build on GitHub Actions
+
+This repository is configured with GitHub Actions to automatically build and publish the Docker image on every push to `main`.
+
+The image is hosted here:
+**`ghcr.io/space-station-os/space_station_os:latest`**
+
 
 ## Interested to contribute? 
 See the project backlog https://github.com/orgs/space-station-os/projects/2/views/1 
