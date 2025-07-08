@@ -1,15 +1,19 @@
 [submodule "space_station_gazebo"]
-	path = space_station_gazebo
-	url = git@github.com:space-station-os/space_station_gazebo.git
+  path = space_station_gazebo
+  url = git@github.com:space-station-os/space_station_gazebo.git
+  branch = main
 
-[submodule "space_station_groundstation"]
-	path = space_station_groundstation
-	url = git@github.com:space-station-os/space_station_groundstation.git
+[submodule "space_station_mission_control"]
+  path = space_station_mission_control
+  url = git@github.com:space-station-os/space_station_mission_control.git
+  branch = main
 
 [submodule "space_station_eclss"]
-	path = space_station_eclss
-	url = git@github.com:space-station-os/space_station_eclss.git
+  path = space_station_eclss
+  url = git@github.com:space-station-os/space_station_eclss.git
+  branch = main
 
 [submodule "space_station_gnc"]
-	path = space_station_gnc
-	url = git@github.com:space-station-os/space_station_gnc.git
+  path = space_station_gnc
+  url = git@github.com:space-station-os/space_station_gnc.git
+  branch = main
