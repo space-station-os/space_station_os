@@ -19,28 +19,26 @@ RUN apt update && apt install -y \
     ros-humble-joint-state-publisher \
     ros-humble-joint-state-publisher-gui \
     ros-humble-actuator-msgs \
+    ros-humble-rosbridge-server \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependency: CasADi
 RUN pip3 install casadi
 
 # Initialize rosdep
-RUN rosdep init || true && rosdep update
+RUN rosdep init || true && rosdep update        
 
 # Create clean ROS 2 workspace layout
 WORKDIR /root/ssos_ws
 RUN mkdir -p src
 
-# Copy space_station_os repo into src/
+# Copy the entire monorepo into src/
 COPY . src/space_station_os
 
 # Set working directory inside workspace
 WORKDIR /root/ssos_ws
 
-# Initialize and update submodules
-RUN git -C src/space_station_os submodule update --init --recursive
-
-# Install ROS 2 package dependencies
+# Install ROS 2 package dependencies 
 RUN bash -c "source /opt/ros/humble/setup.bash && rosdep install --from-paths src --ignore-src -r -y"
 
 # Build the workspace

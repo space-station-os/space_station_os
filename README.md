@@ -1,51 +1,60 @@
 # **Space Station OS – Setup & Demo Guide**
 
-
 <p align="center">
   <img src="https://github.com/user-attachments/assets/4cfe5156-7282-4c26-aa7b-324bb8c1196b" width="100%" />
 </p>
 
-
 [![ROS 2 Humble CI](https://github.com/space-station-os/space_station_os/actions/workflows/ros2_humble_ci.yml/badge.svg)](https://github.com/space-station-os/space_station_os/actions/workflows/ros2_humble_ci.yml)
-
-
-##  Prerequisites
-
-Before starting, make sure you have the following:
-
-* **Operating System:** Ubuntu 22.04
-* **ROS 2 Distribution:** ROS 2 Humble (Desktop Install)
-  [→ Official ROS 2 Installation Guide](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html)
 
 ---
 
-##  Installation Steps
+## 🚀 Quick Start with Docker (Recommended)
 
-### 1. Prepare a ROS 2 workspace
+If you prefer not to build everything locally, use our **prebuilt Docker image** to get up and running instantly.
 
-If you're new to ROS 2, create a workspace:
+### 1. Pull the image
+
+```bash
+docker pull ghcr.io/space-station-os/space_station_os:latest
+```
+
+> No need to install ROS 2 manually. Docker must be installed and running.
+
+### 2. Run the container
+
+```bash
+docker run -it --rm ghcr.io/space-station-os/space_station_os:latest
+```
+
+You'll be dropped into a ready-to-use environment with ROS 2 Humble and all Space Station OS packages pre-built.
+
+---
+
+## 🔧 Local Installation (Build from Source)
+
+Use this method if you want to modify the source code or don't want to use Docker.
+
+### Prerequisites
+
+* **OS:** Ubuntu 22.04
+* **ROS 2:** Humble (Desktop)
+  → [ROS 2 Installation Guide](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html)
+
+### 1. Create a ROS 2 workspace
 
 ```bash
 mkdir -p ~/ssos_ws/src
 cd ~/ssos_ws/src
 ```
 
-### 2. Clone the `space_station_os` super-repository with submodules
+### 2. Clone the super-repository with submodules
 
 ```bash
-git clone --recurse-submodules https://github.com/space-station-os/space_station_os.git
+git clone https://github.com/space-station-os/space_station_os.git
 cd space_station_os
 ```
 
-> If you've already cloned it, initialize submodules manually:
-
-```bash
-git submodule update --init --recursive
-```
-
 ### 3. Build the workspace
-
-Go back to the workspace root and build everything:
 
 ```bash
 cd ~/ssos_ws
@@ -53,207 +62,102 @@ colcon build --symlink-install
 source install/setup.bash
 ```
 
----
-
->  Tip: Always source your workspace before running ROS 2 nodes:
+> Always source the workspace before running ROS 2 commands:
 >
 > ```bash
-> source ~/ros2_ws/install/setup.bash
+> source ~/ssos_ws/install/setup.bash
 > ```
 
 ---
 
-##  Running Demo 1: ISS Incident Simulation (Nauka & Others)
+## 🛰️ Running Demo 1: ISS Incident Simulation
 
-This demo shows the attitude control and fault management systems of a space station through three different crisis scenarios.
+You need **3 terminals** for this demo.
 
-###  Terminal Setup Overview
+### Terminal 1 – Run a Scenario
 
-You’ll need **3 terminals** for full functionality:
+Choose one:
 
----
+```bash
+ros2 run space_station_gnc demo1a_nauka_incident_estimate     # Real-world based
+ros2 run space_station_gnc demo1b_crisis_mainengine           # High-severity test
+ros2 run space_station_gnc demo1c_small_incident              # CMG logic test
+```
 
-###  Terminal 1: Run the Incident Scenario
-
-Choose one of the following scenarios:
-
-* **Demo 1a:** Nauka incident simulation (July 2021)
-  *(moderate severity, real-world based)*
-
-  ```bash
-  ros2 run space_station_gnc demo1a_nauka_incident_estimate
-  ```
-
-* **Demo 1b:** Hypothetical engine crisis
-  *(high severity test case)*
-
-  ```bash
-  ros2 run space_station_gnc demo1b_crisis_mainengine
-  ```
-
-* **Demo 1c:** Minor perturbation
-  *(ideal for testing CMG control logic)*
-
-  ```bash
-  ros2 run space_station_gnc demo1c_small_incident
-  ```
-
----
-
-###  Terminal 2: Launch the GNC Core System
-
-This runs the core control logic and dynamics for all scenarios:
+### Terminal 2 – Launch GNC Core
 
 ```bash
 ros2 launch space_station_gnc gnc_core.launch.py
 ```
 
-No interaction is needed in this terminal once launched.
-
----
-
-###  Terminal 3: Launch RViz for Visualization
+### Terminal 3 – Launch RViz
 
 ```bash
 ros2 launch space_station_gnc gnc_rviz.launch.py
 ```
 
-#### RViz Setup:
-
-1. Set `Fixed Frame` to `world`
-2. Click `Add` → Select `RobotModel`
-3. Set `Description Topic` to `/robot_description`
-4. Zoom out if needed to see the ISS or your custom model
-
-#### Optional: Use Your Own URDF
-
-To view a custom space station model:
-
-* Place your URDF in:
-  `~/ros2_ws/src/space_station_os/space_station_gnc/urdf`
-* Example provided: `SD_SpaceStation_Ver05.urdf`
-
-To configure which URDF to use:
-
-* Modify:
-  `~/ros2_ws/src/space_station_os/space_station_gnc/launch/gnc_core.launch.py`
+Set `Fixed Frame` to `world`, add `RobotModel`, and choose `/robot_description`.
 
 ---
 
-###  Running the Scenario
+## 🧩 Environmental Control and Life Support System (ECLSS)
 
-Return to **Terminal 1**, follow the on-screen scenario instructions, and observe the response in **RViz** as the space station reacts dynamically to simulated faults or perturbations.
+ECLSS simulates the life support systems needed to maintain habitable space environments.
 
----
+### Subsystems Implemented:
 
+* **ARS** – CO₂ and contaminant removal
+  🔗 [Air Revitalization System Docs](https://github.com/space-station-os/space_station_os/blob/main/space_station_eclss/src/ars_systems/README.md)
 
+* **ORS** – Oxygen generation from water
+  🔗 [Oxygen Recovery System Docs](https://github.com/space-station-os/space_station_os/blob/main/space_station_eclss/src/ors_systems/README.md)
 
-### **Environmental Control and Life Support Systems (ECLSS)**
-Environmental Control and Life Support Systems (ECLSS) are essential for sustaining human life in space by providing a controlled environment that includes air revitalization, water recovery, and waste management. This document serves as an overview of ECLSS and provides links to specific subsystems implemented as part of this project.
+* **WRS** – Water recycling & purification
+  🔗 [Water Recovery System Docs](https://github.com/space-station-os/space_station_os/blob/main/space_station_eclss/src/wrs_systems/README.md)
 
-## **Overview of ECLSS Subsystems**
-ECLSS consists of multiple interconnected subsystems to maintain habitable conditions for astronauts:
+### Launch All Systems
 
-- **Air Revitalization System (ARS):** Handles **CO₂ removal, moisture control, and contaminant filtration** to maintain breathable air.
-- **Oxygen Recovery System (ORS):** Converts **water into oxygen** through electrolysis and uses **hydrogen recovery** to form a closed-loop system.
-- **Water Recovery and Balance Systems:** Processes crew urine, atmospheric condensation, and Sabatier-produced water for reuse.
-- **Temperature and Humidity Control:** Regulates cabin conditions to ensure thermal comfort and moisture control.
-
-## **Available Subsystem Implementations**
-Below are the specific subsystems implemented as part of this project. Click on the links to access their respective documentation.
-
-### **1. Air Revitalization System (ARS)**
-The ARS is responsible for maintaining breathable air by removing CO₂, moisture, and contaminants from the cabin environment. The system consists of multiple ROS2 nodes working together to simulate air purification onboard the **International Space Station (ISS)**.
-
-🔗 [Read the full ARS documentation](https://github.com/space-station-os/space_station_os/blob/main/space_station_eclss/src/ars_systems/README.md)
-
-### **2. Oxygen Recovery System (ORS)**
-The ORS simulates the oxygen generation process used on the ISS. It leverages **electrolysis, Sabatier reaction, and deionization** to create a closed-loop system that efficiently recycles oxygen from water.
-
-🔗 [Read the full ORS documentation](https://github.com/space-station-os/space_station_os/blob/main/space_station_eclss/src/ors_systems/README.md)
-
-### **2. Water Recovery And Purification Systems (WRPS)**
-The WRS system purifies the waste accumulated from the crew and converts it into potable water that is fit for consumption. Some amount of water is also used to get oxygen by electrolysis
-
-🔗 [Read the full WRS documentation](https://github.com/space-station-os/space_station_os/blob/main/space_station_eclss/src/wrs_systems/README.md)
-
-
-
-#### To launch the Systems:
----
-
-```sh
+```bash
 ros2 launch space_station_eclss eclss.launch.py
 ```
-# SPACE STATION GAZEBO 
 
-HAVEN-2 Model
- 
-[Haven-2.webm](https://github.com/user-attachments/assets/3a8192e6-1982-4684-8276-a00e9de465c0)
+---
 
-```sh
+## 🛰️ Space Station Gazebo Simulation
+
+Visualize the Haven-2 model in Gazebo:
+
+```bash
 ros2 launch space_station_description gazebo.launch.py
 ```
 
-#### To run the teleoperation 
----
+### Teleoperation
 
-```sh
+```bash
 ros2 run space_station_description mux
 ros2 run space_station_description teleop
 ```
 
-
-Here's the updated **README** section you can append at the end of your file, under a new header:
-
 ---
 
-##  Using the Prebuilt Docker Image (Recommended)
+## 🐳 Building the Docker Image Locally (Optional)
 
-You can skip building everything from source by pulling the **official Docker image** from [GitHub Container Registry](https://ghcr.io).
+If the prebuilt image doesn’t work, you can build it manually.
 
-### Pull the image
-
-```bash
-docker pull ghcr.io/space-station-os/space_station_os:latest
-```
-
-> Note: Make sure Docker is installed and running on your system.
-> You don’t need ROS 2 installed locally to use the image.
-
---
-###  Run a container
+### 1. Clone the repo
 
 ```bash
-docker run -it --rm ghcr.io/space-station-os/space_station_os:latest
-```
-
-This drops you into a full ROS 2 Humble + Space Station OS environment with everything already built and sourced.
-
----
-
-##  If the Prebuilt Image Doesn’t Work
-
-You can always **build the Docker image locally**:
-
-### 1. Clone the repository with submodules:
-
-```bash
-git clone --recurse-submodules https://github.com/space-station-os/space_station_os.git
+git clone https://github.com/space-station-os/space_station_os.git
 cd space_station_os
 ```
 
-### 2. Build the Docker image
+### 2. Build the image
 
 ```bash
 docker build -t space_station_os:latest .
 ```
 
-> This builds a Docker image with all ROS 2 packages, dependencies, and your code inside.
-
----
-
-### 3. Run the image
+### 3. Run the container
 
 ```bash
 docker run -it --rm space_station_os:latest
@@ -261,14 +165,9 @@ docker run -it --rm space_station_os:latest
 
 ---
 
-##  Docker Build on GitHub Actions
-
-This repository is configured with GitHub Actions to automatically build and publish the Docker image on every push to `main`.
-
-The image is hosted here:
-**`ghcr.io/space-station-os/space_station_os:latest`**
 
 
-## Interested to contribute? 
-See the project backlog https://github.com/orgs/space-station-os/projects/2/views/1 
+##  Contributing
 
+See the project backlog:
+[Space Station OS – Project Board](https://github.com/orgs/space-station-os/projects/2/views/1)
