@@ -1,0 +1,45 @@
+{
+  "name": "openmct-ros",
+  "version": "0.0.1-SNAPSHOT",
+  "description": "An adapter for connecting Open MCT with ROS",
+  "main": "dist/openmct-ros.js",
+  "scripts": {
+    "clean": "rm -rf ./dist ./node_modules ./package-lock.json",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint src example",
+    "lint:fix": "eslint src example --fix",
+    "build:dist": "NODE_ENV=production webpack",
+    "build:example": "npm install nasa/openmct#master --no-save",
+    "start": "NODE_ENV=dev webpack-dev-server",
+    "prepare": "npm run build:dist",
+    "postinstall": "npm run build:example"
+  },
+
+  "keywords": [
+    "openmct",
+    "ros"
+  ],
+  "author": "TRACLabs Inc.",
+  "license": "closed",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "peerDependencies": {
+    "openmct": "^4.1.0 || ^4.1.0-next"
+  },
+  "devDependencies": {
+    "@babel/core": "7.19.6",
+    "@babel/eslint-parser": "7.19.1",
+    "eslint": "8.25.0",
+    "eventemitter3": "4.0.7",
+    "source-map-loader": "^3.0.1",
+    "uuid": "9.0.0",
+    "webpack": "^5.99.8",
+    "webpack-cli": "4.10.0",
+    "webpack-dev-server": "4.11.1"
+  },
+  "dependencies": {
+    "lru-cache": "11.1.0",
+    "roslib": "1.4.1"
+  }
+}

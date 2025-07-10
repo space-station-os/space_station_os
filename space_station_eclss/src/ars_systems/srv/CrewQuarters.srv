@@ -1,0 +1,9 @@
+#Service file to get co2 from crew quarters
+float64 co2_mass            # Mass of CO2 in grams
+float64 moisture_content    # Moisture content in percentage
+float64 contaminants        # Level of contaminants in percentage
+
+---
+
+bool success
+string message

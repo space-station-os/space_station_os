@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='utf-8'?>
+<sdf version="1.6">
+    <model name="earth">
+        <static>true</static>
+        <pose>93.56 2226.08 -1279.39 0.58 -0.35 -0.22</pose>
+        <link name="base_link">
+            <visual name="base_link_visual">
+                <geometry>
+                    <mesh>
+                        <uri>models://earth/resources/earth.glb</uri>
+                        <scale>250 250 250</scale>
+                    </mesh>
+                </geometry>
+            </visual>
+        </link>
+    </model>
+</sdf>
