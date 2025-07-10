@@ -8,13 +8,39 @@ on:
   workflow_dispatch:        
 
 jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    container:
+      image: ros:humble
+      options: --user root
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v3
+
+      - name: Install colcon and dependencies
+        run: |
+          apt update
+          apt install -y python3-colcon-common-extensions python3-pip git
+          apt install -y build-essential
+          apt install -y build-essential libopencv-dev
+          rosdep update
+          rosdep install --from-paths . --ignore-src -r -y
+
+      - name: Build the workspace
+        run: |
+          bash -c "source /opt/ros/humble/setup.bash && colcon build --event-handlers console_direct+"
+
+
+
   docker-publish:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
+        
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
