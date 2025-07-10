@@ -23,6 +23,7 @@ jobs:
           apt update
           apt install -y python3-colcon-common-extensions python3-pip git
           apt install -y build-essential
+          apt install -y build-essential libopencv-dev
           rosdep update
           rosdep install --from-paths . --ignore-src -r -y
 
@@ -40,9 +41,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-        with:
-          submodules: recursive
-
+        
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
