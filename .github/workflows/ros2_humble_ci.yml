@@ -27,9 +27,12 @@ jobs:
           rosdep install --from-paths . --ignore-src -r -y
 
       - name: Build the workspace
+        shell: bash
         run: |
           source /opt/ros/humble/setup.bash
           colcon build --event-handlers console_direct+
+
+
 
   docker-publish:
     runs-on: ubuntu-latest
