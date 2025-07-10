@@ -652,7 +652,7 @@ int main(int argc, char *argv[])
 {
     rclcpp::init(argc, argv);
     rclcpp::NodeOptions options;
-    //options.automatically_declare_parameters_from_overrides(true);
+    options.automatically_declare_parameters_from_overrides(true);
     auto node = std::make_shared<AttitudeDynamicsNode>(options);
     rclcpp::spin(node);
 
