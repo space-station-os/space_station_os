@@ -1,19 +1,0 @@
-
-®
-(thermal_controller/ThermalNodeData.protothermal_controller"“
-ThermalNodeData
-name (	Rname 
-temperature (Rtemperature#
-heat_capacity (RheatCapacity%
-internal_power (RinternalPower"P
-ThermalNodeData_V;
-states (2#.thermal_controller.ThermalNodeDataRstatesbproto3
-Œ
-(thermal_controller/ThermalLinkFlow.protothermal_controller"t
-ThermalLinkFlow
-from (	Rfrom
-to (	Rto 
-conductance (Rconductance
-	heat_flow (RheatFlow"N
-ThermalLinkFlow_V9
-flows (2#.thermal_controller.ThermalLinkFlowRflowsbproto3
