@@ -22,10 +22,6 @@
   <exec_depend>rosidl_default_runtime</exec_depend>
 
 
-  <exec_depend>gz-sim8</exec_depend>
-  <exec_depend>gz-msgs8</exec_depend>
-  <exec_depend>gz-transport13</exec_depend>
-
   <depend>rclcpp</depend>
   <depend>urdf</depend>
 

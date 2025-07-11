@@ -2,9 +2,9 @@ name: Docker Publish
 
 on:
   push:
-    branches: ["**"]        
+    branches: ["main"]        
   pull_request:
-    branches: ["**"]
+    branches: ["main"]
   workflow_dispatch:        
 
 jobs:
@@ -30,4 +30,6 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/space-station-os/space_station_os:latest
+          tags: ghcr.io/${{ github.repository_owner }}/space_station_os:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
