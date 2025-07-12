@@ -33,6 +33,10 @@ jobs:
           apt update 
           apt install -y libopencv-dev python3-opencv
 
+      - name: Install Python packages (casadi)
+        run: |
+          pip install casadi
+          
       - name: Build the workspace
         run: |
           source /opt/ros/humble/setup.bash
