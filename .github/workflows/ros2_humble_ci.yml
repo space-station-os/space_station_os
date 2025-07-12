@@ -28,6 +28,11 @@ jobs:
           rosdep update
           rosdep install --from-paths . --ignore-src -r -y
 
+      - name: Install OpenCV
+        run: |
+          apt update 
+          apt install -y libopencv-dev python3-opencv
+
       - name: Build the workspace
         run: |
           source /opt/ros/humble/setup.bash
