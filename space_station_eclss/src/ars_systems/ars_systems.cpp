@@ -1,226 +1,207 @@
 #include "space_station_eclss/ars_systems.hpp"
 
-namespace space_station_eclss
+using namespace std::chrono_literals;
+using space_station_eclss::ARSActionServer;
+
+ARSActionServer::ARSActionServer(const rclcpp::NodeOptions & options)
+: Node("air_revitalisation", options)
 {
-
-ARSActionServer::ARSActionServer() : Node("air_revitalisation")
-{
-  // Declare and get parameters
-  this->declare_parameter("sim_step_duration", 0.1);
-  this->declare_parameter("desiccant_capacity_1", 400.0);
-  this->declare_parameter("desiccant_capacity_2", 400.0);
-  this->declare_parameter("adsorbent_capacity_1", 850.0);
-  this->declare_parameter("adsorbent_capacity_2", 850.0);
-  this->declare_parameter("removal_efficiency", 0.95);
-  this->declare_parameter("vent_ratio", 0.4);
-  this->declare_parameter("initial_co2_level", 1000.0);
-  this->declare_parameter("co2_generation_per_crew", 1.04);
-  this->declare_parameter("crew_count", 4);
-  this->declare_parameter("co2_tank_capacity", 500.0);
-  this->get_parameter("co2_tank_capacity", co2_tank_capacity_);
-
-  this->get_parameter("sim_step_duration", sim_step_duration_);
-  this->get_parameter("desiccant_capacity_1", desiccant_capacity_1_);
-  this->get_parameter("desiccant_capacity_2", desiccant_capacity_2_);
-  this->get_parameter("adsorbent_capacity_1", adsorbent_capacity_1_);
-  this->get_parameter("adsorbent_capacity_2", adsorbent_capacity_2_);
-  this->get_parameter("removal_efficiency", removal_efficiency_);
-  this->get_parameter("vent_ratio", vent_ratio_);
-  this->get_parameter("initial_co2_level", initial_co2_level_);
-  this->get_parameter("co2_generation_per_crew", co2_generation_per_crew_);
-  this->get_parameter("crew_count", crew_count_);
-
-  current_co2_level_ = initial_co2_level_;
-  failure_triggered_ = false;
-  cycle_counter_ = 0;
-  total_vent_events_ = 0;
-  total_co2_vented_ = 0.0;
+  std::srand(std::time(nullptr)); 
+  declare_parameters();
 
   action_server_ = rclcpp_action::create_server<AirRevitalisation>(
     this,
     "air_revitalisation",
-    std::bind(&ARSActionServer::handle_goal, this, std::placeholders::_1, std::placeholders::_2),
-    std::bind(&ARSActionServer::handle_cancel, this, std::placeholders::_1),
-    std::bind(&ARSActionServer::handle_accepted, this, std::placeholders::_1));
+    [](const rclcpp_action::GoalUUID &, std::shared_ptr<const AirRevitalisation::Goal>) {
+      return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+    },
+    [](const std::shared_ptr<GoalHandleARS>) {
+      return rclcpp_action::CancelResponse::ACCEPT;
+    },
+    std::bind(&ARSActionServer::execute, this, std::placeholders::_1)
+  );
 
-  heartbeat_pub_ = this->create_publisher<diagnostic_msgs::msg::DiagnosticStatus>("ars/heartbeat", 10);
-  heartbeat_timer_ = this->create_wall_timer(
-    std::chrono::seconds(1),
-    [this]() {
-      if (!failure_triggered_) {
-        send_heartbeat("OK", "ARS nominal operation");
-      } else {
-        send_heartbeat("ERROR", failure_message_);
+  co2_storage_timer_ = this->create_wall_timer(
+      1s,  // Publish every 1s
+      [this]() {
+        std_msgs::msg::Float64 msg;
+        msg.data = this->total_co2_storage_;
+        co2_storage_pub_->publish(msg);
       }
-    });
+    );
 
-  co2_storage = this->create_publisher<std_msgs::msg::Float64>("/co2_storage", 10);
+  heartbeat_pub_ = this->create_publisher<diagnostic_msgs::msg::DiagnosticStatus>("/ars/heartbeat", 10);
+  co2_storage_pub_ = this->create_publisher<std_msgs::msg::Float64>("/co2_storage", 10);
+
 
   RCLCPP_INFO(this->get_logger(), "ARS Action Server Initialized");
 }
 
-rclcpp_action::GoalResponse ARSActionServer::handle_goal(
-  const rclcpp_action::GoalUUID &, std::shared_ptr<const AirRevitalisation::Goal>)
+void ARSActionServer::declare_parameters()
 {
-  RCLCPP_INFO(this->get_logger(), "[Goal] Received new ARS simulation goal");
-  return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+  sim_time_ = this->declare_parameter<int>("sim_time", 1000);
+  enable_failure_ = this->declare_parameter("enable_failure", false);
+  max_co2_storage_ = this->declare_parameter("max_co2_storage", 3000.0);
+
+  des1_capacity_ = this->declare_parameter("desiccant_bed_1.capacity", 50.0);
+  des1_removal_  = this->declare_parameter("desiccant_bed_1.removal_rate", 0.1);
+  des1_temp_limit_ = this->declare_parameter("desiccant_bed_1.max_temperature", 80.0);
+
+  des2_capacity_ = this->declare_parameter("desiccant_bed_2.capacity", 50.0);
+  des2_removal_  = this->declare_parameter("desiccant_bed_2.removal_rate", 0.1);
+  des2_temp_limit_ = this->declare_parameter("desiccant_bed_2.max_temperature", 80.0);
+
+  ads1_capacity_ = this->declare_parameter("adsorbent_bed_1.capacity", 500.0);
+  ads1_removal_  = this->declare_parameter("adsorbent_bed_1.removal_rate", 5.0);
+  ads1_temp_limit_ = this->declare_parameter("adsorbent_bed_1.max_temperature", 204.0);
+
+  ads2_capacity_ = this->declare_parameter("adsorbent_bed_2.capacity", 500.0);
+  ads2_removal_  = this->declare_parameter("adsorbent_bed_2.removal_rate", 5.0);
+  ads2_temp_limit_ = this->declare_parameter("adsorbent_bed_2.max_temperature", 204.0);
 }
 
-rclcpp_action::CancelResponse ARSActionServer::handle_cancel(
-  const std::shared_ptr<GoalHandleAirRevitalisation>)
-{
-  RCLCPP_WARN(this->get_logger(), "[Cancel] ARS goal was requested to be cancelled");
-  return rclcpp_action::CancelResponse::ACCEPT;
-}
-
-void ARSActionServer::handle_accepted(const std::shared_ptr<GoalHandleAirRevitalisation> goal_handle)
-{
-  RCLCPP_INFO(this->get_logger(), "[Accepted] Executing ARS simulation...");
-  std::thread{std::bind(&ARSActionServer::execute, this, goal_handle)}.detach();
-}
-
-void ARSActionServer::send_heartbeat(const std::string & level, const std::string & message)
-{
-  diagnostic_msgs::msg::DiagnosticStatus status;
-  status.name = "ARS Simulation Heartbeat";
-  status.level = (level == "OK") ? status.OK : status.ERROR;
-  status.message = message;
-  heartbeat_pub_->publish(status);
-}
-
-void ARSActionServer::simulateDesiccantBed1(float &moisture_content, rclcpp::Time)
-{
-  moisture_content *= 0.8;
-  RCLCPP_DEBUG(this->get_logger(), "Desiccant Bed 1 reduced moisture to %.2f", moisture_content);
-}
-
-void ARSActionServer::simulateDesiccantBed2(float &moisture_content, rclcpp::Time)
-{
-  moisture_content *= 1.05;
-  RCLCPP_DEBUG(this->get_logger(), "Desiccant Bed 2 added humidity to %.2f", moisture_content);
-}
-
-void ARSActionServer::simulateAdsorbentBed1(
-  float &co2_content, rclcpp::Time, bool &venting, int &vent_bed_id, float &vent_amount)
-{
-  float removed = co2_content * removal_efficiency_;
-  co2_content -= removed;
-  venting = true;
-  vent_bed_id = 1;
-  vent_amount = removed * vent_ratio_;
-  total_vent_events_++;
-  total_co2_vented_ += vent_amount;
-
-  RCLCPP_INFO(this->get_logger(), "Adsorbent Bed 1 vented %.2f CO2", vent_amount);
-}
-
-void ARSActionServer::simulateAdsorbentBed2(
-  float &co2_content, rclcpp::Time, bool &venting, int &vent_bed_id, float &vent_amount)
-{
-  co2_content *= 1.02;
-  venting = true;
-  vent_bed_id = 2;
-  vent_amount = co2_content * 0.01;
-  total_vent_events_++;
-  total_co2_vented_ += vent_amount;
-
-  RCLCPP_INFO(this->get_logger(), "Adsorbent Bed 2 desorbed and vented %.2f CO2", vent_amount);
-}
-
-void ARSActionServer::execute(const std::shared_ptr<GoalHandleAirRevitalisation> goal_handle)
+void ARSActionServer::execute(const std::shared_ptr<GoalHandleARS> goal_handle)
 {
   auto goal = goal_handle->get_goal();
   auto feedback = std::make_shared<AirRevitalisation::Feedback>();
   auto result = std::make_shared<AirRevitalisation::Result>();
 
-  rclcpp::Rate rate(1.0 / sim_step_duration_);
-  int sim_time = goal->sim_time;
-  float moisture = 50.0;
+  float co2 = goal->initial_co2_mass;
+  float h2o = goal->initial_moisture_content;
 
-  RCLCPP_INFO(this->get_logger(), "ARS Simulation started for %d seconds", sim_time);
+  float t_ads1 = 140.0, t_ads2 = 140.0;
+  float t_des1 = 30.0, t_des2 = 30.0;
 
-  for (int t = 0; t <= sim_time; ++t)
-  {
-    if (goal_handle->is_canceling()) {
-      result->success = false;
-      result->summary_message = "Simulation cancelled by client.";
-      goal_handle->canceled(result);
-      RCLCPP_WARN(this->get_logger(), "ARS Simulation cancelled");
-      return;
+  int cycles = 0;
+  int vents = 0;
+  float total_vented = 0.0;
+  bool success = true;
+
+  RCLCPP_INFO(this->get_logger(), "[Goal] ARS simulation started");
+
+  for (int t = 0; t <= sim_time_; t++) {
+    // [1] Check CO2 storage overflow failure condition
+    if (enable_failure_ && total_co2_storage_ > max_co2_storage_) {
+      RCLCPP_FATAL(this->get_logger(), "[FAILURE] CO₂ leak into crew quarters! Storage exceeded %.2f ppm", total_co2_storage_);
+      publish_bed_heartbeat("CO₂ Storage", false, "CO₂ leak detected due to overcapacity");
+      success = false;
+      break;
     }
 
-    // Moisture management
-    simulateDesiccantBed1(moisture, now());
-    simulateDesiccantBed2(moisture, now());
-
-    // CO2 generation from crew
-    current_co2_level_ += crew_count_ * co2_generation_per_crew_;
-
-    // Check for tank threshold
-    bool venting = false;
-    int vent_bed_id = 0;
-    float vent_amount = 0.0;
-
-    if (current_co2_level_ >= co2_tank_capacity_) {
-      venting = true;
-      vent_bed_id = 1;  // Assume venting via Bed 1
-      vent_amount = current_co2_level_ * vent_ratio_;
-      current_co2_level_ = 0.0;  // Reset CO2 after venting
-
-      std_msgs::msg::Float64 co2_msg;
-      co2_msg.data = vent_amount;
-      co2_storage->publish(co2_msg);
-
-      total_vent_events_++;
-      total_co2_vented_ += vent_amount;
-
-      RCLCPP_INFO(this->get_logger(),
-                  "[VENT] CO₂ storage threshold reached. Vented %.2f units to Sabatier tank",
-                  vent_amount);
-    }
-
-    // Feedback
     feedback->current_time = t;
-    feedback->cabin_co2_level = current_co2_level_;
-    feedback->venting = venting;
-    feedback->vent_bed_id = vent_bed_id;
-    feedback->vent_amount = vent_amount;
-    goal_handle->publish_feedback(feedback);
+    feedback->cabin_co2_level = co2;
 
-    // Simulate failure at halfway point if enabled
-    if (goal->simulate_failure && t == sim_time / 2) {
-      failure_triggered_ = true;
-      failure_message_ = "Simulated failure: Adsorbent Bed 1 stuck closed.";
-      RCLCPP_ERROR(this->get_logger(), "[FAILURE] %s", failure_message_.c_str());
+    if (!simulate_desiccant_bed(h2o, des1_capacity_, des1_removal_, des1_temp_limit_, "Desiccant Bed 1", t_des1)) {
+      publish_bed_heartbeat("Desiccant Bed 1", false, "H₂O capacity depleted");
+      success = false;
+      break;
     }
 
-    rate.sleep();
+    if (!simulate_desiccant_bed(h2o, des2_capacity_, des2_removal_, des2_temp_limit_, "Desiccant Bed 2", t_des2)) {
+      publish_bed_heartbeat("Desiccant Bed 2", false, "H₂O capacity depleted");
+      success = false;
+      break;
+    }
+
+    if (!simulate_adsorbent_bed(co2, ads1_capacity_, ads1_removal_, ads1_temp_limit_, "Adsorbent Bed 1", t_ads1)) {
+      publish_bed_heartbeat("Adsorbent Bed 1", false, "CO₂ capacity depleted");
+      success = false;
+      break;
+    }
+
+    if (!simulate_adsorbent_bed(co2, ads2_capacity_, ads2_removal_, ads2_temp_limit_, "Adsorbent Bed 2", t_ads2)) {
+      publish_bed_heartbeat("Adsorbent Bed 2", false, "CO₂ capacity depleted");
+      success = false;
+      break;
+    }
+
+    // VENTING
+    if (co2 > 800.0) {
+      feedback->venting = true;
+      feedback->vent_bed_id = 3;
+      feedback->vent_amount = co2 * 0.25;
+      co2 -= feedback->vent_amount;
+      total_vented += feedback->vent_amount;
+      vents++;
+
+      this->total_co2_storage_ += feedback->vent_amount;
+
+      // CO₂ sensor failure simulation
+      if (enable_failure_ && (rand() % 500) == 0) {
+        RCLCPP_FATAL(this->get_logger(), "[FAILURE] CO₂ sensor failed. Cannot proceed.");
+        publish_bed_heartbeat("Sensor", false, "CO₂ sensor failure");
+        success = false;
+        break;
+      }
+
+      RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000, "[VENT] CO₂ > 800ppm. Vented %.2f", feedback->vent_amount);
+    } else {
+      feedback->venting = false;
+      feedback->vent_bed_id = -1;
+      feedback->vent_amount = 0.0;
+    }
+
+    goal_handle->publish_feedback(feedback);
+    rclcpp::sleep_for(100ms);
+    cycles++;
   }
 
-  // Final result
-  cycle_counter_++;
-  result->success = !failure_triggered_;
-  result->cycles_completed = cycle_counter_;
-  result->total_vents = total_vent_events_;
-  result->total_co2_vented = total_co2_vented_;
-  result->summary_message = failure_triggered_ ? failure_message_ : "ARS simulation completed successfully";
+  result->success = success;
+  result->cycles_completed = cycles;
+  result->total_vents = vents;
+  result->total_co2_vented = total_vented;
+  result->summary_message = success ? "ARS simulation completed" : "Simulation terminated early";
 
+  publish_bed_heartbeat("ARS", success, result->summary_message);
   goal_handle->succeed(result);
-
-  RCLCPP_INFO(this->get_logger(),
-              "[COMPLETE] Simulation ended. Success: %s | Vents: %d | Total CO₂ Vented: %.2f",
-              result->success ? "YES" : "NO",
-              result->total_vents,
-              result->total_co2_vented);
 }
 
-}  // namespace space_station_eclss
 
-int main(int argc, char ** argv)
+bool ARSActionServer::simulate_desiccant_bed(float &h2o, float cap, float rate, float max_temp, const std::string &name, float &temp)
+{
+  h2o -= rate;
+  temp += 0.5;
+  if (enable_failure_ && (rand() % 100) < 5) {  // 5% chance of failure
+    RCLCPP_ERROR(this->get_logger(), "[FAILURE] %s failed to remove contaminants. TCCS malfunction!", name.c_str());
+    publish_bed_heartbeat(name, false, "TCCS failure - contaminants leaked");
+    return false;
+  }
+
+  RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 5000, "[%s] Removing H₂O %.2f, Temp: %.2f°C", name.c_str(), rate, temp);
+  return h2o >= 0.0 && temp <= max_temp;
+}
+
+bool ARSActionServer::simulate_adsorbent_bed(float &co2, float cap, float rate, float max_temp, const std::string &name, float &temp)
+{
+  temp += 10.0;
+  if (temp < 200.0) {
+    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 3000, "[%s] Heating... Temp: %.2f°C", name.c_str(), temp);
+    return true;
+  }
+
+  co2 -= rate;
+  RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 3000, "[%s] Removing CO₂ %.2f, Temp: %.2f°C", name.c_str(), rate, temp);
+  return co2 >= 0.0 && temp <= max_temp;
+}
+
+void ARSActionServer::publish_bed_heartbeat(const std::string &bed, bool ok, const std::string &msg)
+{
+  diagnostic_msgs::msg::DiagnosticStatus status;
+  status.name = bed + " Status";
+  status.level = ok ? status.OK : status.ERROR;
+  status.message = msg;
+  status.hardware_id = "ARS_BED";
+  heartbeat_pub_->publish(status);
+}
+
+
+
+int main(int argc, char **argv)
 {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<space_station_eclss::ARSActionServer>();
-  rclcpp::spin(node);
+  auto node_options = rclcpp::NodeOptions();
+  auto ars_node = std::make_shared<ARSActionServer>(node_options);
+  rclcpp::spin(ars_node);
   rclcpp::shutdown();
   return 0;
 }

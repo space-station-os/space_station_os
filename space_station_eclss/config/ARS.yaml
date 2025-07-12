@@ -1,31 +1,23 @@
 air_revitalisation:
   ros__parameters:
+    sim_time: 5000
 
-    # Simulation
-    sim_step_time: 0.1               # Real seconds per 1s sim (100ms)
-    exhaled_co2_per_step: 0.25      # g/s per simulated second
-    co2_threshold: 100.0            # Safety threshold, not enforced yet
+    desiccant_bed_1:
+      capacity: 50.0
+      removal_rate: 0.1
+      max_temperature: 80.0
 
-    # Desiccant Bed 1
-    desiccant_capacity_1: 100.0     # grams
-    desiccant_efficiency_1: 0.95    # 95% removal rate
+    desiccant_bed_2:
+      capacity: 50.0
+      removal_rate: 0.1
+      max_temperature: 80.0
 
-    # Desiccant Bed 2
-    desiccant_capacity_2: 100.0     # grams
-    desiccant_efficiency_2: 0.90    # 90% removal
+    adsorbent_bed_1:
+      capacity: 500.0
+      removal_rate: 5.0
+      max_temperature: 204.0
 
-    # Adsorbent Bed 1 (CDRA CO2 bed)
-    adsorbent_capacity_1: 200.0     # grams
-    adsorbent_efficiency_1: 0.92    # 92% CO2 removal
-
-    # Adsorbent Bed 2 (second CDRA bed)
-    adsorbent_capacity_2: 200.0     # grams
-    adsorbent_efficiency_2: 0.88    # slightly lower efficiency
-
-    # CO2 venting settings
-    co2_vent_threshold: 80.0        # vent if cabin CO2 exceeds this (g)
-    co2_storage_ratio: 0.6          # 60% of CO₂ stored, 40% vented to Sabatier
-
-    # (optional future use in FDIR or dynamic control)
-    health_check_interval: 5.0      # seconds
-    emergency_mode_threshold: 150.0
+    adsorbent_bed_2:
+      capacity: 500.0
+      removal_rate: 5.0
+      max_temperature: 204.0
