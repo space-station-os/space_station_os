@@ -1,0 +1,22 @@
+FROM osrf/ros:humble-desktop
+
+SHELL ["/bin/bash", "-c"]
+
+WORKDIR /app
+
+RUN git clone https://github.com/DominikN/ros2_docker_examples.git
+
+RUN apt-get update && apt-get install -y
+
+RUN cp -r ros2_docker_examples/ros2_ws . && \
+    cd ros2_ws/src && \
+    source /opt/ros/humble/setup.bash && \
+    cd .. && \
+    rosdep install -i --from-path src --rosdistro humble -y && \
+    colcon build
+
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
+
+CMD ["ros2", "launch", "my_turtle_bringup", "only_controller.launch.py"]

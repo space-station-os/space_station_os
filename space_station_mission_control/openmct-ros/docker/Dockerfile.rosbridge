@@ -1,0 +1,23 @@
+FROM osrf/ros:humble-desktop
+
+SHELL ["/bin/bash", "-c"]
+
+WORKDIR /app
+
+EXPOSE 9090
+
+# update to latest and install dependencies
+RUN apt-get update && apt-get install -y && \
+    mkdir -p ros2_ws/src && \
+    cd ros2_ws/src && \
+    git clone https://github.com/RobotWebTools/rosbridge_suite.git && \
+    source /opt/ros/humble/setup.bash && \
+    cd .. && \
+    rosdep install -i --from-path src --rosdistro humble -y && \
+    colcon build
+
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
+
+CMD ["ros2", "launch", "rosbridge_server", "rosbridge_websocket_launch.xml"]

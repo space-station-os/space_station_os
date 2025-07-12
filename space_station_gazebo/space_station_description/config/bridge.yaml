@@ -1,0 +1,167 @@
+# Thruster joint commands (12 total)
+- ros_topic_name: "/spacestation/thrust/xp_th_1"
+  gz_topic_name: "/model/spacestation/joint/xp_th_1/cmd_thrust"
+  ros_type_name: "std_msgs/msg/Float64"
+  gz_type_name: "gz.msgs.Double"
+  direction: BIDIRECTIONAL
+
+- ros_topic_name: "/spacestation/thrust/xp_th_2"
+  gz_topic_name: "/model/spacestation/joint/xp_th_2/cmd_thrust"
+  ros_type_name: "std_msgs/msg/Float64"
+  gz_type_name: "gz.msgs.Double"
+  direction: BIDIRECTIONAL
+
+- ros_topic_name: "/spacestation/thrust/xp_th_3"
+  gz_topic_name: "/model/spacestation/joint/xp_th_3/cmd_thrust"
+  ros_type_name: "std_msgs/msg/Float64"
+  gz_type_name: "gz.msgs.Double"
+  direction: BIDIRECTIONAL
+
+- ros_topic_name: "/spacestation/thrust/xp_th_4"
+  gz_topic_name: "/model/spacestation/joint/xp_th_4/cmd_thrust"
+  ros_type_name: "std_msgs/msg/Float64"
+  gz_type_name: "gz.msgs.Double"
+  direction: BIDIRECTIONAL
+
+- ros_topic_name: "/spacestation/thrust/xn_th_1"
+  gz_topic_name: "/model/spacestation/joint/xn_th_1/cmd_thrust"
+  ros_type_name: "std_msgs/msg/Float64"
+  gz_type_name: "gz.msgs.Double"
+  direction: BIDIRECTIONAL
+
+- ros_topic_name: "/spacestation/thrust/xn_th_2"
+  gz_topic_name: "/model/spacestation/joint/xn_th_2/cmd_thrust"
+  ros_type_name: "std_msgs/msg/Float64"
+  gz_type_name: "gz.msgs.Double"
+  direction: BIDIRECTIONAL
+
+- ros_topic_name: "/spacestation/thrust/xn_th_3"
+  gz_topic_name: "/model/spacestation/joint/xn_th_3/cmd_thrust"
+  ros_type_name: "std_msgs/msg/Float64"
+  gz_type_name: "gz.msgs.Double"
+  direction: BIDIRECTIONAL
+
+- ros_topic_name: "/spacestation/thrust/xn_th_4"
+  gz_topic_name: "/model/spacestation/joint/xn_th_4/cmd_thrust"
+  ros_type_name: "std_msgs/msg/Float64"
+  gz_type_name: "gz.msgs.Double"
+  direction: BIDIRECTIONAL
+
+- ros_topic_name: "/spacestation/thrust/yp_th_1"
+  gz_topic_name: "/model/spacestation/joint/yp_th_1/cmd_thrust"
+  ros_type_name: "std_msgs/msg/Float64"
+  gz_type_name: "gz.msgs.Double"
+  direction: BIDIRECTIONAL
+
+- ros_topic_name: "/spacestation/thrust/yp_th_2"
+  gz_topic_name: "/model/spacestation/joint/yp_th_2/cmd_thrust"
+  ros_type_name: "std_msgs/msg/Float64"
+  gz_type_name: "gz.msgs.Double"
+  direction: BIDIRECTIONAL
+
+- ros_topic_name: "/spacestation/thrust/yn_th_1"
+  gz_topic_name: "/model/spacestation/joint/yn_th_1/cmd_thrust"
+  ros_type_name: "std_msgs/msg/Float64"
+  gz_type_name: "gz.msgs.Double"
+  direction: BIDIRECTIONAL
+
+- ros_topic_name: "/spacestation/thrust/yn_th_2"
+  gz_topic_name: "/model/spacestation/joint/yn_th_2/cmd_thrust"
+  ros_type_name: "std_msgs/msg/Float64"
+  gz_type_name: "gz.msgs.Double"
+  direction: BIDIRECTIONAL
+
+- ros_topic_name: "/spacestation/thrust/zp_th_1"
+  gz_topic_name: "/model/spacestation/joint/zp_th_1/cmd_thrust"
+  ros_type_name: "std_msgs/msg/Float64"
+  gz_type_name: "gz.msgs.Double"
+  direction: BIDIRECTIONAL
+
+- ros_topic_name: "/spacestation/thrust/zp_th_2"
+  gz_topic_name: "/model/spacestation/joint/zp_th_2/cmd_thrust"
+  ros_type_name: "std_msgs/msg/Float64"
+  gz_type_name: "gz.msgs.Double"
+  direction: BIDIRECTIONAL
+
+- ros_topic_name: "/spacestation/thrust/zn_th_1"
+  gz_topic_name: "/model/spacestation/joint/zn_th_1/cmd_thrust"
+  ros_type_name: "std_msgs/msg/Float64"
+  gz_type_name: "gz.msgs.Double"
+  direction: BIDIRECTIONAL
+
+- ros_topic_name: "/spacestation/thrust/zn_th_2"
+  gz_topic_name: "/model/spacestation/joint/zn_th_2/cmd_thrust"
+  ros_type_name: "std_msgs/msg/Float64"
+  gz_type_name: "gz.msgs.Double"
+  direction: BIDIRECTIONAL
+
+# IMU sensor
+- ros_topic_name: "/imu"
+  gz_topic_name: "/imu"
+  ros_type_name: "sensor_msgs/msg/Imu"
+  gz_type_name: "gz.msgs.IMU"
+  direction: GZ_TO_ROS
+
+# GPS (NavSat)
+- ros_topic_name: "/navsat"
+  gz_topic_name: "/navsat"
+  ros_type_name: "sensor_msgs/msg/NavSatFix"
+  gz_type_name: "gz.msgs.NavSat"
+  direction: GZ_TO_ROS
+
+# Clock sync
+- ros_topic_name: "/clock"
+  gz_topic_name: "/clock"
+  ros_type_name: "rosgraph_msgs/msg/Clock"
+  gz_type_name: "gz.msgs.Clock"
+  direction: GZ_TO_ROS
+
+# Cameras (4 primary)
+- ros_topic_name: "/front_camera/image"
+  gz_topic_name: "/front_camera/image"
+  ros_type_name: "sensor_msgs/msg/Image"
+  gz_type_name: "gz.msgs.Image"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/front_camera/camera_info"
+  gz_topic_name: "/front_camera/camera_info"
+  ros_type_name: "sensor_msgs/msg/CameraInfo"
+  gz_type_name: "gz.msgs.CameraInfo"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/back_camera/image"
+  gz_topic_name: "/back_camera/image"
+  ros_type_name: "sensor_msgs/msg/Image"
+  gz_type_name: "gz.msgs.Image"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/back_camera/camera_info"
+  gz_topic_name: "/back_camera/camera_info"
+  ros_type_name: "sensor_msgs/msg/CameraInfo"
+  gz_type_name: "gz.msgs.CameraInfo"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/left_camera/image"
+  gz_topic_name: "/left_camera/image"
+  ros_type_name: "sensor_msgs/msg/Image"
+  gz_type_name: "gz.msgs.Image"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/left_camera/camera_info"
+  gz_topic_name: "/left_camera/camera_info"
+  ros_type_name: "sensor_msgs/msg/CameraInfo"
+  gz_type_name: "gz.msgs.CameraInfo"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/right_camera/image"
+  gz_topic_name: "/right_camera/image"
+  ros_type_name: "sensor_msgs/msg/Image"
+  gz_type_name: "gz.msgs.Image"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/right_camera/camera_info"
+  gz_topic_name: "/right_camera/camera_info"
+  ros_type_name: "sensor_msgs/msg/CameraInfo"
+  gz_type_name: "gz.msgs.CameraInfo"
+  direction: GZ_TO_ROS
+

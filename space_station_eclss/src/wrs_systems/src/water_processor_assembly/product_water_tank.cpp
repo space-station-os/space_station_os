@@ -55,6 +55,7 @@ void ProductWaterTank::handle_dispense_water(
     std::shared_ptr<space_station_eclss::srv::CleanWater::Response> response) 
 {
     double requested_water = request->water;
+    response->delivered_volume = requested_water;
 
     if (requested_water > current_water_volume_) {
         response->success = false;
@@ -73,7 +74,7 @@ void ProductWaterTank::handle_dispense_water(
     current_water_volume_ -= requested_water;
     response->success = true;
     response->message = "Water dispensed.";
-
+    response->delivered_volume = requested_water;
     RCLCPP_INFO(this->get_logger(), "[DISPENSE] %.2fL dispensed. Remaining: %.2fL", requested_water, current_water_volume_);
 }
 

@@ -1,0 +1,3 @@
+[submodule "openmct-ros"]
+	path = openmct-ros
+	url = https://github.com/traclabs/openmct-ros.git
