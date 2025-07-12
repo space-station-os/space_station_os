@@ -25,7 +25,6 @@ jobs:
           apt install -y python3-colcon-common-extensions python3-pip git
           apt install -y libsdl2-dev
           apt install -y build-essential
-          pip install ament-python
           rosdep update
           rosdep install --from-paths src --ignore-src -r -y
 
