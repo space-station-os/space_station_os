@@ -9,7 +9,7 @@
 
 
   <buildtool_depend>ament_cmake</buildtool_depend>
-  <buildtool_depend>ament_python</buildtool_depend>
+  <!--buildtool_depend>ament_python</buildtool_depend-->
   
 
   <exec_depend>rclcpp</exec_depend>
