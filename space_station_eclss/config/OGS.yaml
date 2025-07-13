@@ -1,0 +1,8 @@
+oxygen_generation:
+  ros__parameters:
+    enable_failure: false
+    electrolysis_temp: 100.0
+    o2_efficiency: 0.95
+    sabatier_efficiency: 0.75
+    sabatier_temp: 300.0
+    sabatier_pressure: 1.0

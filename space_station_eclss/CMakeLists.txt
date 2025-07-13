@@ -42,6 +42,7 @@ set(msg_files
   "src/ars_systems/msg/CdraStatus.msg"
 
   "action/AirRevitalisation.action"
+  "action/OxygenGeneration.action"
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -99,11 +100,16 @@ ament_target_dependencies(deionization_bed std_srvs rosidl_default_generators rc
 rosidl_target_interfaces(deionization_bed ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 
+add_executable(ogs src/ors_systems/src/ogs_systems.cpp)
+ament_target_dependencies(ogs std_srvs rosidl_default_generators rclcpp rclcpp_action diagnostic_msgs)
+
+rosidl_target_interfaces(ogs ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+
 add_executable(electrolysis src/ors_systems/src/electrolysis.cpp)
 ament_target_dependencies(electrolysis std_srvs rosidl_default_generators rclcpp sensor_msgs)
 
 rosidl_target_interfaces(electrolysis ${PROJECT_NAME} "rosidl_typesupport_cpp")
-
 
 add_executable(whc src/wrs_systems/src/whc_controller.cpp)
 ament_target_dependencies(whc rosidl_default_generators rclcpp sensor_msgs)
@@ -154,6 +160,7 @@ rosidl_target_interfaces(safety ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 install(TARGETS
   ars
+  ogs
   collector
   desiccant1
   desiccant2
