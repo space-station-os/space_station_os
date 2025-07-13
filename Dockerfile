@@ -4,7 +4,9 @@ FROM osrf/ros:humble-desktop
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
-
+ENV ROS_DOMAIN_ID=0
+ENV RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+ENV ROS_SUPER_CLIENT=1 
 # Install system dependencies
 RUN apt update && apt install -y \
     git \
@@ -44,5 +46,6 @@ RUN bash -c "source /opt/ros/humble/setup.bash && rosdep install --from-paths sr
 # Build the workspace
 RUN bash -c "source /opt/ros/humble/setup.bash && colcon build --symlink-install"
 
+RUN bash -c "export ROS_DOMAIN_ID=0 "
 # Source the workspace on container startup
 CMD ["/bin/bash", "-c", "source /opt/ros/humble/setup.bash && source install/setup.bash && exec bash"]

@@ -23,8 +23,10 @@ docker pull ghcr.io/space-station-os/space_station_os:latest
 ### 2. Run the container
 
 ```bash
-docker run -it --rm ghcr.io/space-station-os/space_station_os:latest
+docker run --rm -it --network=host -e ROS_DOMAIN_ID=1 ghcr.io/space-station-os/space_station_os:latest
 ```
+
+>Note : Ensure your ROS_DOMAIN_ID=1 in your .bashrc
 
 You'll be dropped into a ready-to-use environment with ROS 2 Humble and all Space Station OS packages pre-built.
 
