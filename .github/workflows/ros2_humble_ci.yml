@@ -26,7 +26,8 @@ jobs:
           apt install -y libsdl2-dev
           apt install -y build-essential
           rosdep update
-          rosdep install --from-paths . --ignore-src -r -y
+          rosdep install --from-paths . --ignore-src --skip-keys="ssos_new_description" -r -y
+
 
       - name: Install OpenCV
         run: |
