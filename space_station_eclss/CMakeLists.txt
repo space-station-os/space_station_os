@@ -43,6 +43,8 @@ set(msg_files
 
   "action/AirRevitalisation.action"
   "action/OxygenGeneration.action"
+  "action/WaterRecovery.action"
+  "src/wrs_systems/srv/RequestProductWater.srv"
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -146,6 +148,11 @@ ament_target_dependencies(ultrasound rosidl_default_generators rclcpp sensor_msg
 rosidl_target_interfaces(ultrasound ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 
+add_executable(wrs src/wrs_systems/src/wrs_systems.cpp)
+ament_target_dependencies(wrs rosidl_default_generators rclcpp rclcpp_action diagnostic_msgs std_srvs)
+rosidl_target_interfaces(wrs ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+
 # CDRA SAFETY
 
 
@@ -161,6 +168,7 @@ rosidl_target_interfaces(safety ${PROJECT_NAME} "rosidl_typesupport_cpp")
 install(TARGETS
   ars
   ogs
+  wrs
   collector
   desiccant1
   desiccant2
