@@ -1,0 +1,8 @@
+# Request
+float64 requested_volume      
+
+---
+# Response
+bool granted
+string status_msg
+float64 current_temperature   # ammonia temperature at the time of request
