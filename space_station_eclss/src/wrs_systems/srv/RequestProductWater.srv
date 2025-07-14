@@ -1,4 +1,5 @@
 float32 amount  # Liters to request
 ---
+float32 water_granted
 bool success
 string message

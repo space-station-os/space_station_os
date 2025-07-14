@@ -40,29 +40,17 @@ WRSActionServer::WRSActionServer(const rclcpp::NodeOptions & options)
   );
 
   // Product water request service
-  water_request_server_ = this->create_service<srv::RequestProductWater>(
+  water_request_server_ = this->create_service<space_station_eclss::srv::RequestProductWater>(
     "wrs/product_water_request",
     std::bind(&WRSActionServer::handle_product_water_request, this, std::placeholders::_1, std::placeholders::_2)
   );
 
-  // Gray water intake service
-  gray_water_service_ = this->create_service<std_srvs::srv::Trigger>(
+  gray_water_service_ = this->create_service<space_station_eclss::srv::GreyWater>(
     "/grey_water",
-    [this](const std::shared_ptr<std_srvs::srv::Trigger::Request>,
-           std::shared_ptr<std_srvs::srv::Trigger::Response> response)
-    {
-      if (waste_collector_current_ + 5.0 > waste_collector_capacity_) {
-        response->success = false;
-        response->message = "Gray water rejected: Waste collector full";
-        publish_diagnostics("WasteCollector", true, response->message);
-      } else {
-        waste_collector_current_ += 5.0;
-        response->success = true;
-        response->message = "Gray water accepted (5L)";
-        publish_diagnostics("WasteCollector", false, response->message);
-      }
-    }
+    std::bind(&WRSActionServer::handle_gray_water_request, this,
+              std::placeholders::_1, std::placeholders::_2)
   );
+
 
   diag_pub_ = this->create_publisher<diagnostic_msgs::msg::DiagnosticStatus>("wrs/diagnostics", 10);
   reserve_pub_ = this->create_publisher<std_msgs::msg::Float32>("wrs/product_water_reserve", 10);
@@ -88,6 +76,32 @@ rclcpp_action::CancelResponse WRSActionServer::handle_cancel(const std::shared_p
   (void)goal_handle;
   return rclcpp_action::CancelResponse::ACCEPT;
 }
+
+void WRSActionServer::handle_gray_water_request(
+  const std::shared_ptr<space_station_eclss::srv::GreyWater::Request> request,
+  std::shared_ptr<space_station_eclss::srv::GreyWater::Response> response)
+{
+  float volume = request->gray_water_liters;
+
+  if (volume <= 0.0f) {
+    response->success = false;
+    response->message = "Invalid gray water input volume.";
+    publish_diagnostics("WasteCollector", true, response->message);
+    return;
+  }
+
+  if (waste_collector_current_ + volume > waste_collector_capacity_) {
+    response->success = false;
+    response->message = "Gray water rejected: Waste collector full";
+    publish_diagnostics("WasteCollector", true, response->message);
+  } else {
+    waste_collector_current_ += volume;
+    response->success = true;
+    response->message = "Gray water accepted: " + std::to_string(volume) + " L";
+    publish_diagnostics("WasteCollector", false, response->message);
+  }
+}
+
 
 void WRSActionServer::handle_accepted(const std::shared_ptr<GoalHandleWRS> goal_handle)
 {
@@ -145,8 +159,8 @@ void WRSActionServer::execute(const std::shared_ptr<GoalHandleWRS> goal_handle)
 }
 
 void WRSActionServer::handle_product_water_request(
-  const std::shared_ptr<srv::RequestProductWater::Request> request,
-  std::shared_ptr<srv::RequestProductWater::Response> response)
+  const std::shared_ptr<space_station_eclss::srv::RequestProductWater::Request> request,
+  std::shared_ptr<space_station_eclss::srv::RequestProductWater::Response> response)
 {
   if (request->amount <= product_water_reserve_) {
     product_water_reserve_ -= request->amount;

@@ -5,7 +5,7 @@
 #include <std_msgs/msg/float64.hpp>
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
 #include "space_station_eclss/action/air_revitalisation.hpp"
-#include "space_station_eclss/srv/co_request.hpp"
+#include "space_station_eclss/srv/co2_request.hpp"
 
 namespace space_station_eclss {
 
@@ -13,7 +13,7 @@ class ARSActionServer : public rclcpp::Node {
 public:
   using AirRevitalisation = space_station_eclss::action::AirRevitalisation;
   using GoalHandleARS = rclcpp_action::ServerGoalHandle<AirRevitalisation>;
-  using Co2Request = space_station_eclss::srv::CoRequest;
+  using Co2Request = space_station_eclss::srv::Co2Request;
 
   explicit ARSActionServer(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
 

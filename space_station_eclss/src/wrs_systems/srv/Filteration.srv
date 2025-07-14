@@ -1,9 +1,0 @@
-# Request
-float64 filtered_water
-float64 contaminants  # Remaining 30%
-float64 organics 
-float64 ammonia 
----
-# Response
-bool success
-string message
