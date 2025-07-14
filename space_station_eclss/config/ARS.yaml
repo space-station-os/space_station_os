@@ -1,23 +1,30 @@
-air_revitalisation:
+ars_systems_node:
   ros__parameters:
-    sim_time: 5000
+    sim_time: 10
+    enable_failure: true
 
-    desiccant_bed_1:
-      capacity: 50.0
-      removal_rate: 0.1
-      max_temperature: 80.0
+    # CO2 ppm corresponding to 3 mmHg (approx)
+    max_co2_storage: 3947.0
 
-    desiccant_bed_2:
-      capacity: 50.0
-      removal_rate: 0.1
-      max_temperature: 80.0
+    # ppm threshold for contaminants
+    contaminant_limit: 100.0
 
-    adsorbent_bed_1:
-      capacity: 500.0
-      removal_rate: 5.0
-      max_temperature: 204.0
+    # Desiccant Bed 1
+    des1_capacity: 100.0
+    des1_removal: 1.5
+    des1_temp_limit: 120.0
 
-    adsorbent_bed_2:
-      capacity: 500.0
-      removal_rate: 5.0
-      max_temperature: 204.0
+    # Desiccant Bed 2
+    des2_capacity: 100.0
+    des2_removal: 1.5
+    des2_temp_limit: 120.0
+
+    # Adsorbent Bed 1
+    ads1_capacity: 100.0
+    ads1_removal: 2.5
+    ads1_temp_limit: 204.0
+
+    # Adsorbent Bed 2
+    ads2_capacity: 100.0
+    ads2_removal: 2.5
+    ads2_temp_limit: 204.0

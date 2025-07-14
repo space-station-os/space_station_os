@@ -46,6 +46,8 @@ set(msg_files
   "action/OxygenGeneration.action"
   "action/WaterRecovery.action"
   "src/wrs_systems/srv/RequestProductWater.srv"
+  "src/ars_systems/srv/CoRequest.srv"
+  "src/ors_systems/srv/O2Request.srv"
 
 )
 
@@ -149,6 +151,9 @@ add_executable(ultrasound src/wrs_systems/src/ultrasound_sensor.cpp)
 ament_target_dependencies(ultrasound rosidl_default_generators rclcpp sensor_msgs)
 rosidl_target_interfaces(ultrasound ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
+add_executable(crew_quarters src/crew_quarters.cpp)
+ament_target_dependencies(crew_quarters rosidl_default_generators rclcpp rclcpp_action)
+rosidl_target_interfaces(crew_quarters ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 add_executable(wrs src/wrs_systems/src/wrs_systems.cpp)
 ament_target_dependencies(wrs rosidl_default_generators rclcpp rclcpp_action diagnostic_msgs std_srvs)
@@ -171,6 +176,7 @@ install(TARGETS
   ars
   ogs
   wrs
+  crew_quarters
   safety
   collector
   desiccant1
