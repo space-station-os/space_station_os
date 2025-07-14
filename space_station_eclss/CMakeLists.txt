@@ -41,7 +41,7 @@ set(msg_files
   # CDRA SAFETY
   "src/ars_systems/msg/CdraStatus.msg"
 
-  "action/AirRevitalisation.action"
+  
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -78,9 +78,7 @@ add_executable(adsorbent2 src/ars_systems/adsorbent_tank_2.cpp )
 ament_target_dependencies(adsorbent2 std_srvs rosidl_default_generators rclcpp sensor_msgs)
 rosidl_target_interfaces(adsorbent2 ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
-add_executable(ars src/ars_systems/ars_systems.cpp )
-ament_target_dependencies(ars std_srvs rosidl_default_generators rclcpp rclcpp_action diagnostic_msgs)
-rosidl_target_interfaces(ars ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
 
 add_executable(sabatier src/ors_systems/src/sabatier.cpp)
 ament_target_dependencies(sabatier std_srvs rosidl_default_generators rclcpp sensor_msgs)
@@ -153,7 +151,6 @@ rosidl_target_interfaces(safety ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 
 install(TARGETS
-  ars
   collector
   desiccant1
   desiccant2

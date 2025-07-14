@@ -13,54 +13,54 @@ def generate_launch_description():
     return LaunchDescription([
         Node(
             package='space_station_eclss',
-            executable='ars',
-            name='air_revitalisation',
+            executable='collector',
+            name='air_collector',
             output='screen',
             parameters=[params_file],
             emulate_tty=True
         ),
 
-        # Node(
-        #     package='space_station_eclss',
-        #     executable='desiccant1',
-        #     name='desiccant_bed_1',
-        #     output='screen',
-        #     parameters=[params_file],
-        #     emulate_tty=True
-        # ),
-        # Node(
-        #     package='space_station_eclss',
-        #     executable='desiccant2',
-        #     name='desiccant_bed_2',
-        #     output='screen',
-        #     parameters=[params_file],
-        #     emulate_tty=True
-        # ),
-        # Node(
-        #     package='space_station_eclss',
-        #     executable='adsorbent1',
-        #     name='adsorbent_bed_1',
-        #     output='screen',
-        #     parameters=[params_file],
-        #     emulate_tty=True
-        # ),
-        # Node(
-        #     package='space_station_eclss',
-        #     executable='adsorbent2',
-        #     name='adsorbent_bed_2',
-        #     output='screen',
-        #     parameters=[params_file],
-        #     emulate_tty=True
-        # ),
+        Node(
+            package='space_station_eclss',
+            executable='desiccant1',
+            name='desiccant_bed_1',
+            output='screen',
+            parameters=[params_file],
+            emulate_tty=True
+        ),
+        Node(
+            package='space_station_eclss',
+            executable='desiccant2',
+            name='desiccant_bed_2',
+            output='screen',
+            parameters=[params_file],
+            emulate_tty=True
+        ),
+        Node(
+            package='space_station_eclss',
+            executable='adsorbent1',
+            name='adsorbent_bed_1',
+            output='screen',
+            parameters=[params_file],
+            emulate_tty=True
+        ),
+        Node(
+            package='space_station_eclss',
+            executable='adsorbent2',
+            name='adsorbent_bed_2',
+            output='screen',
+            parameters=[params_file],
+            emulate_tty=True
+        ),
 
-        # Node(
-        #     package='space_station_eclss',
-        #     executable='safety',
-        #     name='stl_monitor',
-        #     output='screen',
-        #     parameters=[params_file],
-        #     emulate_tty=True
-        # ),
+        Node(
+            package='space_station_eclss',
+            executable='safety',
+            name='stl_monitor',
+            output='screen',
+            parameters=[params_file],
+            emulate_tty=True
+        ),
        
        
     ])
