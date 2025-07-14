@@ -122,3 +122,10 @@ if(BUILD_TESTING)
 endif()
 
 ament_package()
+<<<<<<< HEAD
+=======
+
+# add_subdirectory(plugin)
+
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+>>>>>>> 16232c3bf33ad57317205400a5908f68238161c4

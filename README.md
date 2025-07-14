@@ -56,6 +56,8 @@ cd space_station_os
 
 ### 3. Build the workspace
 
+Go back to the workspace root and build everything:
+
 ```bash
 cd ~/ssos_ws
 colcon build --symlink-install

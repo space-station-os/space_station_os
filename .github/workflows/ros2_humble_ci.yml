@@ -1,0 +1,48 @@
+name: Docker Publish
+
+on:
+  push:
+    branches: ["**"]        
+  pull_request:
+    branches: ["**"]
+  workflow_dispatch:        
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    container:
+      image: ros:humble
+      options: --user root
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v3
+
+      - name: Install colcon and dependencies
+        run: |
+          apt update
+          apt install -y python3-colcon-common-extensions python3-pip git
+          apt install -y libsdl2-dev
+          apt install -y build-essential
+          rosdep update
+          rosdep install --from-paths . --ignore-src -r -y
+
+
+      - name: Install OpenCV
+        run: |
+          apt update 
+          apt install -y libopencv-dev python3-opencv
+
+      - name: Install Python packages (casadi)
+        run: |
+          pip install casadi
+          
+      - name: Build the workspace
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon build --event-handlers console_direct+
+        shell: bash
+
+      
+          
