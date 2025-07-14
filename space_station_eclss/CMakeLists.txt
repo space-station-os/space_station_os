@@ -13,6 +13,8 @@ find_package(rosidl_default_generators REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(actionlib_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
+find_package(diagnostic_msgs REQUIRED)
+find_package(rclcpp_action REQUIRED)
 
 
 # uncomment the following section in order to fill in
@@ -40,14 +42,11 @@ set(msg_files
   # CDRA SAFETY
   "src/ars_systems/msg/CdraStatus.msg"
 
-<<<<<<< HEAD
   "action/AirRevitalisation.action"
   "action/OxygenGeneration.action"
   "action/WaterRecovery.action"
   "src/wrs_systems/srv/RequestProductWater.srv"
-=======
- 
->>>>>>> 16232c3bf33ad57317205400a5908f68238161c4
+
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -84,7 +83,9 @@ add_executable(adsorbent2 src/ars_systems/adsorbent_tank_2.cpp )
 ament_target_dependencies(adsorbent2 std_srvs rosidl_default_generators rclcpp sensor_msgs)
 rosidl_target_interfaces(adsorbent2 ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
-
+add_executable(ars src/ars_systems/ars_systems.cpp )
+ament_target_dependencies(ars std_srvs rosidl_default_generators rclcpp sensor_msgs rclcpp_action diagnostic_msgs)
+rosidl_target_interfaces(ars ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 add_executable(sabatier src/ors_systems/src/sabatier.cpp)
 ament_target_dependencies(sabatier std_srvs rosidl_default_generators rclcpp sensor_msgs)
@@ -167,13 +168,10 @@ rosidl_target_interfaces(safety ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 
 install(TARGETS
-<<<<<<< HEAD
   ars
   ogs
   wrs
-=======
-  
->>>>>>> 16232c3bf33ad57317205400a5908f68238161c4
+  safety
   collector
   desiccant1
   desiccant2
