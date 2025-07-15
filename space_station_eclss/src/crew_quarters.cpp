@@ -55,8 +55,8 @@ void HumanSimulationNode::simulate_event()
 {
   if (current_day_ >= number_of_days_) {
     RCLCPP_INFO(this->get_logger(), "Simulation complete. Shutting down.");
-    rclcpp::shutdown();
-    return;
+    current_day_ = 0;
+    events_completed_today_ = 0;
   }
 
   double o2_needed = 0.771 * crew_size_;
