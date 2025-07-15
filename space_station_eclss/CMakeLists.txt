@@ -36,8 +36,11 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   DEPENDENCIES  std_msgs sensor_msgs visualization_msgs
 )
 
-  
 
+install(PROGRAMS
+  src/crew_simulation.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 
 include_directories(include)
@@ -51,10 +54,6 @@ add_executable(ogs src/ors_systems/src/ogs_systems.cpp)
 ament_target_dependencies(ogs std_srvs rosidl_default_generators rclcpp rclcpp_action diagnostic_msgs)
 rosidl_target_interfaces(ogs ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
-add_executable(crew_quarters src/crew_quarters.cpp)
-ament_target_dependencies(crew_quarters rosidl_default_generators rclcpp rclcpp_action)
-rosidl_target_interfaces(crew_quarters ${PROJECT_NAME} "rosidl_typesupport_cpp")
-
 add_executable(wrs src/wrs_systems/src/wrs_systems.cpp)
 ament_target_dependencies(wrs rosidl_default_generators rclcpp rclcpp_action diagnostic_msgs std_srvs)
 rosidl_target_interfaces(wrs ${PROJECT_NAME} "rosidl_typesupport_cpp")
@@ -64,8 +63,6 @@ install(TARGETS
   ars
   ogs
   wrs
-  crew_quarters
-    
   DESTINATION lib/${PROJECT_NAME})
 
   install(DIRECTORY launch/
@@ -75,13 +72,6 @@ install(TARGETS
 install(DIRECTORY config/
   DESTINATION share/${PROJECT_NAME}/config
 )
-
-install(PROGRAMS
-  scripts/iss_simulator.py
-  DESTINATION lib/${PROJECT_NAME}
-)
-
-
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

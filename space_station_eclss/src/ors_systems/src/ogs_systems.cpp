@@ -2,6 +2,31 @@
 
 OGSSystem::OGSSystem() : Node("ogs_system")
 {
+  this->declare_parameter("enable_failure", false);
+  enable_failure_ = this->get_parameter("enable_failure").as_bool();
+
+  this->declare_parameter("electrolysis_temp", 100.0);
+  electrolysis_temp_ = this->get_parameter("electrolysis_temp").as_double();
+
+  this->declare_parameter("o2_efficiency", 0.95);
+  o2_efficiency_ = this->get_parameter("o2_efficiency").as_double();
+
+  this->declare_parameter("sabatier_efficiency", 0.75);
+  sabatier_efficiency_ = this->get_parameter("sabatier_efficiency").as_double();
+
+  this->declare_parameter("sabatier_temp", 300.0);
+  sabatier_temp_ = this->get_parameter("sabatier_temp").as_double();
+
+  this->declare_parameter("sabatier_pressure", 1.0);
+  sabatier_pressure_ = this->get_parameter("sabatier_pressure").as_double();
+
+  this->declare_parameter("min_o2_capacity", 100.0);
+  min_o2_capacity_ = this->get_parameter("min_o2_capacity").as_double();
+
+  this->declare_parameter("max_o2_capacity", 10000.0);
+  max_o2_capacity_ = this->get_parameter("max_o2_capacity").as_double();
+
+  // Setup clients, servers, publishers
   action_server_ = rclcpp_action::create_server<space_station_eclss::action::OxygenGeneration>(
     this,
     "oxygen_generation",
@@ -21,11 +46,14 @@ OGSSystem::OGSSystem() : Node("ogs_system")
   o2_pub_ = this->create_publisher<std_msgs::msg::Float64>("/o2_storage", 10);
   ch4_pub_ = this->create_publisher<std_msgs::msg::Float64>("/methane_vented", 10);
   diag_pub_ = this->create_publisher<diagnostic_msgs::msg::DiagnosticStatus>("/ogs/diagnostics", 10);
+
   timer_ = this->create_wall_timer(
-  std::chrono::seconds(5),
-  std::bind(&OGSSystem::publish_periodic_status, this));
+    std::chrono::seconds(5),
+    std::bind(&OGSSystem::publish_periodic_status, this));
+
   RCLCPP_INFO(this->get_logger(), "OGS system ready.");
 }
+
 
 rclcpp_action::GoalResponse OGSSystem::handle_goal(
   const rclcpp_action::GoalUUID &,
@@ -68,8 +96,21 @@ void OGSSystem::execute_goal(
       }
 
       double water_granted = water_resp->water_granted;
-      double o2_generated = 0.888 * water_granted;
-      double h2_generated = 0.112 * water_granted;
+      double o2_generated = o2_efficiency_ * water_granted;
+      double h2_generated = (1.0 - o2_efficiency_) * water_granted;
+      latest_o2_ += o2_generated;
+
+      // O2 overflow check
+      if (enable_failure_ && latest_o2_ > max_o2_capacity_) {
+        std::string msg = "O2 storage overflow: " + std::to_string(latest_o2_) + " g";
+        RCLCPP_FATAL(this->get_logger(), "%s", msg.c_str());
+        publish_failure_diagnostics("O2Storage", msg);
+        result->success = false;
+        result->summary_message = msg;
+        goal_handle->abort(result);
+        return;
+      }
+
       latest_o2_ += o2_generated;
 
       if (o2_generated <= 0.0) {
@@ -103,7 +144,8 @@ void OGSSystem::execute_goal(
           }
 
           double co2_granted = co2_resp->co2_resp;
-          double ch4 = 0.5 * co2_granted;
+          double ch4 = sabatier_efficiency_ * co2_granted;
+
           double gray_water = 0.8 * water_granted;
 
           RCLCPP_INFO(this->get_logger(), "Sabatier output: CH4 = %.2f g, Grey water = %.2f L", ch4, gray_water);
@@ -225,9 +267,16 @@ void OGSSystem::o2_service_callback(
   std::shared_ptr<space_station_eclss::srv::O2Request::Response> response)
 {
   double amount = request->o2_req;
-
   if (latest_o2_ >= amount) {
     latest_o2_ -= amount;
+
+    // O2 underflow check
+    if (enable_failure_ && latest_o2_ < min_o2_capacity_) {
+      std::string msg = "O2 storage underflow: " + std::to_string(latest_o2_) + " g";
+      RCLCPP_FATAL(this->get_logger(), "%s", msg.c_str());
+      publish_failure_diagnostics("O2Storage", msg);
+    }
+
     response->o2_resp = amount;
     response->success = true;
     response->message = "O2 request successful.";
@@ -235,11 +284,8 @@ void OGSSystem::o2_service_callback(
     std_msgs::msg::Float64 o2_msg;
     o2_msg.data = latest_o2_;
     o2_pub_->publish(o2_msg);
-  } else {
-    response->o2_resp = 0.0;
-    response->success = false;
-    response->message = "Insufficient O2 available.";
   }
+
 }
 
 void OGSSystem::publish_failure_diagnostics(const std::string &unit, const std::string &reason)
@@ -252,7 +298,17 @@ void OGSSystem::publish_failure_diagnostics(const std::string &unit, const std::
 }
 
 void OGSSystem::publish_periodic_status()
-{
+{ 
+  if (enable_failure_) {
+    if (latest_o2_ > max_o2_capacity_) {
+      publish_failure_diagnostics("O2Storage", "O2 storage over max threshold.");
+      RCLCPP_FATAL(this->get_logger(), "O2 storage overflow: %.2f g", latest_o2_);
+    } else if (latest_o2_ < min_o2_capacity_) {
+      publish_failure_diagnostics("O2Storage", "O2 storage below min threshold.");
+      RCLCPP_FATAL(this->get_logger(), "O2 storage underflow: %.2f g", latest_o2_);
+    }
+  }
+
   // Publish current O2 storage
   std_msgs::msg::Float64 o2_msg;
   o2_msg.data = latest_o2_;

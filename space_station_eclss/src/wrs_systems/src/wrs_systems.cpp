@@ -16,7 +16,8 @@ WRSActionServer::WRSActionServer(const rclcpp::NodeOptions & options)
 {
   enable_failure_ = this->declare_parameter("enable_failure", true);
   product_water_capacity_ = this->declare_parameter("product_max_capacity", 2000.0f);
-  waste_collector_capacity_ = this->declare_parameter("waste_max_capacity", 500.0f);
+  waste_collector_capacity_ = this->declare_parameter("waste_max_capacity", 2000.0f);
+  min_product_water_capacity_ = this->declare_parameter("product_min_capacity", 300.0f);
 
   upa_valve_pressure_ = this->declare_parameter("upa_valve_pressure", 100.0f);
   ionization_valve_pressure_ = this->declare_parameter("ionization_valve_pressure", 90.0f);
@@ -114,10 +115,13 @@ void WRSActionServer::execute(const std::shared_ptr<GoalHandleWRS> goal_handle)
     }
 
     if (enable_failure_ && product_water_reserve_ + after_ionization > product_water_capacity_) {
-      publish_diagnostics("ProductWaterTank", true, "Tank capacity exceeded.");
+      std::string msg = "Tank capacity exceeded: " + std::to_string(product_water_reserve_ + after_ionization) + " L";
+      RCLCPP_FATAL(this->get_logger(), "%s", msg.c_str());
+      publish_diagnostics("ProductWaterTank", true, msg);
       fail_goal(goal_handle, result, cycles, purified_total, "Tank full");
       return;
     }
+
 
     product_water_reserve_ += after_ionization;
     purified_total += after_ionization;
@@ -201,6 +205,13 @@ void WRSActionServer::handle_product_water_request(
 {
   if (request->amount <= product_water_reserve_) {
     product_water_reserve_ -= request->amount;
+
+    // Check if we fall below minimum threshold
+    if (product_water_reserve_ < min_product_water_capacity_) {
+      RCLCPP_FATAL(this->get_logger(), "Product water tank below minimum threshold: %.2f L", product_water_reserve_);
+      publish_diagnostics("ProductWaterTank", true, "Tank below minimum safe capacity.");
+    }
+    
     response->water_granted = request->amount;
     response->success = true;
     response->message = "Water delivered";
@@ -211,6 +222,7 @@ void WRSActionServer::handle_product_water_request(
   }
   publish_reserve();
 }
+
 
 void WRSActionServer::handle_gray_water_request(
   const std::shared_ptr<space_station_eclss::srv::GreyWater::Request> request,

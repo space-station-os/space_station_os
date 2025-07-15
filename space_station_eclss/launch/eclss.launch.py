@@ -27,7 +27,7 @@ def generate_launch_description():
 
     crew_quarters_node = Node(
         package='space_station_eclss',
-        executable='crew_quarters',
+        executable='crew_simulation.py',
         name='crew_quarters_node',
         output='screen',
         parameters=[CrewQuarterConfig],

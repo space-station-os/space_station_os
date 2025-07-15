@@ -49,7 +49,7 @@ private:
   // Internal state
   float product_water_reserve_;
   float waste_collector_current_;
-
+  float min_product_water_capacity_;
   // System parameters
   float product_water_capacity_;
   float waste_collector_capacity_;

@@ -43,6 +43,14 @@ private:
 
   // Timers
   rclcpp::TimerBase::SharedPtr timer_;
+  bool enable_failure_;
+  double electrolysis_temp_;
+  double o2_efficiency_;
+  double sabatier_efficiency_;
+  double sabatier_temp_;
+  double sabatier_pressure_;
+  double min_o2_capacity_;
+  double max_o2_capacity_;
 
   // Storage
   double latest_o2_ = 0.0;
