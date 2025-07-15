@@ -25,7 +25,15 @@ ARSActionServer::ARSActionServer(const rclcpp::NodeOptions & options)
 
 
   heartbeat_pub_ = this->create_publisher<diagnostic_msgs::msg::DiagnosticStatus>("/ars/heartbeat", 10);
+  heartbeat_timer_ = this->create_wall_timer(1s, [this]() {
+    publish_bed_heartbeat("ARS Monitor", true, "System nominal");
+  });
   co2_storage_pub_ = this->create_publisher<std_msgs::msg::Float64>("/co2_storage", 10);
+  co2_pub_timer_ = this->create_wall_timer(2s, [this]() {
+    std_msgs::msg::Float64 msg;
+    msg.data = total_co2_storage_;
+    co2_storage_pub_->publish(msg);
+  });
 
   co2_request_srv_ = this->create_service<Co2Request>(
     "/ars/request_co2",
@@ -35,11 +43,15 @@ ARSActionServer::ARSActionServer(const rclcpp::NodeOptions & options)
   combustion_timer_ = this->create_wall_timer(10s, [this]() { monitor_combustion_and_contaminants(); });
 
   contaminant_timer_ = this->create_wall_timer(3s, [this]() {
-    contaminant_level_ += (std::rand() % 4);  // ppm increase
+    contaminant_level_ += static_cast<float>(std::rand() % 4);
+    contaminant_level_ = std::min(contaminant_level_, 500.0f);  // arbitrary cap
     if (contaminant_level_ > contaminant_limit_) {
       publish_bed_heartbeat("Atmosphere", false, "Contaminant threshold exceeded");
+    } else {
+      publish_bed_heartbeat("Atmosphere", true, "Contaminant levels within safe range");
     }
   });
+
 
   RCLCPP_INFO(this->get_logger(), "ARS action server ready.");
 }
@@ -97,7 +109,7 @@ void ARSActionServer::execute(const std::shared_ptr<GoalHandleARS> goal_handle)
   float co2 = goal_handle->get_goal()->initial_co2_mass;
   float h2o = goal_handle->get_goal()->initial_moisture_content;
   float contaminants = goal_handle->get_goal()->initial_contaminants;
-  float temp1 = 100.0, temp2 = 100.0;
+  float temp1 = 30.0, temp2 = 30.0, temp3 = 230.0, temp4 = 230.0;
 
   int vents = 0;
 
@@ -109,8 +121,8 @@ void ARSActionServer::execute(const std::shared_ptr<GoalHandleARS> goal_handle)
 
     bool d1 = simulate_desiccant_bed(h2o, des1_capacity_, des1_removal_, des1_temp_limit_, "Desiccant_1", temp1);
     bool d2 = simulate_desiccant_bed(h2o, des2_capacity_, des2_removal_, des2_temp_limit_, "Desiccant_2", temp2);
-    bool a1 = simulate_adsorbent_bed(co2, ads1_capacity_, ads1_removal_, ads1_temp_limit_, "Adsorbent_1", temp1);
-    bool a2 = simulate_adsorbent_bed(co2, ads2_capacity_, ads2_removal_, ads2_temp_limit_, "Adsorbent_2", temp2);
+    bool a1 = simulate_adsorbent_bed(co2, ads1_capacity_, ads1_removal_, ads1_temp_limit_, "Adsorbent_1", temp3);
+    bool a2 = simulate_adsorbent_bed(co2, ads2_capacity_, ads2_removal_, ads2_temp_limit_, "Adsorbent_2", temp4);
 
     if (!(d1 && d2 && a1 && a2)) {
       result->success = false;
@@ -251,6 +263,7 @@ int main(int argc, char **argv)
   auto ars_node = std::make_shared<space_station_eclss::ARSActionServer>(node_options);
 
   rclcpp::spin(ars_node);
+
   rclcpp::shutdown();
   return 0;
 }

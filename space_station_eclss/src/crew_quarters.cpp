@@ -1,11 +1,18 @@
 #include "space_station_eclss/crew_quarter.hpp"
 
 HumanSimulationNode::HumanSimulationNode()
-: Node("crew_quarters_node")
+: Node("crew_quarters_node"),
+  current_day_(0),
+  events_completed_today_(0),
+  ars_sent_(false),
+  wrs_sent_(false),
+  ogs_sent_(false),
+  current_o2_reserve_(0.0),
+  current_water_reserve_(0.0)
 {
   this->declare_parameter<int>("crew_size", 4);
   this->declare_parameter<int>("events_per_day", 7);
-  this->declare_parameter<int>("number_of_days", 5);
+  this->declare_parameter<int>("number_of_days", 1);
   this->declare_parameter<std::string>("mode", "rest");
   this->declare_parameter<float>("calorie_intake", 2000.0);
   this->declare_parameter<float>("potable_water_intake", 2.5);
@@ -18,151 +25,175 @@ HumanSimulationNode::HumanSimulationNode()
   this->get_parameter("potable_water_intake", potable_water_intake_);
 
   ars_client_ = rclcpp_action::create_client<space_station_eclss::action::AirRevitalisation>(this, "air_revitalisation");
-  ogs_client_ = rclcpp_action::create_client<space_station_eclss::action::OxygenGeneration>(this, "oxygen_generation");
   wrs_client_ = rclcpp_action::create_client<space_station_eclss::action::WaterRecovery>(this, "water_recovery_systems");
+  o2_service_client_ = this->create_client<space_station_eclss::srv::O2Request>("ogs/request_o2");
+  water_service_client_ = this->create_client<space_station_eclss::srv::RequestProductWater>("wrs/product_water_request");
 
-  o2_service_client_ = this->create_client<space_station_eclss::srv::O2Request>("/ogs/request_o2");
-  water_service_client_ = this->create_client<space_station_eclss::srv::RequestProductWater>("/wrs/product_water_request");
-
-  int retries = 0;
-  while (rclcpp::ok() && retries < 30 &&
-        (!ars_client_->wait_for_action_server(std::chrono::seconds(1)) ||
-         !ogs_client_->wait_for_action_server(std::chrono::seconds(1)) ||
-         !wrs_client_->wait_for_action_server(std::chrono::seconds(1)))) {
-    RCLCPP_WARN(this->get_logger(), "Waiting for ARS, OGS, and WRS action servers... (%d)", retries);
-    retries++;
+  while (!ars_client_->wait_for_action_server(std::chrono::seconds(2))) {
+    RCLCPP_WARN(this->get_logger(), "Waiting for ARS action server...");
+  }
+  while (!wrs_client_->wait_for_action_server(std::chrono::seconds(2))) {
+    RCLCPP_WARN(this->get_logger(), "Waiting for WRS action server...");
   }
 
-  if (retries >= 30) {
-    RCLCPP_ERROR(this->get_logger(), "Timeout waiting for action servers. Exiting.");
-    return;
-  }
+  o2_storage_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+    "o2_storage", 10,
+    [this](const std_msgs::msg::Float64::SharedPtr msg) {
+      current_o2_reserve_ = msg->data;
+    });
 
-  simulation_timer_ = this->create_wall_timer(
-    std::chrono::seconds(5),
-    std::bind(&HumanSimulationNode::simulate_metabolic_cycle, this)
-  );
+  water_reserve_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+    "wrs/product_water_reserve", 10,
+    [this](const std_msgs::msg::Float64::SharedPtr msg) {
+      current_water_reserve_ = msg->data;
+    });
 
-  RCLCPP_INFO(this->get_logger(), "Human Simulation Node started.");
+  timer_ = this->create_wall_timer(std::chrono::milliseconds(100), std::bind(&HumanSimulationNode::simulate_event, this));
 }
 
-void HumanSimulationNode::simulate_metabolic_cycle()
+void HumanSimulationNode::simulate_event()
 {
   if (current_day_ >= number_of_days_) {
-    RCLCPP_INFO(this->get_logger(), "Simulation complete: %d days done.", current_day_);
+    RCLCPP_INFO(this->get_logger(), "Simulation complete. Shutting down.");
+    rclcpp::shutdown();
     return;
   }
 
-  float o2_rest = 0.771f;
-  float o2_exercise = 0.376f;
-  float o2_total_per_person = (mode_ == "exercise") ? (o2_rest + o2_exercise) : o2_rest;
-  float total_o2 = o2_total_per_person * crew_size_;
+  double o2_needed = 0.771 * crew_size_;
+  if (mode_ == "exercise") {
+    o2_needed += 0.376 * crew_size_;
+  }
+  float water_needed = potable_water_intake_ * crew_size_;
 
+  if (!ars_sent_) {
+    send_ars_goal();
+    ars_sent_ = true;
+  }
+
+  if (!wrs_sent_ && current_water_reserve_ >= water_needed) {
+    send_wrs_goal();
+    request_water(water_needed);
+    wrs_sent_ = true;
+  } else if (!wrs_sent_) {
+    RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+                         "Waiting for water reserve. Water: %.2f / %.2f", current_water_reserve_, water_needed);
+  }
+
+  if (!ogs_sent_ && current_o2_reserve_ >= o2_needed) {
+    request_o2(o2_needed);
+    ogs_sent_ = true;
+  } else if (!ogs_sent_) {
+    RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+                         "Waiting for O2 reserve. O2: %.2f / %.2f", current_o2_reserve_, o2_needed);
+  }
+
+  if (ars_sent_ && wrs_sent_ && ogs_sent_) {
+    events_completed_today_++;
+    ars_sent_ = wrs_sent_ = ogs_sent_ = false;
+
+    if (events_completed_today_ >= events_per_day_) {
+      current_day_++;
+      events_completed_today_ = 0;
+      RCLCPP_INFO(this->get_logger(), "Completed Day %d of %d", current_day_, number_of_days_);
+    }
+  }
+}
+
+void HumanSimulationNode::request_o2(double o2_required)
+{
+  auto req = std::make_shared<space_station_eclss::srv::O2Request::Request>();
+  req->o2_req = o2_required;
+
+  if (!o2_service_client_->wait_for_service(std::chrono::seconds(1))) {
+    RCLCPP_WARN(this->get_logger(), "O2 service unavailable.");
+    return;
+  }
+
+  auto future = o2_service_client_->async_send_request(
+    req,
+    [this](rclcpp::Client<space_station_eclss::srv::O2Request>::SharedFuture future_result) {
+      auto res = future_result.get();
+      if (res->success) {
+        RCLCPP_INFO(this->get_logger(), "O2 granted: %.2f g", res->o2_resp);
+      } else {
+        RCLCPP_ERROR(this->get_logger(), "O2 request failed: %s", res->message.c_str());
+      }
+    }
+  );
+
+}
+
+void HumanSimulationNode::request_water(float water_required)
+{
+  auto req = std::make_shared<space_station_eclss::srv::RequestProductWater::Request>();
+  req->amount = water_required;
+
+  if (!water_service_client_->wait_for_service(std::chrono::seconds(1))) {
+    RCLCPP_WARN(this->get_logger(), "Water service unavailable.");
+    return;
+  }
+
+  auto future = water_service_client_->async_send_request(
+    req,
+    [this](rclcpp::Client<space_station_eclss::srv::RequestProductWater>::SharedFuture future_result) {
+      auto res = future_result.get();
+      if (res->success) {
+        RCLCPP_INFO(this->get_logger(), "Water granted: %.2f L", res->water_granted);
+      } else {
+        RCLCPP_ERROR(this->get_logger(), "Water request failed: %s", res->message.c_str());
+      }
+    }
+  );
+
+}
+
+void HumanSimulationNode::send_ars_goal()
+{
   float co2_per_person = (calorie_intake_ >= 2000.0f) ? 350.0f :
                          (calorie_intake_ >= 1500.0f) ? 262.0f : 175.0f;
   float total_co2 = co2_per_person * crew_size_;
-
   float total_water = potable_water_intake_ * crew_size_;
-  float total_urine = 1.0f * events_per_day_ * crew_size_;
+  float moisture_content = 0.8f * total_water;
 
-  send_o2_request(total_o2);
-  send_water_request(total_water);
-  send_ars_goal(total_co2, 0.8f * total_water);
-  send_ogs_goal(total_water);
-  send_wrs_goal(total_urine);
+  auto goal_msg = space_station_eclss::action::AirRevitalisation::Goal();
+  goal_msg.initial_co2_mass = total_co2;
+  goal_msg.initial_moisture_content = moisture_content;
+  goal_msg.initial_contaminants = 5.0f;
 
-  current_event_count_++;
-  RCLCPP_INFO(this->get_logger(), "Event %d of Day %d complete", current_event_count_, current_day_ + 1);
+  auto options = rclcpp_action::Client<space_station_eclss::action::AirRevitalisation>::SendGoalOptions();
+  options.result_callback = [this](const auto &result) {
+    if (result.result->success) {
+      RCLCPP_INFO(this->get_logger(), "ARS Success: Vented %.2f ppm CO2 in %d cycles (%d vents)",
+                  result.result->total_co2_vented,
+                  result.result->cycles_completed,
+                  result.result->total_vents);
+    } else {
+      RCLCPP_ERROR(this->get_logger(), "ARS Failed: %s", result.result->summary_message.c_str());
+    }
+  };
 
-  if (current_event_count_ >= events_per_day_) {
-    current_day_++;
-    current_event_count_ = 0;
-    RCLCPP_INFO(this->get_logger(), "=== Completed Day %d ===", current_day_);
-  }
+  ars_client_->async_send_goal(goal_msg, options);
 }
 
-
-void HumanSimulationNode::send_o2_request(float o2_amount)
+void HumanSimulationNode::send_wrs_goal()
 {
-  if (!o2_service_client_->wait_for_service(std::chrono::seconds(2))) {
-    RCLCPP_ERROR(this->get_logger(), "O2 service not available.");
-    return;
-  }
+  float urine_volume = 1.0f * events_per_day_ * crew_size_;
 
-  auto request = std::make_shared<space_station_eclss::srv::O2Request::Request>();
-  request->o2_req = o2_amount;
+  auto goal_msg = space_station_eclss::action::WaterRecovery::Goal();
+  goal_msg.urine_volume = urine_volume;
 
-  o2_service_client_->async_send_request(request,
-    [this](std::shared_future<space_station_eclss::srv::O2Request::Response::SharedPtr> future) {
-      if (future.valid()) {
-        auto response = future.get();
-        if (response) { // Check if the response pointer is valid
-          if (!response->success) {
-            RCLCPP_WARN(this->get_logger(), "O2 request denied: %s", response->message.c_str());
-          } else {
-            RCLCPP_INFO(this->get_logger(), "O2 request successful.");
-          }
-        } else {
-          RCLCPP_ERROR(this->get_logger(), "Received null O2 service response.");
-        }
-      } else {
-        RCLCPP_ERROR(this->get_logger(), "Failed to call O2 service: future not valid.");
-      }
-    });
-}
+  auto options = rclcpp_action::Client<space_station_eclss::action::WaterRecovery>::SendGoalOptions();
+  options.result_callback = [this](const auto &result) {
+    if (result.result->success) {
+      RCLCPP_INFO(this->get_logger(), "WRS Success: Recovered %.2f L in %d cycles",
+                  result.result->total_purified_water,
+                  result.result->total_cycles);
+    } else {
+      RCLCPP_ERROR(this->get_logger(), "WRS Failed: %s", result.result->summary_message.c_str());
+    }
+  };
 
-void HumanSimulationNode::send_water_request(float water_amount)
-{
-  if (!water_service_client_->wait_for_service(std::chrono::seconds(2))) {
-    RCLCPP_ERROR(this->get_logger(), "Water service not available.");
-    return;
-  }
-
-  auto request = std::make_shared<space_station_eclss::srv::RequestProductWater::Request>();
-  request->amount = water_amount;
-
-  water_service_client_->async_send_request(request,
-    [this](std::shared_future<space_station_eclss::srv::RequestProductWater::Response::SharedPtr> future) {
-      if (future.valid()) {
-        auto response = future.get();
-        if (response) { // Check if the response pointer is valid
-          if (!response->success) {
-            RCLCPP_WARN(this->get_logger(), "Water request denied: %s", response->message.c_str());
-          } else {
-            RCLCPP_INFO(this->get_logger(), "Water request successful.");
-          }
-        } else {
-          RCLCPP_ERROR(this->get_logger(), "Received null Water service response.");
-        }
-      } else {
-        RCLCPP_ERROR(this->get_logger(), "Failed to call Water service: future not valid.");
-      }
-    });
-}
-
-
-
-void HumanSimulationNode::send_ars_goal(float co2_mass, float moisture_content)
-{
-  auto goal = space_station_eclss::action::AirRevitalisation::Goal();
-  goal.initial_co2_mass = co2_mass;
-  goal.initial_moisture_content = moisture_content;
-  goal.initial_contaminants = 5.0f;
-  ars_client_->async_send_goal(goal);
-}
-
-void HumanSimulationNode::send_ogs_goal(float water_mass)
-{
-  auto goal = space_station_eclss::action::OxygenGeneration::Goal();
-  goal.input_water_mass = water_mass;
-  ogs_client_->async_send_goal(goal);
-}
-
-void HumanSimulationNode::send_wrs_goal(float urine_volume)
-{
-  auto goal = space_station_eclss::action::WaterRecovery::Goal();
-  goal.urine_volume = urine_volume;
-  wrs_client_->async_send_goal(goal);
+  wrs_client_->async_send_goal(goal_msg, options);
 }
 
 int main(int argc, char **argv)

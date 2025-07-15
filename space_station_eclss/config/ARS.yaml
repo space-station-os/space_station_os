@@ -1,30 +1,23 @@
-ars_systems_node:
+air_revitalisation:
   ros__parameters:
     sim_time: 10
     enable_failure: true
 
-    # CO2 ppm corresponding to 3 mmHg (approx)
     max_co2_storage: 3947.0
-
-    # ppm threshold for contaminants
     contaminant_limit: 100.0
 
-    # Desiccant Bed 1
     des1_capacity: 100.0
     des1_removal: 1.5
     des1_temp_limit: 120.0
 
-    # Desiccant Bed 2
     des2_capacity: 100.0
     des2_removal: 1.5
     des2_temp_limit: 120.0
 
-    # Adsorbent Bed 1
     ads1_capacity: 100.0
     ads1_removal: 2.5
-    ads1_temp_limit: 204.0
+    ads1_temp_limit: 404.0
 
-    # Adsorbent Bed 2
     ads2_capacity: 100.0
     ads2_removal: 2.5
-    ads2_temp_limit: 204.0
+    ads2_temp_limit: 404.0

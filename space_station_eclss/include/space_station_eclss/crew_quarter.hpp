@@ -4,15 +4,11 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <std_msgs/msg/float64.hpp>
-#include <string>
-#include <memory>
-#include <future> 
-#include "space_station_eclss/action/air_revitalisation.hpp"
-#include "space_station_eclss/action/oxygen_generation.hpp"
-#include "space_station_eclss/action/water_recovery.hpp"
 
-#include "space_station_eclss/srv/request_product_water.hpp"
+#include "space_station_eclss/action/air_revitalisation.hpp"
+#include "space_station_eclss/action/water_recovery.hpp"
 #include "space_station_eclss/srv/o2_request.hpp"
+#include "space_station_eclss/srv/request_product_water.hpp"
 
 class HumanSimulationNode : public rclcpp::Node
 {
@@ -28,30 +24,39 @@ private:
   float calorie_intake_;
   float potable_water_intake_;
 
-  int current_day_ = 0;
-  int current_event_count_ = 0;
+  // State variables
+  int current_day_;
+  int events_completed_today_;
+  bool ars_sent_ = false;
+  bool wrs_sent_ = false;
+  bool ogs_sent_ = false;
+
+  double current_o2_reserve_ = 0.0;
+  double current_water_reserve_ = 0.0;
+
+  // ROS interfaces
+  rclcpp::TimerBase::SharedPtr timer_;
 
   // Action clients
   rclcpp_action::Client<space_station_eclss::action::AirRevitalisation>::SharedPtr ars_client_;
-  rclcpp_action::Client<space_station_eclss::action::OxygenGeneration>::SharedPtr ogs_client_;
   rclcpp_action::Client<space_station_eclss::action::WaterRecovery>::SharedPtr wrs_client_;
 
   // Service clients
   rclcpp::Client<space_station_eclss::srv::O2Request>::SharedPtr o2_service_client_;
   rclcpp::Client<space_station_eclss::srv::RequestProductWater>::SharedPtr water_service_client_;
 
-  // Timer
-  rclcpp::TimerBase::SharedPtr simulation_timer_;
+  // Subscriptions
+  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr o2_storage_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr water_reserve_sub_;
 
-  // Simulation logic
-  void simulate_metabolic_cycle();
+  // Simulation loop
+  void simulate_event();
 
-  // ROS interaction
-  void send_o2_request(float o2_amount);
-  void send_water_request(float water_amount);
-  void send_ars_goal(float co2_mass, float moisture_content);
-  void send_ogs_goal(float water_mass);
-  void send_wrs_goal(float urine_volume);
+  // Helper functions
+  void send_ars_goal();
+  void send_wrs_goal();
+  void request_o2(double o2_required);
+  void request_water(float water_required);
 };
 
 #endif  // SPACE_STATION_ECLSS__CREW_QUARTER_HPP_

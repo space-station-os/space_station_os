@@ -37,8 +37,8 @@ private:
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticStatus>::SharedPtr heartbeat_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr co2_storage_pub_;
   rclcpp::Service<Co2Request>::SharedPtr co2_request_srv_;
-
-  rclcpp::TimerBase::SharedPtr co2_storage_timer_;
+  rclcpp::TimerBase::SharedPtr co2_pub_timer_;
+  rclcpp::TimerBase::SharedPtr heartbeat_timer_;
   rclcpp::TimerBase::SharedPtr combustion_timer_;
   rclcpp::TimerBase::SharedPtr contaminant_timer_;
 
