@@ -9,13 +9,18 @@ from PyQt5.QtCore import Qt
 import rclpy
 from rclpy.node import Node
 from rclpy.parameter import Parameter
-
+from PyQt5.QtGui import QPixmap
+import random
 from rclpy.action import ActionClient
 from std_msgs.msg import Float64
 from space_station_eclss.action import AirRevitalisation, WaterRecovery
 from space_station_eclss.srv import O2Request, RequestProductWater
+from astro_mode import AstronautSimGui
+from developer_mode import DeveloperSimGui
+from user_mode import UserSimGui
 
-from Subsystem import SubsystemParamDialog
+import os
+
 
 class HumanSimGuiNode(Node):
     def __init__(self):
@@ -118,247 +123,65 @@ class HumanSimGuiNode(Node):
         fut = self.water_client.call_async(req)
         fut.add_done_callback(lambda f: gui.log_box.append(f"Water granted: {f.result().water_granted}" if f.result().success else "Water request failed"))
 
-### -----------------------------
-### User Mode
-### -----------------------------
-class UserSimGui(QWidget):
-    def __init__(self, node): super().__init__(); self.node = node; self.init_ui()
-    def init_ui(self):
-        self.setWindowTitle("User Mode")
-        layout = QVBoxLayout()
-        self.inputs = {}
-        for label, default in [("Crew Size", 4), ("Events/Day", 7), ("Days", 1),
-                               ("Mode", "rest"), ("Calorie Intake", 2000.0), ("Water Intake", 2.5)]:
-            layout.addWidget(QLabel(label))
-            if label == "Mode":
-                box = QComboBox(); box.addItems(["rest", "exercise"])
-            elif isinstance(default, int):
-                box = QSpinBox(); box.setValue(default)
-            else:
-                box = QDoubleSpinBox(); box.setValue(default)
-            layout.addWidget(box); self.inputs[label] = box
-        self.log_box = QTextEdit(); self.log_box.setReadOnly(True)
-        self.button = QPushButton("Start Simulation"); self.button.clicked.connect(self.start_sim)
-        layout.addWidget(self.button); layout.addWidget(self.log_box); self.setLayout(layout)
-        self.timer = QTimer(); self.timer.timeout.connect(lambda: self.node.run_simulation_step(self))
-    def log(self, msg): self.log_box.append(msg)
-    def start_sim(self):
-        param_map = {
-            "Crew Size": "crew_size",
-            "Events/Day": "events_per_day",
-            "Days": "number_of_days",
-            "Mode": "mode",
-            "Calorie Intake": "calorie_intake",
-            "Water Intake": "potable_water_intake",
-        }
-        params = []
-        for label, widget in self.inputs.items():
-            value = widget.value() if hasattr(widget, 'value') else widget.currentText()
-            t = Parameter.Type.INTEGER if isinstance(value, int) else Parameter.Type.DOUBLE if isinstance(value, float) else Parameter.Type.STRING
-            params.append(Parameter(param_map[label], t, value))
-        self.node.set_parameters(params)
-        self.log("Simulation started."); self.timer.start(100)
 
-### -----------------------------
-### Developer Mode
-### -----------------------------
-class DeveloperSimGui(QWidget):
-    def __init__(self, node):
-        super().__init__()
-        self.node = node
-        self.setWindowTitle("Developer Mode")
-        self.inputs = {}
-        self.subsystem_parameters = {
-            "ARS": {
-                "sim_time": 10,
-                "enable_failure": True,
-                "max_co2_storage": 3947.0,
-                "contaminant_limit": 100.0,
-                "des1_capacity": 100.0,
-                "des1_removal": 1.5,
-                "des1_temp_limit": 120.0,
-                "des2_capacity": 100.0,
-                "des2_removal": 1.5,
-                "des2_temp_limit": 120.0,
-                "ads1_capacity": 100.0,
-                "ads1_removal": 2.5,
-                "ads1_temp_limit": 404.0,
-                "ads2_capacity": 100.0,
-                "ads2_removal": 2.5,
-                "ads2_temp_limit": 404.0,
-            },
-            "OGS": {
-                "enable_failure": True,
-                "electrolysis_temp": 100.0,
-                "o2_efficiency": 0.95,
-                "sabatier_efficiency": 0.75,
-                "sabatier_temp": 300.0,
-                "sabatier_pressure": 1.0,
-                "min_o2_capacity": 100.0,
-                "max_o2_capacity": 10000.0,
-            },
-            "WRS": {
-                "enable_failure": True,
-                "product_max_capacity": 2000.0,
-                "waste_max_capacity": 500.0,
-                "upa_valve_pressure": 100.0,
-                "upa_max_temperature": 170.0,
-                "ionization_valve_pressure": 90.0,
-                "ionization_max_temperature": 165.0,
-                "filter_valve_pressure": 85.0,
-                "filter_max_temperature": 120.0,
-                "catalytic_valve_pressure": 95.0,
-                "catalytic_max_temperature": 180.0,
-                "product_valve_pressure": 110.0,
-                "waste_valve_pressure": 90.0,
-            }
-        }
-        self.subsystem_choice = QComboBox()
-        self.subsystem_choice.addItems(["ARS", "OGS", "WRS"])
-        self.init_ui()
-
-    def init_ui(self):
-        layout = QVBoxLayout()
-        base_params = [
-            ("crew_size", 4),
-            ("events_per_day", 7),
-            ("number_of_days", 1),
-            ("mode", "rest"),
-            ("calorie_intake", 2000.0),
-            ("potable_water_intake", 2.5),
-        ]
-
-        for name, default in base_params:
-            layout.addWidget(QLabel(f"Base Parameters\n{name}"))
-            if isinstance(default, int):
-                box = QSpinBox()
-                box.setMaximum(int(1e6))
-                box.setValue(default)
-            elif isinstance(default, float):
-                box = QDoubleSpinBox()
-                box.setDecimals(4)
-                box.setMaximum(1e6)
-                box.setValue(default)
-            else:
-                box = QComboBox()
-                box.addItems(["rest", "exercise"])
-            self.inputs[name] = box
-            layout.addWidget(box)
-
-        layout.addWidget(QLabel("Select Subsystem"))
-        layout.addWidget(self.subsystem_choice)
-
-        self.sub_button = QPushButton("Open Subsystem Config")
-        self.sub_button.clicked.connect(self.open_subsystem_dialog)
-        layout.addWidget(self.sub_button)
-
-        self.apply_button = QPushButton("Apply + Start Simulation")
-        self.apply_button.clicked.connect(self.apply_and_start)
-        layout.addWidget(self.apply_button)
-
-        self.log_box = QTextEdit()
-        self.log_box.setReadOnly(True)
-        layout.addWidget(self.log_box)
-
-        self.setLayout(layout)
-        self.timer = QTimer()
-        self.timer.timeout.connect(lambda: self.node.run_simulation_step(self))
-
-    def open_subsystem_dialog(self):
-        subsystem = self.subsystem_choice.currentText()
-        dialog = SubsystemParamDialog(subsystem, self.subsystem_parameters[subsystem], self)
-        if dialog.exec_():
-            updated_params = dialog.get_parameters()
-            for p in updated_params:
-                self.subsystem_parameters[subsystem][p.name] = p.value
-
-    def apply_and_start(self):
-        params = []
-
-        # Base params
-        base_params = [
-            ("crew_size", 4),
-            ("events_per_day", 7),
-            ("number_of_days", 1),
-            ("mode", "rest"),
-            ("calorie_intake", 2000.0),
-            ("potable_water_intake", 2.5),
-        ]
-
-        for name, widget in self.inputs.items():
-            if isinstance(widget, QSpinBox):
-                value = widget.value()
-                t = Parameter.Type.INTEGER
-            elif isinstance(widget, QDoubleSpinBox):
-                value = widget.value()
-                t = Parameter.Type.DOUBLE
-            elif isinstance(widget, QComboBox):
-                value = widget.currentText()
-                t = Parameter.Type.STRING
-            else:
-                continue
-            # Declare before setting
-            try:
-                self.node.declare_parameter(name, value)
-            except Exception:
-                pass  # Already declared
-            params.append(Parameter(name, t, value))
-
-        # Subsystem params
-        subsystem = self.subsystem_choice.currentText()
-        subsystem_dict = self.subsystem_parameters[subsystem]
-
-        for name, value in subsystem_dict.items():
-            if isinstance(value, bool):
-                t = Parameter.Type.BOOL
-            elif isinstance(value, int):
-                t = Parameter.Type.INTEGER
-            elif isinstance(value, float):
-                t = Parameter.Type.DOUBLE
-            else:
-                t = Parameter.Type.STRING
-            try:
-                self.node.declare_parameter(name, value)
-            except Exception:
-                pass  # Already declared
-            params.append(Parameter(name, t, value))
-
-        # Apply and log
-        for param in params:
-            try:
-                self.node.set_parameters([param])
-                self.log_box.append(f"[OK] Set: {param.name} = {param.value}")
-            except Exception as e:
-                self.log_box.append(f"[FAIL] Could not set '{param.name}': {str(e)}")
-
-        self.log_box.append("Parameters applied. Starting simulation.")
-        self.timer.start(100)
-
-
-
-
-### -----------------------------
-### Astronaut Mode (Stub)
-### -----------------------------
-class AstronautSimGui(QWidget):
-    def __init__(self): super().__init__(); self.setWindowTitle("Astronaut Mode"); layout = QVBoxLayout(); layout.addWidget(QLabel("Coming soon.")); self.setLayout(layout)
-
-### -----------------------------
-### Mode Selector
-### -----------------------------
 class ModeSelectionWindow(QWidget):
     def __init__(self, node):
         super().__init__()
         self.node = node
         self.setWindowTitle("Simulation Mode Selector")
+        self.setFixedSize(500, 600)
+
         layout = QVBoxLayout()
-        user = QPushButton("User Mode"); dev = QPushButton("Developer Mode"); astro = QPushButton("Astronaut Mode")
-        user.clicked.connect(self.launch_user); dev.clicked.connect(self.launch_dev); astro.clicked.connect(self.launch_astro)
-        layout.addWidget(QLabel("Choose a simulation mode:")); layout.addWidget(user); layout.addWidget(dev); layout.addWidget(astro)
+
+       
+        image_path = "/home/siddarth/ssos_ws/src/space_station_os/space_station_eclss/assets/ssos.png"
+
+        image_label = QLabel()
+        pixmap = QPixmap(image_path)
+        if not pixmap.isNull():
+            pixmap = pixmap.scaled(480, 360, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            image_label.setPixmap(pixmap)
+            image_label.setAlignment(Qt.AlignCenter)
+            layout.addWidget(image_label)
+        else:
+            layout.addWidget(QLabel("Image failed to load."))
+
+        # Title label
+        title = QLabel("Choose a simulation mode:")
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("font-weight: bold; font-size: 16px; margin-top: 20px;")
+        layout.addWidget(title)
+
+        # Mode buttons
+        user_btn = QPushButton("User Mode")
+        dev_btn = QPushButton("Developer Mode")
+        astro_btn = QPushButton("Astronaut Mode")
+
+        user_btn.clicked.connect(self.launch_user)
+        dev_btn.clicked.connect(self.launch_dev)
+        astro_btn.clicked.connect(self.launch_astro)
+
+        layout.addWidget(user_btn)
+        layout.addWidget(dev_btn)
+        layout.addWidget(astro_btn)
+
+        layout.setAlignment(Qt.AlignTop)
         self.setLayout(layout)
-    def launch_user(self): self.hide(); self.ui = UserSimGui(self.node); self.ui.show()
-    def launch_dev(self): self.hide(); self.ui = DeveloperSimGui(self.node); self.ui.show()
-    def launch_astro(self): self.hide(); self.ui = AstronautSimGui(); self.ui.show()
+
+    def launch_user(self):
+        self.hide()
+        self.ui = UserSimGui(self.node)
+        self.ui.show()
+
+    def launch_dev(self):
+        self.hide()
+        self.ui = DeveloperSimGui(self.node)
+        self.ui.show()
+
+    def launch_astro(self):
+        self.hide()
+        self.ui = AstronautSimGui(self.node)
+        self.ui.show()
 
 ### -----------------------------
 ### main()

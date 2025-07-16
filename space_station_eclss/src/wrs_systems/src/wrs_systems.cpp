@@ -11,7 +11,7 @@ namespace space_station_eclss
 
 WRSActionServer::WRSActionServer(const rclcpp::NodeOptions & options)
 : Node("wrs_action_server", options),
-  product_water_reserve_(500.0),
+  product_water_reserve_(1760.0),
   waste_collector_current_(0.0)
 {
   enable_failure_ = this->declare_parameter("enable_failure", true);
