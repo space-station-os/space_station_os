@@ -18,7 +18,7 @@ from space_station_eclss.srv import O2Request, RequestProductWater
 from astro_mode import AstronautSimGui
 from developer_mode import DeveloperSimGui
 from user_mode import UserSimGui
-
+from ament_index_python.packages import get_package_share_directory
 import os
 
 
@@ -134,7 +134,10 @@ class ModeSelectionWindow(QWidget):
         layout = QVBoxLayout()
 
        
-        image_path = "/home/siddarth/ssos_ws/src/space_station_os/space_station_eclss/assets/ssos.png"
+        
+        
+        package_dir = get_package_share_directory('space_station_eclss')
+        image_path = os.path.join(package_dir, 'assets', 'ssos.png')
 
         image_label = QLabel()
         pixmap = QPixmap(image_path)

@@ -10,7 +10,8 @@ from diagnostic_msgs.msg import DiagnosticStatus
 from std_msgs.msg import Bool
 from space_station_eclss.action import AirRevitalisation, OxygenGeneration, WaterRecovery
 from rclpy.action import ActionClient
-
+import os
+from ament_index_python.packages import get_package_share_directory
 class FailurePopup(QDialog):
     def __init__(self, image_path, node, title, subsystem):
         super().__init__()
@@ -62,10 +63,11 @@ class AstronautSimGui(QWidget):
         self.day = 1
 
         self.subsystems = ["ARS", "OGS", "WRS"]
+        self.package_dir = get_package_share_directory('space_station_eclss')
         self.failure_images = {
-            "ARS": "/home/siddarth/ssos_ws/src/space_station_os/space_station_eclss/assets/Co2_failure.png",
-            "OGS": "/home/siddarth/ssos_ws/src/space_station_os/space_station_eclss/assets/Oxygen_failure.png",
-            "WRS": "/home/siddarth/ssos_ws/src/space_station_os/space_station_eclss/assets/wrs_failure.png"
+            "ARS": os.path.join(self.package_dir, "assets", "Co2_failure.png"),
+            "OGS": os.path.join(self.package_dir, "assets", "Oxygen_failure.png"),
+            "WRS": os.path.join(self.package_dir, "assets", "wrs_failure.png"),
         }
 
         layout = QVBoxLayout()
@@ -154,11 +156,11 @@ class AstronautSimGui(QWidget):
 
         self.call_ogs()
 
-        # Simulate rotating failure
-        if random.random() < 0.2:
-            fail_sub = self.subsystems[self.tick % 3]
-            popup = FailurePopup(self.failure_images[fail_sub], self.node, f"{fail_sub} FAILURE Simulated", fail_sub)
-            popup.exec_()
+        # # Simulate rotating failure
+        # if random.random() < 0.2:
+        #     fail_sub = self.subsystems[self.tick % 3]
+        #     popup = FailurePopup(self.failure_images[fail_sub], self.node, f"{fail_sub} FAILURE Simulated", fail_sub)
+        #     popup.exec_()
 
         if self.tick >= events_per_day:
             self.day += 1
