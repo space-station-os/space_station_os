@@ -12,12 +12,17 @@
 #include <tf2_ros/transform_broadcaster.h>
 #include <std_msgs/msg/float64.hpp>
 #include <std_msgs/msg/float64_multi_array.hpp>
+#include <std_msgs/msg/float32_multi_array.hpp>
+#include <std_msgs/msg/multi_array_dimension.hpp>
+#include <std_msgs/msg/multi_array_layout.hpp>
+#include <std_msgs/msg/string.hpp>
 #include <chrono>
 #include <thread>
 #include <Eigen/Dense>
 #include <vector>
 #include "L_p_func.cpp"
 #include "space_station_gnc/action/unloading.hpp"
+#include "space_station_gnc/thruster_matrix.hpp"
 //std::string mode_demo;
 
 class AttitudeDynamicsNode : public rclcpp::Node
@@ -27,22 +32,22 @@ public:
     using GoalHandleUnloading = rclcpp_action::ClientGoalHandle<unloading>;
     AttitudeDynamicsNode(const rclcpp::NodeOptions & options) : Node("physics_motion", options)
     {
-        // dynamics parameters
-        this->declare_parameter<double>("dynamics.J.xx", 280e6);
-        this->declare_parameter<double>("dynamics.J.yy", 140e6);
-        this->declare_parameter<double>("dynamics.J.zz", 420e6);
-        this->declare_parameter<double>("dynamics.mu", 3.986e14);
-        this->declare_parameter<double>("dynamics.r_orbit", 7e6);
+        // // dynamics parameters
+        // this->declare_parameter<double>("dynamics.J.xx", 280e6);
+        // this->declare_parameter<double>("dynamics.J.yy", 140e6);
+        // this->declare_parameter<double>("dynamics.J.zz", 420e6);
+        // this->declare_parameter<double>("dynamics.mu", 3.986e14);
+        // this->declare_parameter<double>("dynamics.r_orbit", 7e6);
         
-        // timing parameters
-        this->declare_parameter<double>("timing.torque_dt", 0.1);
-        this->declare_parameter<double>("timing.pub_dt", 0.1);
-        this->declare_parameter<int>   ("timing.publish_every", 10);
+        // // timing parameters
+        // this->declare_parameter<double>("timing.torque_dt", 0.1);
+        // this->declare_parameter<double>("timing.pub_dt", 0.1);
+        // this->declare_parameter<int>   ("timing.publish_every", 10);
         
-        // initial state parameters
-        this->declare_parameter<std::vector<double>>("initial.attitude", {0,0,0,1});
-        this->declare_parameter<std::vector<double>>("initial.angvel", {0,0,0});
-        this->declare_parameter<std::vector<double>>("initial.angacc", {0,0,0});
+        // // initial state parameters
+        // this->declare_parameter<std::vector<double>>("initial.attitude", {0,0,0,1});
+        // this->declare_parameter<std::vector<double>>("initial.angvel", {0,0,0});
+        // this->declare_parameter<std::vector<double>>("initial.angacc", {0,0,0});
 
         Ttorque_ = this->get_parameter("timing.torque_dt").as_double();
         Tpubatt_ = this->get_parameter("timing.pub_dt").as_double();
@@ -121,7 +126,24 @@ public:
         sub_bias_torque_control = this->create_subscription<geometry_msgs::msg::Vector3>(
             "gnc/bias_torque_cmd", 1, 
             std::bind(&AttitudeDynamicsNode::callback_bias_inp, this, std::placeholders::_1));
-            
+
+        sub_bias_thruster_control = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+            "gnc/bias_thruster_cmd", 1, 
+            std::bind(&AttitudeDynamicsNode::callback_bias_thruster_inp, this, std::placeholders::_1));
+        
+        urdf_sub_ = this->create_subscription<std_msgs::msg::String>(
+            "/robot_description", 10,
+            [this](const std_msgs::msg::String::SharedPtr msg)
+            {
+                if (!received_) {
+                    received_ = true;
+                    thrusterMat.initialize(msg->data);
+                    RCLCPP_INFO(this->get_logger(), "Received robot description and initialised thrusters!!");
+
+                    urdf_sub_.reset();
+                }
+            });
+
         timer_ = this->create_wall_timer(
             std::chrono::milliseconds((int)(Tpubatt_*1000.0)), 
             std::bind(&AttitudeDynamicsNode::callback_timer_pub_att, this));
@@ -147,16 +169,18 @@ public:
         send_goal_options.feedback_callback = std::bind(&AttitudeDynamicsNode::feedback_callback, this, std::placeholders::_1, std::placeholders::_2);
         send_goal_options.result_callback = std::bind(&AttitudeDynamicsNode::result_callback, this, std::placeholders::_1);
     }
-
 private:
     
     //ros2 stuff
     rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr sub_torque_control;
     rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr sub_cmg_torque_control;
     rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr sub_bias_torque_control;
+    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_bias_thruster_control;
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr sub_t_fwd_sim;
     rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr sub_angvel_overwrite;
     rclcpp::Subscription<geometry_msgs::msg::Quaternion>::SharedPtr sub_attitude_overwrite;
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr urdf_sub_;
+    bool received_ = false;
 
     rclcpp::Publisher<geometry_msgs::msg::Quaternion>::SharedPtr pub_attitude_LVLH;
     rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr pub_angvel_body;
@@ -193,7 +217,7 @@ private:
     tf2::Vector3 omedotbcur; //rad/sec^2 angular acc of body frame
     tf2::Vector3 omedotbprv; //rad/sec^2 angular acc of body frame
     Eigen::Vector4d deltacur; //rad, each CMG angle around torque axis
-
+    Eigen::VectorXd bias_thruster_input;
     
     tf2::Vector3 tau_ctlcmgcur; 
     tf2::Vector3 tau_ctlthrcur; 
@@ -221,6 +245,8 @@ private:
 
     std::atomic<bool> unload = false; // Flag to indicate if unloading is required
     std::atomic<bool> prevUnload = false;
+
+    ThrusterMatrix thrusterMat;
 
     void goal_response_callback(
         const GoalHandleUnloading::SharedPtr &future)
@@ -291,7 +317,7 @@ private:
         transform_stamped.header.stamp = this->get_clock()->now();
         transform_stamped.header.frame_id = "world";
         //transform_stamped.child_frame_id = "pose_marker";
-        transform_stamped.child_frame_id = "Root";
+        transform_stamped.child_frame_id = "base_link";
 
         transform_stamped.transform.translation.x = 0.0;
         transform_stamped.transform.translation.y = 0.0;
@@ -611,6 +637,25 @@ private:
         tau_ctlbiascur.setValue(msg->x,msg->y,msg->z);
     }
 
+    void callback_bias_thruster_inp(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
+    {
+        // if(msg->data.size() != 12){
+        //     RCLCPP_ERROR(this->get_logger(), "Bias thruster input must have 12 values, received %zu", msg->data.size());
+        //     return;
+        // }
+        size_t idx = 0;
+        bias_thruster_input.resize(msg->data.size());
+        for (auto& value : msg->data) {
+            if (std::isnan(value)) {
+                RCLCPP_ERROR(this->get_logger(), "Received NaN value in bias thruster input");
+                return;
+            }
+            bias_thruster_input(idx) = value;
+            ++idx;
+        }
+
+    }
+
     void callback_attitude_dynamics(const geometry_msgs::msg::Vector3::SharedPtr msg)
     {
         should_pub_att = true;
@@ -618,6 +663,15 @@ private:
 
         //TODO: Currently we assume only gravity gradient torque 
         tau_extgracur = gravityGradT();
+
+        Eigen::Vector3d tau_ctlbiascur_eigen;
+        if (thrusterMat.isReady()) {
+            thrusterMat.thrusterToBody(bias_thruster_input, tau_ctlbiascur_eigen);
+        } else {
+            tau_ctlbiascur_eigen = Eigen::Vector3d::Zero();
+        }
+
+        tau_ctlbiascur.setValue(tau_ctlbiascur_eigen.x(), tau_ctlbiascur_eigen.y(), tau_ctlbiascur_eigen.z());
 
         tau_allcur = tau_ctlcmgcur + tau_ctlthrcur + tau_extgracur + tau_ctlbiascur;
 
@@ -661,4 +715,3 @@ int main(int argc, char *argv[])
 
     return 0;
 }
-
