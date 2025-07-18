@@ -11,6 +11,7 @@
 #include "space_station_eclss/srv/request_product_water.hpp"
 #include "space_station_eclss/srv/co2_request.hpp"
 #include "space_station_eclss/srv/grey_water.hpp"
+#include <std_msgs/msg/bool.hpp>
 
 class OGSSystem : public rclcpp::Node
 {
@@ -40,7 +41,7 @@ private:
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr o2_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr ch4_pub_;
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticStatus>::SharedPtr diag_pub_;
-
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr disable_failure_;
   // Timers
   rclcpp::TimerBase::SharedPtr timer_;
   bool enable_failure_;
