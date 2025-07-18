@@ -1,14 +1,12 @@
 # **Space Station OS – Setup & Demo Guide**
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/4cfe5156-7282-4c26-aa7b-324bb8c1196b" width="100%" />
-</p>
+[![Watch the demo](https://img.youtube.com/vi/3SkXipaJXfI/hqdefault.jpg)](https://www.youtube.com/watch?v=3SkXipaJXfI)
 
 [![ROS 2 Humble CI](https://github.com/space-station-os/space_station_os/actions/workflows/ros2_humble_ci.yml/badge.svg)](https://github.com/space-station-os/space_station_os/actions/workflows/ros2_humble_ci.yml)
 
 ---
 
-## 🚀 Quick Start with Docker (Recommended)
+## 🚀 Quick Start with Docker
 
 If you prefer not to build everything locally, use our **prebuilt Docker image** to get up and running instantly.
 
