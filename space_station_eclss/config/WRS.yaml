@@ -1,0 +1,29 @@
+water_recovery_system:
+  ros__parameters:
+    enable_failure: true
+
+    # Capacities
+    product_max_capacity: 2000.0  # liters
+    waste_max_capacity: 500.0     # liters
+
+    # UPA
+    upa_valve_pressure: 100.0    # kPa
+    upa_max_temperature: 170.0    # °C
+
+    # Ionization Bed
+    ionization_valve_pressure: 90.0
+    ionization_max_temperature: 165.0
+
+    # Filtration Unit
+    filter_valve_pressure: 85.0
+    filter_max_temperature: 120.0
+
+    # Catalytic Chamber
+    catalytic_valve_pressure: 95.0
+    catalytic_max_temperature: 180.0
+
+    # Product Water Tank
+    product_valve_pressure: 110.0
+
+    # Waste Collector
+    waste_valve_pressure: 90.0

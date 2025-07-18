@@ -1,0 +1,8 @@
+crew_quarters_node:
+  ros__parameters:
+    crew_size: 4                         # Number of astronauts
+    events_per_day: 7                   # Max events per SS day
+    number_of_days: 5                   # Total number of simulation days
+    mode: "rest"                        # Mode: "rest", "exercise", or "eva"
+    calorie_intake: 2000.0              # kcal per person per day
+    potable_water_intake: 2.5           # Liters per person per day

@@ -1,8 +1,0 @@
-# Request
-float64 water
-float64 iodine_level
----
-# Response
-bool success
-string message
-float64 delivered_volume
