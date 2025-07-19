@@ -6,9 +6,9 @@
 
 ---
 
-## 🚀 Quick Start with Docker
+## 🚀 Quick Start with Docker (with GUI support)
 
-If you prefer not to build everything locally, use our **prebuilt Docker image** to get up and running instantly.
+If you prefer not to build everything locally, use our **prebuilt Docker image** to get up and running instantly — including GUI support for the astronaut simulation.
 
 ### 1. Pull the image
 
@@ -16,15 +16,31 @@ If you prefer not to build everything locally, use our **prebuilt Docker image**
 docker pull ghcr.io/space-station-os/space_station_os:latest
 ```
 
-> No need to install ROS 2 manually. Docker must be installed and running.
+> Docker must be installed and running. No need to install ROS 2 or dependencies manually.
 
-### 2. Run the container
+---
+
+### 2. Allow GUI access
+
+Before running the container, allow local Docker containers to access your X server:
 
 ```bash
-docker run -it --rm ghcr.io/space-station-os/space_station_os:latest
+xhost +local:root
 ```
 
-You'll be dropped into a ready-to-use environment with ROS 2 Humble and all Space Station OS packages pre-built.
+---
+
+### 3. Run the container with GUI support
+
+```bash
+docker run -it --rm \
+  --env="DISPLAY=$DISPLAY" \
+  --env="QT_X11_NO_MITSHM=1" \
+  --env="LIBGL_ALWAYS_SOFTWARE=1" \
+  --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
+  --network=host \
+  ghcr.io/space-station-os/space_station_os:latest
+```
 
 ---
 
@@ -139,10 +155,11 @@ ros2 run space_station_description teleop
 ```
 
 ---
-
 ## 🐳 Building the Docker Image Locally (Optional)
 
-If the prebuilt image doesn’t work, you can build it manually.
+If the prebuilt image doesn’t work, you can build and run the environment manually with full GUI support.
+
+---
 
 ### 1. Clone the repo
 
@@ -151,21 +168,39 @@ git clone https://github.com/space-station-os/space_station_os.git
 cd space_station_os
 ```
 
+---
+
 ### 2. Build the image
 
 ```bash
 docker build -t space_station_os:latest .
 ```
 
-### 3. Run the container
+---
+
+### 3. Allow GUI access
+
+Before launching the container, allow it to access your display:
 
 ```bash
-docker run -it --rm space_station_os:latest
+xhost +local:root
 ```
 
 ---
 
+### 4. Run the container (with GUI support)
 
+```bash
+docker run -it --rm \
+  --env="DISPLAY=$DISPLAY" \
+  --env="QT_X11_NO_MITSHM=1" \
+  --env="LIBGL_ALWAYS_SOFTWARE=1" \
+  --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
+  --network=host \
+  space_station_os:latest
+```
+
+---
 
 ##  Contributing
 
