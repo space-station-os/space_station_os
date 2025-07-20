@@ -26,12 +26,8 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 find_package(rosidl_default_generators REQUIRED)
 find_package(rosidl_default_runtime REQUIRED)
 find_package(action_msgs REQUIRED)
-<<<<<<< HEAD
 find_package(Eigen3 REQUIRED)
-find_package(urdfdom REQUIRED)
-=======
 find_package(urdf REQUIRED)
->>>>>>> origin/v0.8.4-dev
 
 # Generate interfaces
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -81,7 +77,8 @@ target_link_libraries(physics_motion
 
 target_link_libraries(thruster_matrix
   Eigen3::Eigen
-  urdfdom_model)
+  urdf::urdf)
+#   urdfdom_model)
 
 ament_export_include_directories(
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
