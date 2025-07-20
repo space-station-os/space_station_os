@@ -26,6 +26,7 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 find_package(rosidl_default_generators REQUIRED)
 find_package(rosidl_default_runtime REQUIRED)
 find_package(action_msgs REQUIRED)
+find_package(urdf REQUIRED)
 
 # Generate interfaces
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -59,7 +60,7 @@ ament_target_dependencies(control_torque rclcpp std_msgs tf2 tf2_ros nav_msgs tf
 rosidl_get_typesupport_target(cpp_typesupport_target
   ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(control_torque ${cpp_typesupport_target})
-target_link_libraries(physics_motion ${cpp_typesupport_target})
+target_link_libraries(physics_motion ${cpp_typesupport_target} urdf::urdf)
 
 # Link OpenCV libraries
 target_link_libraries(demo1a_nauka_incident_estimate ${OpenCV_LIBRARIES} ${SDL2_LIBRARIES})
