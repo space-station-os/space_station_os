@@ -1,4 +1,0 @@
-float64 tank_capacity
-sensor_msgs/Temperature tank_temperature
-sensor_msgs/FluidPressure tank_pressure
-bool tank_heater_on

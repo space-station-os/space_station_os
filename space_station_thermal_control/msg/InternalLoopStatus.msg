@@ -1,2 +1,0 @@
-sensor_msgs/Temperature loop_a
-sensor_msgs/Temperature loop_b

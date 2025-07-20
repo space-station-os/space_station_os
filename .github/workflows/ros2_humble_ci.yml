@@ -28,7 +28,6 @@ jobs:
           rosdep update
           rosdep install --from-paths . --ignore-src -r -y
 
-
       - name: Install OpenCV
         run: |
           apt update 

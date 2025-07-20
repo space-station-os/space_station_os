@@ -217,7 +217,12 @@
  <mu1>100</mu1>
   <self_collide>true</self_collide>
 </gazebo>
+<gazebo>
+    <plugin
+    filename="libThermalPlugin.so"
+    name="gz::sim::systems::ThermalPlugin"/>
 
+</gazebo>
  <!-- Thruster Plugins -->
   <gazebo>
     <plugin filename="gz-sim-thruster-system" name="gz::sim::systems::Thruster">
