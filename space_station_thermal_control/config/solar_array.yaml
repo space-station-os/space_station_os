@@ -1,0 +1,28 @@
+solar_heat_node:
+  ros__parameters:
+    solar_constant: 1361.0
+    panels_names: ['lsa_1', 'lsa_2', 'lsa_3', 'rsa_1', 'rsa_2', 'rsa_3']
+
+    lsa_1.absorptivity: 0.85
+    lsa_1.area: 2.0
+    lsa_1.normal: [0.0, -1.0, 0.0]
+
+    lsa_2.absorptivity: 0.85
+    lsa_2.area: 2.0
+    lsa_2.normal: [0.0, -1.0, 0.0]
+
+    lsa_3.absorptivity: 0.85
+    lsa_3.area: 2.0
+    lsa_3.normal: [0.0, -1.0, 0.0]
+
+    rsa_1.absorptivity: 0.85
+    rsa_1.area: 2.0
+    rsa_1.normal: [0.0, 1.0, 0.0]
+
+    rsa_2.absorptivity: 0.85
+    rsa_2.area: 2.0
+    rsa_2.normal: [0.0, 1.0, 0.0]
+
+    rsa_3.absorptivity: 0.85
+    rsa_3.area: 2.0
+    rsa_3.normal: [0.0, 1.0, 0.0]

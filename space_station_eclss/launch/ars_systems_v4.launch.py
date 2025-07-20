@@ -7,7 +7,7 @@ def generate_launch_description():
     params_file = os.path.join(
         get_package_share_directory('space_station_eclss'),
         'config',
-        'ars_sys.yaml'
+        'ARS.yaml'
     )
 
     return LaunchDescription([
@@ -62,10 +62,5 @@ def generate_launch_description():
             emulate_tty=True
         ),
        
-        # Node(
-        #     package='rosbridge_server',
-        #     executable='rosbridge_websocket',
-        #     name='rosbridge_websocket',
-        #     output='screen'
-        # ),
+       
     ])

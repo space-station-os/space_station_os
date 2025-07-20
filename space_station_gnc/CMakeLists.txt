@@ -27,7 +27,7 @@ find_package(rosidl_default_generators REQUIRED)
 find_package(rosidl_default_runtime REQUIRED)
 find_package(action_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(urdfdom REQUIRED)
+find_package(urdf REQUIRED)
 
 # Generate interfaces
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -83,6 +83,9 @@ ament_export_include_directories(
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
+
+target_link_libraries(control_torque ${cpp_typesupport_target})
+target_link_libraries(physics_motion ${cpp_typesupport_target} urdf::urdf)
 
 # Link OpenCV libraries
 target_link_libraries(demo1a_nauka_incident_estimate ${OpenCV_LIBRARIES} ${SDL2_LIBRARIES})
