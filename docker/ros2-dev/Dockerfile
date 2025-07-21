@@ -1,5 +1,8 @@
 # Base ROS 2 image
-FROM osrf/ros:humble-desktop
+FROM osrf/ros:jazzy-desktop
+
+# Maintainer
+LABEL maintainer="Space Station OS <spacestationos@spacedata.co.jp>"
 
 # Environment setup
 ENV DEBIAN_FRONTEND=noninteractive
@@ -7,12 +10,8 @@ ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 ENV QT_X11_NO_MITSHM=1
 ENV ROS_DOMAIN_ID=23
-# ENV RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-# ENV ROS_DISCOVERY_SERVER=10.0.0.109:11811
-# ENV ROS_SUPER_CLIENT=1
 ENV DISPLAY=:0
 ENV LIBGL_ALWAYS_SOFTWARE=1 
-# ENV QT_DEBUG_PLUGINS=1
 
 # Install system packages
 RUN apt update && apt install -y \
@@ -20,6 +19,11 @@ RUN apt update && apt install -y \
     curl \
     wget \
     tmux \
+    vim \
+    nano \
+    htop \
+    lsb-release \
+    gnupg \
     ranger \
     python3-pip \
     python3-rosdep \
@@ -27,36 +31,46 @@ RUN apt update && apt install -y \
     libopencv-dev \
     python3-opencv \
     python3-pyqt5 \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
-    ros-humble-xacro \
-    ros-humble-joint-state-publisher \
-    ros-humble-joint-state-publisher-gui \
-    ros-humble-actuator-msgs \
-    ros-humble-rosbridge-server \
+    ros-jazzy-xacro \
+    ros-jazzy-joint-state-publisher \
+    ros-jazzy-joint-state-publisher-gui \
+    ros-jazzy-actuator-msgs \
+    ros-jazzy-rosbridge-server \
+    ros-jazzy-ros2-control \
+    ros-jazzy-ros-gz \
+    ros-jazzy-ros-gz-* \
+    ros-jazzy-gz-ros2-control \
+    ros-jazzy-gz-ros2-control-demos \
     ros-dev-tools \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-RUN pip3 install casadi
+# Install CasADi
+# CasADi is a symbolic framework for automatic differentiation and numerical optimization.
+# It is used for trajectory optimization and control in robotics applications.
+# For more information, see: https://web.casadi.org/
+RUN pip3 install --break-system-packages casadi
 
-# Initialize rosdep
-RUN sudo rosdep init || true && rosdep update
+ENV GZ_VERSION=harmonic
+ENV GZ_SIM_RESOURCE_PATH=/usr/share/gz/harmonic:/root/ssos_ws/src/space_station_description/urdf:/root/ssos_ws/src/space_station_description/meshes
+# -----------------------------
+# ROS workspace setup
+# -----------------------------
+RUN sudo rosdep init || true &&  rosdep update
 
-# Create workspace
 WORKDIR /root/ssos_ws
 RUN mkdir -p src
 
-# Copy your monorepo into the workspace
+# Copy workspace source code
 COPY . src/space_station_os
 
-# Install dependencies
-RUN bash -c "source /opt/ros/humble/setup.bash && rosdep install --from-paths src --ignore-src -r -y"
+# Install ROS dependencies
+RUN bash -c "source /opt/ros/jazzy/setup.bash && rosdep install --from-paths src --ignore-src -r -y"
+RUN rosdep resolve gz-harmonic || true
+# Build workspace
+RUN bash -c "source /opt/ros/jazzy/setup.bash && colcon build --symlink-install"
 
-# Build the workspace
-RUN bash -c "source /opt/ros/humble/setup.bash && colcon build --symlink-install"
-
-# Copy and configure entrypoint to start Discovery Server and shell
+# Copy and configure entrypoint
 COPY entry-point.sh /root/entry-point.sh
 RUN chmod +x /root/entry-point.sh
-

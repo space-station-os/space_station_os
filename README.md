@@ -75,6 +75,9 @@ Go back to the workspace root and build everything:
 ```bash
 cd ~/ssos_ws
 colcon build --symlink-install
+sudo rosdep init
+rosdep update 
+rosdep install --from-paths src --ignore-src -r -y
 source install/setup.bash
 ```
 
