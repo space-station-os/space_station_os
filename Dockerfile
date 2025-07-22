@@ -20,6 +20,8 @@ RUN apt update && apt install -y \
     ros-humble-joint-state-publisher-gui \
     ros-humble-actuator-msgs \
     ros-humble-rosbridge-server \
+    && apt update \
+    && apt install -y libopencv-dev python3-opencv \
     ros-humble-urdf-parser-plugin \
     && rm -rf /var/lib/apt/lists/*
 

@@ -21,7 +21,8 @@ CoolantManager::CoolantManager()
   water_acquired_(false),
   water_request_pending_(false)
 {
-  water_client_ = this->create_client<space_station_eclss::srv::CleanWater>("/wpa/dispense_water");
+  water_client_ = this->create_client<space_station_eclss::srv::RequestProductWater>("/wrs/product_water_request");
+
 
   ammonia_server_ = this->create_service<space_station_thermal_control::srv::CoolantFlow>(
     "/tcs/request_ammonia", std::bind(&CoolantManager::handle_ammonia, this, _1, _2));
@@ -58,19 +59,19 @@ void CoolantManager::handle_fill_loops(
 void CoolantManager::request_water()
 {
   if (!water_client_->wait_for_service(std::chrono::seconds(2))) {
-    RCLCPP_WARN(this->get_logger(), "[FILL] Water service not available.");
+    RCLCPP_WARN(this->get_logger(), "[FILL] Product Water service not available.");
     return;
   }
 
-  auto req = std::make_shared<space_station_eclss::srv::CleanWater::Request>();
-  req->water = 100.0;
-  req->iodine_level = 0.2;
+  auto req = std::make_shared<space_station_eclss::srv::RequestProductWater::Request>();
+  req->amount = 100.0;  // request in liters
 
   water_future_ = water_client_->async_send_request(req);
   water_request_pending_ = true;
 
-  RCLCPP_INFO(this->get_logger(), "[FILL] Requested 100L clean water...");
+  RCLCPP_INFO(this->get_logger(), "[FILL] Requested %.2f L potable water from WRS...", req->amount);
 }
+
 
 void CoolantManager::apply_heat_reduction(
   const space_station_thermal_control::msg::ExternalLoopStatus::SharedPtr msg)
@@ -179,13 +180,13 @@ void CoolantManager::control_cycle()
     request_water();
   }
 
-  if (water_request_pending_) {
+    if (water_request_pending_) {
     auto future_status = water_future_.wait_for(std::chrono::seconds(0));
     if (future_status == std::future_status::ready) {
       auto resp = water_future_.get();
       water_request_pending_ = false;
 
-      if (resp->success && resp->delivered_volume > 0.0) {
+      if (resp->success && resp->water_granted > 0.0) {
         water_acquired_ = true;
         current_temperature_ += 2.5;
 
@@ -193,8 +194,8 @@ void CoolantManager::control_cycle()
           std::chrono::seconds(1), std::bind(&CoolantManager::publish_loop_temperatures, this));
 
         RCLCPP_INFO(this->get_logger(),
-          "[LOOP FILL] %.2fL received | Temp: %.2f°C",
-          resp->delivered_volume, current_temperature_);
+          "[LOOP FILL] %.2fL granted | Temp: %.2f°C",
+          resp->water_granted, current_temperature_);
       } else {
         RCLCPP_WARN(this->get_logger(),
           "[FILL] Water request failed: %s",
@@ -202,6 +203,7 @@ void CoolantManager::control_cycle()
       }
     }
   }
+
 
   if (ammonia_temp_ < -10.0 && !heater_on_) {
     heater_on_ = true;

@@ -6,11 +6,11 @@
 #include "sensor_msgs/msg/temperature.hpp"
 #include "sensor_msgs/msg/fluid_pressure.hpp"
 
-#include "space_station_eclss/srv/clean_water.hpp"
+
 #include "space_station_thermal_control/srv/coolant_flow.hpp"
 #include "space_station_thermal_control/srv/internal_loop.hpp"
 #include "space_station_thermal_control/srv/node_heat_flow.hpp"
-
+#include "space_station_eclss/srv/request_product_water.hpp"
 #include "space_station_thermal_control/msg/tank_status.hpp"
 #include "space_station_thermal_control/msg/internal_loop_status.hpp"
 #include "space_station_thermal_control/msg/external_loop_status.hpp"
@@ -51,7 +51,7 @@ private:
 
   void control_cycle();
 
-  rclcpp::Client<space_station_eclss::srv::CleanWater>::SharedPtr water_client_;
+  rclcpp::Client<space_station_eclss::srv::RequestProductWater>::SharedPtr water_client_;
   rclcpp::Service<space_station_thermal_control::srv::CoolantFlow>::SharedPtr ammonia_server_;
   rclcpp::Service<space_station_thermal_control::srv::InternalLoop>::SharedPtr thermal_state_server_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr fill_loops_server_;
@@ -63,7 +63,7 @@ private:
 
   rclcpp::TimerBase::SharedPtr control_timer_;
   rclcpp::TimerBase::SharedPtr publish_timer_;
-  rclcpp::Client<space_station_eclss::srv::CleanWater>::SharedFuture water_future_;
+  rclcpp::Client<space_station_eclss::srv::RequestProductWater>::SharedFuture water_future_;
   bool water_request_pending_ = false;
 
   // === System state ===

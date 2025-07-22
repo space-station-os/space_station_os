@@ -6,11 +6,13 @@ ThermalSolverNode::ThermalSolverNode()
 : Node("thermal_solver_node")
 {
   urdf_sub_ = this->create_subscription<std_msgs::msg::String>(
-    "/robot_description", 10,
+    "/robot_description",
+    rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
     [this](const std_msgs::msg::String::SharedPtr msg)
     {
       parseURDF(msg->data);
     });
+
 
   node_pub_ = this->create_publisher<space_station_thermal_control::msg::ThermalNodeDataArray>(
     "/thermal/nodes/state", 10);
