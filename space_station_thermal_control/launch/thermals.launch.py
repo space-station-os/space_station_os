@@ -10,7 +10,7 @@ def generate_launch_description():
     xacro_file = os.path.join(share_dir, 'urdf', 'space_station.xacro')
     robot_description_config = xacro.process_file(xacro_file)
     robot_urdf = robot_description_config.toxml()
-
+    
     
     return LaunchDescription([
         

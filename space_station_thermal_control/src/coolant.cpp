@@ -86,7 +86,7 @@ void CoolantManager::apply_heat_reduction(
   double loop_b_after = current_temperature_ + 0.5;
 
   RCLCPP_INFO(this->get_logger(),
-    "[EXCHANGE] ΔT=%.2f°C | Avg: %.2f→%.2f°C | A: %.2f→%.2f°C | B: %.2f→%.2f°C",
+    "[EXCHANGE] ΔT=%.2f°C | Avg: %.2f->%.2f°C | A: %.2f->%.2f°C | B: %.2f->%.2f°C",
     deltaT, before, current_temperature_,
     loop_a_before, loop_a_after,
     loop_b_before, loop_b_after);
@@ -133,7 +133,7 @@ void CoolantManager::handle_heatflow(
   const std::shared_ptr<space_station_thermal_control::srv::NodeHeatFlow::Request> request,
   std::shared_ptr<space_station_thermal_control::srv::NodeHeatFlow::Response> response)
 {
-  double avg_temp = request->heat_flow;  // This is actually average temperature
+  double avg_temp = request->heat_flow;  
   const double Cp = 4.186;
   double deltaT = avg_temp - initial_temperature_;
   deltaT = std::max(0.0, deltaT);
@@ -167,9 +167,13 @@ void CoolantManager::publish_loop_temperatures()
 
   loop_temp_pub_->publish(msg);
 
-  RCLCPP_INFO(this->get_logger(),
+  RCLCPP_INFO_THROTTLE(
+    this->get_logger(),
+    *this->get_clock(),
+    5000,  
     "[TEMP] A: %.2f°C | B: %.2f°C | Avg: %.2f°C",
     loop_a_temp, loop_b_temp, current_temperature_);
+
 }
 
 void CoolantManager::control_cycle()

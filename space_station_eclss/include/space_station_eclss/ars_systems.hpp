@@ -32,7 +32,7 @@ private:
 
   rclcpp_action::CancelResponse handle_cancel(
   const std::shared_ptr<rclcpp_action::ServerGoalHandle<AirRevitalisation>> goal_handle);
-
+  void simulate_co2_leak();
   rclcpp_action::Server<AirRevitalisation>::SharedPtr action_server_;
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticStatus>::SharedPtr heartbeat_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr co2_storage_pub_;
@@ -41,6 +41,7 @@ private:
   rclcpp::TimerBase::SharedPtr heartbeat_timer_;
   rclcpp::TimerBase::SharedPtr combustion_timer_;
   rclcpp::TimerBase::SharedPtr contaminant_timer_;
+  rclcpp::TimerBase::SharedPtr co2_leak_timer_;
 
   // Simulation Parameters
   int sim_time_;
@@ -49,6 +50,9 @@ private:
   float total_co2_storage_ = 0.0;
   float contaminant_level_ = 0.0;
   float contaminant_limit_ = 100.0; // ppm threshold
+  double co2_leak_rate_;
+  double co2_leak_threshold_;
+  double last_co2_level_ = 0.0;
 
   // Desiccant Beds
   float des1_capacity_, des1_removal_, des1_temp_limit_;
