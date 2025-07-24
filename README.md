@@ -95,6 +95,27 @@ source install/setup.bash
 # TO RUN THE DEMOS
 
 ([Check out our wiki](https://github.com/space-station-os/space_station_os/wiki))
+
+## Behavior Tree
+The behavior tree subsystem is composed of three packages:
+
+- `space_station_bt` implements the core `BehaviorTreeEngine` responsible for loading plugins and executing trees.
+- `space_station_bt_nodes` contains the plugin libraries for tree nodes (actions, conditions, decorators, controls).
+- `space_station_bt_navigator` instantiates the engine inside a ROS 2 node to run behavior trees.
+
+Typical workflow:
+1. The navigator loads the node plugin library and constructs a tree from XML.
+2. The engine executes the tree, invoking plugins as it traverses nodes.
+3. Plugins implement spacecraft behaviors which can be expanded over time.
+
+An example tree demonstrating a failsafe that unloads the CMGs is provided in
+`space_station_bt_navigator/failsafe_tree.xml`.
+
+For an in-depth walkthrough of the BT engine, navigator and node plugins,
+refer to **behaviourTree.md** in this repository.
+
+---
+
 ##  Contributing
 
 See the project backlog:

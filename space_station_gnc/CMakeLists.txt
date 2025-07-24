@@ -50,6 +50,8 @@ add_executable(physics_sensor src/physics_sensor.cpp)
 add_executable(sense_estimate src/sense_estimate.cpp)
 add_executable(control_torque src/control_torque.cpp)
 add_library(thruster_matrix STATIC src/thruster_matrix.cpp)
+add_executable(torque_controller src/torque_controller.cpp)
+
 ament_target_dependencies(space_station_gnc_node rclcpp std_msgs)
 ament_target_dependencies(demo1a_nauka_incident_estimate rclcpp std_msgs tf2_geometry_msgs tf2 tf2_ros OpenCV)
 ament_target_dependencies(demo1b_crisis_mainengine rclcpp std_msgs tf2_geometry_msgs tf2 tf2_ros OpenCV)
@@ -90,6 +92,8 @@ target_link_libraries(physics_motion ${cpp_typesupport_target})
 
 
 
+ament_target_dependencies(torque_controller rclcpp std_msgs geometry_msgs)
+
 # Link OpenCV libraries
 target_link_libraries(demo1a_nauka_incident_estimate ${OpenCV_LIBRARIES} ${SDL2_LIBRARIES})
 target_link_libraries(demo1b_crisis_mainengine ${OpenCV_LIBRARIES} ${SDL2_LIBRARIES})
@@ -107,6 +111,7 @@ install(TARGETS
   sense_estimate
   control_torque
   thruster_matrix
+  torque_controller
   DESTINATION lib/${PROJECT_NAME})
 
 #launch files

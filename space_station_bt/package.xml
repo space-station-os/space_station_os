@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>space_station_bt</name>
+  <version>0.0.1</version>
+  <description>Behavior tree framework for space station control.</description>
+  <maintainer email="todo@example.com">TODO Maintainer</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>rclcpp</depend>
+  <depend>behaviortree_cpp_v3</depend>
+  <depend>pluginlib</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
