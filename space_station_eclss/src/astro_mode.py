@@ -42,10 +42,13 @@ class FailurePopup(QDialog):
         self.setLayout(layout)
 
     def publish_self_diagnose(self):
-        pub = self.node.create_publisher(Bool, "/self_diagnosis", 10)
-        msg = Bool(); msg.data = True
+        topic = f"/{self.subsystem.lower()}/self_diagnosis"
+        pub = self.node.create_publisher(Bool, topic, 10)
+        msg = Bool()
+        msg.data = True
         pub.publish(msg)
         self.accept()
+
 
     def issue_warning(self):
         self.node.get_logger().warn(f"Astronaut confirmed failure in {self.subsystem}")
@@ -105,6 +108,7 @@ class AstronautSimGui(QWidget):
         self.node.create_subscription(DiagnosticStatus, "/wrs/diagnostics", self.diagnostic_callback, 10)
 
     def diagnostic_callback(self, msg: DiagnosticStatus):
+        print(f"[ASTRO-GUI] Received diagnostic: {msg.name} | Level={msg.level} | Msg={msg.message}")
         if msg.level >= DiagnosticStatus.ERROR:
             for sub in self.subsystems:
                 if sub in msg.name.upper():

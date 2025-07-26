@@ -6,6 +6,7 @@
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
 #include "space_station_eclss/action/air_revitalisation.hpp"
 #include "space_station_eclss/srv/co2_request.hpp"
+#include <std_msgs/msg/bool.hpp>
 
 namespace space_station_eclss {
 
@@ -42,7 +43,7 @@ private:
   rclcpp::TimerBase::SharedPtr heartbeat_timer_;
   rclcpp::TimerBase::SharedPtr combustion_timer_;
   rclcpp::TimerBase::SharedPtr contaminant_timer_;
-  rclcpp::TimerBase::SharedPtr co2_leak_timer_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr disable_failure_;
 
   // Simulation Parameters
   int sim_time_;

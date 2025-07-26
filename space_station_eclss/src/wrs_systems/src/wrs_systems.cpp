@@ -53,6 +53,15 @@ WRSActionServer::WRSActionServer(const rclcpp::NodeOptions & options)
   reserve_pub_ = this->create_publisher<std_msgs::msg::Float64>("wrs/product_water_reserve", 10);
   reserve_timer_ = this->create_wall_timer(2s, std::bind(&WRSActionServer::publish_reserve, this));
 
+
+  disable_failure_ = this->create_subscription<std_msgs::msg::Bool>(
+    "/wrs/self_diagnosis",
+    10,
+    [this](const std_msgs::msg::Bool::SharedPtr msg) {
+      enable_failure_ = msg->data;
+      RCLCPP_INFO(this->get_logger(), "Failure simulation %s", enable_failure_ ? "enabled" : "disabled");
+    }
+  );
   RCLCPP_INFO(this->get_logger(), "WRS Action Server initialized");
 }
 

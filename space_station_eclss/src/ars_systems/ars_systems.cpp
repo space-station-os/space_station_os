@@ -52,6 +52,15 @@ ARSActionServer::ARSActionServer(const rclcpp::NodeOptions & options)
     }
   });
 
+ disable_failure_ = this->create_subscription<std_msgs::msg::Bool>(
+    "/ars/self_diagnosis",
+    10,
+    [this](const std_msgs::msg::Bool::SharedPtr msg) {
+      enable_failure_ = msg->data;
+      RCLCPP_INFO(this->get_logger(), "Failure simulation %s", enable_failure_ ? "enabled" : "disabled");
+    }
+  );
+
 
   RCLCPP_INFO(this->get_logger(), "ARS action server ready.");
 }

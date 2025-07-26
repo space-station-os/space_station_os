@@ -11,6 +11,7 @@
 #include "space_station_eclss/action/oxygen_generation.hpp"
 #include "space_station_eclss/srv/request_product_water.hpp"
 #include "space_station_eclss/srv/grey_water.hpp"
+#include <std_msgs/msg/bool.hpp>
 
 #include <memory>
 #include <string>
@@ -45,7 +46,7 @@ private:
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticStatus>::SharedPtr diag_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr reserve_pub_;
   rclcpp::TimerBase::SharedPtr reserve_timer_;
-
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr disable_failure_;
   // Internal state
   float product_water_reserve_;
   float waste_collector_current_;
