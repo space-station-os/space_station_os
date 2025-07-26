@@ -94,7 +94,8 @@ void ExternalLoopA::interface_heat_exchanger(const space_station_thermal_control
 
   loop_status_pub_->publish(status);
 
-  RCLCPP_INFO_THROTTLE(this->get_logger(),this->get_clock(), 5000,
+  auto clockcurr = this->get_clock();
+  RCLCPP_INFO_THROTTLE(this->get_logger(),*clockcurr, 5000,
     "[EX LOOP] Q=%.2f kJ | Loop: %.2f->%.2f°C | Ammonia: %.2f->%.2f°C",
     received_heat, loop_temp, loop_temp_after, ammonia_temp_, ammonia_temp_after);
 
