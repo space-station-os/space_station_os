@@ -1,5 +1,8 @@
 #include "space_station_thermal_control/thermal_solver.hpp"
+
 #include <std_msgs/msg/string.hpp>
+#include <diagnostic_msgs/msg/diagnostic_status.hpp>
+#include <urdf/model.h>
 #include <random>
 
 ThermalSolverNode::ThermalSolverNode()
@@ -13,13 +16,32 @@ ThermalSolverNode::ThermalSolverNode()
       parseURDF(msg->data);
     });
 
-
   node_pub_ = this->create_publisher<space_station_thermal_control::msg::ThermalNodeDataArray>(
     "/thermal/nodes/state", 10);
   link_pub_ = this->create_publisher<space_station_thermal_control::msg::ThermalLinkFlowsArray>(
     "/thermal/links/flux", 10);
+  diag_pub_ = this->create_publisher<diagnostic_msgs::msg::DiagnosticStatus>(
+    "/thermals/diagnostics", 10);
   cooling_client_ = this->create_client<space_station_thermal_control::srv::NodeHeatFlow>(
     "/internal_loop_cooling");
+
+  this->declare_parameter("enable_failure", false);
+  this->declare_parameter("enable_cooling", true);
+  enable_failure_ = this->get_parameter("enable_failure").as_bool();
+  enable_cooling_ = this->get_parameter("enable_cooling").as_bool();
+
+  param_callback_ = this->add_on_set_parameters_callback(
+      [this](const std::vector<rclcpp::Parameter> &params) {
+        for (const auto &param : params) {
+          if (param.get_name() == "enable_failure")
+            enable_failure_ = param.as_bool();
+          else if (param.get_name() == "enable_cooling")
+            enable_cooling_ = param.as_bool();
+        }
+        rcl_interfaces::msg::SetParametersResult result;
+        result.successful = true;
+        return result;
+      });
 
   timer_ = this->create_wall_timer(100ms, std::bind(&ThermalSolverNode::updateSimulation, this));
 }
@@ -53,11 +75,13 @@ void ThermalSolverNode::parseURDF(const std::string &urdf_string)
     node.heat_capacity = capacity_dist(rng_);
     node.internal_power = power_dist(rng_);
     thermal_nodes_[joint->name] = node;
+    initial_temperatures_[joint->name] = node.temperature;
 
     ThermalLink link;
     link.from = joint->child_link_name;
     link.to = joint->parent_link_name;
     link.conductance = cond_dist(rng_);
+    link.joint_name = joint->name;
     thermal_links_.push_back(link);
 
     RCLCPP_INFO(this->get_logger(), "Added node %s and link %s -> %s",
@@ -86,7 +110,16 @@ double ThermalSolverNode::compute_dTdt(const std::string &name,
 
 void ThermalSolverNode::coolingCallback()
 {
-  if (!cooling_active_ && avg_temperature_ > 400.0) {
+  if (enable_failure_ && avg_temperature_ > 420.0) {
+    diagnostic_msgs::msg::DiagnosticStatus diag;
+    diag.name = "THERMAL_SOLVER_OVERHEAT";
+    diag.level = diagnostic_msgs::msg::DiagnosticStatus::ERROR;
+    diag.message = "Thermal system overheating";
+    diag_pub_->publish(diag);
+    RCLCPP_ERROR(this->get_logger(), "Thermal system overheating, triggering cooling.");
+  }
+
+  if (!cooling_active_ && enable_cooling_ && avg_temperature_ > 330.0) {
     if (cooling_client_->wait_for_service(1s)) {
       auto req = std::make_shared<space_station_thermal_control::srv::NodeHeatFlow::Request>();
       req->heat_flow = avg_temperature_ - 273.15;
@@ -124,9 +157,8 @@ void ThermalSolverNode::updateSimulation()
   avg_temperature_ = total_temp / thermal_nodes_.size();
   avg_internal_power_ = total_power / thermal_nodes_.size();
 
-  RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 10000, 
-                     "Avg temperature of node = %.2f", avg_temperature_);
-
+  RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 10000,
+                       "Avg temperature of node = %.2f", avg_temperature_);
 
   coolingCallback();
 
@@ -163,18 +195,27 @@ void ThermalSolverNode::updateSimulation()
 
   if (cooling_active_) {
     bool all_cooled = true;
+
     for (auto &[name, node] : thermal_nodes_) {
-      node.temperature -= cooling_rate_ * dt;
-      if (node.temperature > 310.0)
+      double target_temp = initial_temperatures_[name];
+      double diff = node.temperature - target_temp;
+
+      if (std::abs(diff) < 0.5) {
+        node.temperature = target_temp;
+      } else {
+        node.temperature -= std::copysign(cooling_rate_ * dt, diff);
         all_cooled = false;
+      }
     }
+
     if (all_cooled) {
+      RCLCPP_INFO(this->get_logger(), "All nodes restored to initial temperatures.");
       cooling_active_ = false;
-      RCLCPP_INFO(this->get_logger(), "Cooling complete. Returning to normal.");
     }
   }
 
-  // Publish ROS messages
+
+  // Publish node temperatures
   space_station_thermal_control::msg::ThermalNodeDataArray node_msg;
   for (const auto &[name, node] : thermal_nodes_) {
     space_station_thermal_control::msg::ThermalNodeData data;
@@ -186,19 +227,31 @@ void ThermalSolverNode::updateSimulation()
   }
   node_pub_->publish(node_msg);
 
+  // Publish heat flux across links
   space_station_thermal_control::msg::ThermalLinkFlowsArray link_msg;
-  for (const auto &link : thermal_links_) {
-    space_station_thermal_control::msg::ThermalLinkFlows l;
-    l.node_a = link.from;
-    l.node_b = link.to;
-    l.conductance = link.conductance;
-    l.heat_flow = 0.0;  // optional
-    link_msg.links.push_back(l);
-  }
-  link_pub_->publish(link_msg);
+      for (const auto &link : thermal_links_) {
+      space_station_thermal_control::msg::ThermalLinkFlows l;
+      l.node_a = link.from;
+      l.node_b = link.to;
+      l.conductance = link.conductance;
+
+      // Retrieve temperature of the joint itself (as node_a)
+      double T_a = 0.0;
+      if (auto it = thermal_nodes_.find(link.joint_name); it != thermal_nodes_.end()) {
+        T_a = it->second.temperature;
+      }
+
+      // Simulate base_link (or surrounding environment) as fixed temp
+      double T_b = 293.15;  
+
+      l.heat_flow = link.conductance * (T_a - T_b);
+      link_msg.links.push_back(l);
+    }
+   link_pub_->publish(link_msg);
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
   rclcpp::init(argc, argv);
   rclcpp::spin(std::make_shared<ThermalSolverNode>());
   rclcpp::shutdown();

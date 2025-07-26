@@ -11,7 +11,7 @@
 #include <chrono>
 #include "std_msgs/msg/string.hpp"
 #include <random>
-
+#include "diagnostic_msgs/msg/diagnostic_status.hpp"
 #include "space_station_thermal_control/msg/thermal_node_data_array.hpp"
 #include "space_station_thermal_control/msg/thermal_node_data.hpp"
 #include "space_station_thermal_control/msg/thermal_link_flows_array.hpp"
@@ -33,6 +33,7 @@ struct ThermalLink
   std::string from;
   std::string to;
   double conductance;
+  std::string joint_name;
 };
 
 class ThermalSolverNode : public rclcpp::Node
@@ -55,11 +56,16 @@ private:
   rclcpp::Publisher<space_station_thermal_control::msg::ThermalNodeDataArray>::SharedPtr node_pub_;
   rclcpp::Publisher<space_station_thermal_control::msg::ThermalLinkFlowsArray>::SharedPtr link_pub_;
   rclcpp::Client<space_station_thermal_control::srv::NodeHeatFlow>::SharedPtr cooling_client_;
+  rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticStatus>::SharedPtr diag_pub_;
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_callback_;
+  bool enable_failure_ = false;
+  bool enable_cooling_ = true;
 
   bool cooling_active_ = false;
   double cooling_rate_ = 10.0;
   double avg_temperature_ = 0.0;
   double avg_internal_power_ = 0.0;
+  std::unordered_map<std::string, double> initial_temperatures_;
 
   std::default_random_engine rng_;
 };

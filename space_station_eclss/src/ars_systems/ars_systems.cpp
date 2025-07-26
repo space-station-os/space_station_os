@@ -155,6 +155,8 @@ void ARSActionServer::execute(const std::shared_ptr<GoalHandleARS> goal_handle)
   total_co2_storage_ += co2;
   if (total_co2_storage_ > max_co2_storage_) {
     publish_bed_heartbeat("CO2_Storage", false, "CO2 partial pressure exceeds 3mmHg");
+    RCLCPP_ERROR(this->get_logger(), "CO2 storage pressure limit exceeded: %.2f mmHg", total_co2_storage_);
+    total_co2_storage_ = max_co2_storage_;  
     result->success = false;
     result->summary_message = "Exceeded CO2 storage pressure limit";
     goal_handle->abort(result);
@@ -170,6 +172,10 @@ void ARSActionServer::execute(const std::shared_ptr<GoalHandleARS> goal_handle)
   result->total_vents = vents;
   result->total_co2_vented = co2;
   result->summary_message = "ARS process completed";
+
+  RCLCPP_INFO(this->get_logger(),
+    "[ARS] Completed %d cycles | Vents: %d | CO2 Vented: %.2f kg",
+    sim_time_, vents, co2);
   goal_handle->succeed(result);
 }
 rclcpp_action::GoalResponse ARSActionServer::handle_goal(

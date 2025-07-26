@@ -21,3 +21,5 @@ air_revitalisation:
     ads2_capacity: 100.0
     ads2_removal: 2.5
     ads2_temp_limit: 404.0
+    co2_leak_rate: 5.0      # ppm/s
+    co2_leak_threshold: 20.0
