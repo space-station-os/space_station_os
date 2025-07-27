@@ -13,8 +13,14 @@ else
   read -p "Enter your ROS 2 workspace directory (e.g. ~/ros2_ws): " WS_DIR
 fi
 
+WS_DIR=$(eval echo "$WS_DIR")
+
 INSTALL_DIR="$WS_DIR/install"
 OPENMCT_DIR="$(find "$WS_DIR/src" -type d -name openmct-ros | head -n 1)"
+echo $OPENMCT_DIR
+echo "[INFO] Ensuring npm dependencies are installed..."
+cd "$OPENMCT_DIR"
+npm install
 
 # Kill if session already exists
 tmux has-session -t $SESSION 2>/dev/null
@@ -32,8 +38,8 @@ tmux send-keys -t $SESSION 'ros2 launch rosbridge_server rosbridge_websocket_lau
 
 # Split window horizontally and run OpenMCT
 tmux split-window -h -t $SESSION
-tmux send-keys -t $SESSION "cd $OPENMCT_DIR" C-m
-tmux send-keys -t $SESSION 'npm start' C-m
+tmux send-keys -t $SESSION "cd $OPENMCT_DIR && npm start" C-m
+
 
 # Attach to the session
 tmux attach-session -t $SESSION
