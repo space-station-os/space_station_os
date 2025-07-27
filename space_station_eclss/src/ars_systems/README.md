@@ -106,7 +106,7 @@ source install/setup.bash
 Launch the node:
 
 ```bash
-ros2 run space_station_eclss ars_systems_node
+ros2 run space_station_eclss ars
 ```
 Sending an action goal 
 

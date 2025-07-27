@@ -24,10 +24,8 @@ ARSActionServer::ARSActionServer(const rclcpp::NodeOptions & options)
     std::bind(&ARSActionServer::execute, this, std::placeholders::_1));
 
 
-  heartbeat_pub_ = this->create_publisher<diagnostic_msgs::msg::DiagnosticStatus>("/ars/heartbeat", 10);
-  heartbeat_timer_ = this->create_wall_timer(1s, [this]() {
-    publish_bed_heartbeat("ARS Monitor", true, "System nominal");
-  });
+  heartbeat_pub_ = this->create_publisher<diagnostic_msgs::msg::DiagnosticStatus>("/ars/diagnostics", 10);
+ 
   co2_storage_pub_ = this->create_publisher<std_msgs::msg::Float64>("/co2_storage", 10);
   co2_pub_timer_ = this->create_wall_timer(2s, [this]() {
     std_msgs::msg::Float64 msg;
@@ -46,10 +44,8 @@ ARSActionServer::ARSActionServer(const rclcpp::NodeOptions & options)
     contaminant_level_ += static_cast<float>(std::rand() % 4);
     contaminant_level_ = std::min(contaminant_level_, 500.0f);  // arbitrary cap
     if (contaminant_level_ > contaminant_limit_) {
-      publish_bed_heartbeat("Atmosphere", false, "Contaminant threshold exceeded");
-    } else {
-      publish_bed_heartbeat("Atmosphere", true, "Contaminant levels within safe range");
-    }
+      publish_bed_heartbeat("ARS", false, "Contaminant threshold exceeded","Contaminant_Monitor");
+    } 
   });
 
  disable_failure_ = this->create_subscription<std_msgs::msg::Bool>(
@@ -154,7 +150,7 @@ void ARSActionServer::execute(const std::shared_ptr<GoalHandleARS> goal_handle)
 
   total_co2_storage_ += co2;
   if (total_co2_storage_ > max_co2_storage_) {
-    publish_bed_heartbeat("CO2_Storage", false, "CO2 partial pressure exceeds 3mmHg");
+    publish_bed_heartbeat("ARS", false, "CO2 partial pressure exceeds 3mmHg","Co2_storage");
     RCLCPP_ERROR(this->get_logger(), "CO2 storage pressure limit exceeded: %.2f mmHg", total_co2_storage_);
     total_co2_storage_ = max_co2_storage_;  
     result->success = false;
@@ -201,10 +197,10 @@ bool ARSActionServer::simulate_desiccant_bed(float &h2o, float cap, float rate, 
   h2o -= rate;
   temp += 10.0;
   if (temp > max_temp) {
-    publish_bed_heartbeat(name, false, "Overheating");
+    publish_bed_heartbeat("ARS", false, "Overheating", name);
     return false;
   }
-  publish_bed_heartbeat(name, true, "Nominal");
+  
   return true;
 }
 
@@ -214,29 +210,30 @@ bool ARSActionServer::simulate_adsorbent_bed(float &co2, float cap, float rate, 
   co2 -= rate;
   temp += 12.0;
   if (temp > max_temp) {
-    publish_bed_heartbeat(name, false, "Overheating");
+    publish_bed_heartbeat("ARS", false, "Overheating", name);
     return false;
   }
-  publish_bed_heartbeat(name, true, "Nominal");
+ 
   return true;
 }
 
-void ARSActionServer::publish_bed_heartbeat(const std::string &bed, bool ok, const std::string &msg)
+void ARSActionServer::publish_bed_heartbeat(const std::string &bed, bool ok, const std::string &msg, const std::string &hardware_id)
 {
   diagnostic_msgs::msg::DiagnosticStatus status;
   status.name = bed;
   status.level = ok ? diagnostic_msgs::msg::DiagnosticStatus::OK : diagnostic_msgs::msg::DiagnosticStatus::ERROR;
   status.message = msg;
+  status.hardware_id = hardware_id;
   heartbeat_pub_->publish(status);
 }
 
 void ARSActionServer::monitor_combustion_and_contaminants()
 {
   if (enable_failure_ && (std::rand() % 1000 < 3)) {
-    publish_bed_heartbeat("Combustion Detector", false, "Possible toxic combustion products detected");
+    publish_bed_heartbeat("ARS", false, "Possible toxic combustion products detected","ARS_Monitor");
   }
   if (enable_failure_ && (std::rand() % 1000 < 5)) {
-    publish_bed_heartbeat("Unknown Contaminant", false, "Atmospheric anomaly detected");
+    publish_bed_heartbeat("ARS", false, "Atmospheric anomaly detected","ARS_Monitor");
   }
 }
 

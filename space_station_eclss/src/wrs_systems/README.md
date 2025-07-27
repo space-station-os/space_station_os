@@ -89,7 +89,7 @@ ros2 launch space_station_eclss wrs_systems_v2.launch.py
 Or run the node directly:
 
 ```bash
-ros2 run space_station_eclss wrs_action_server
+ros2 run space_station_eclss wrs
 ```
 
 ---
@@ -99,7 +99,7 @@ ros2 run space_station_eclss wrs_action_server
 You can send a test goal using the ROS 2 CLI:
 
 ```bash
-ros2 action send_goal /water_recovery_systems space_station_eclss/action/WRS "{urine_volume: 10.0}"
+ros2 action send_goal /water_recovery_systems space_station_eclss/action/WaterRecovery "{urine_volume: 10.0}"
 ```
 
 ---

@@ -39,6 +39,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 
 install(PROGRAMS
   src/crew_simulation.py
+  src/diagnostic_signal.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
