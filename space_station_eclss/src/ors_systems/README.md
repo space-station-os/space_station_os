@@ -59,7 +59,7 @@ source install/setup.bash
 Then run the OGS node:
 
 ```bash
-ros2 run space_station_eclss ogs_system
+ros2 run space_station_eclss ogs
 ```
 
 ---

@@ -1,92 +1,32 @@
-import random
-from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QPushButton, QDialog, QSpinBox,
-    QDoubleSpinBox, QComboBox, QHBoxLayout
-)
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QPixmap
-from rclpy.parameter import Parameter
-from diagnostic_msgs.msg import DiagnosticStatus
-from std_msgs.msg import Bool
-from space_station_eclss.action import AirRevitalisation, OxygenGeneration, WaterRecovery
-from rclpy.action import ActionClient
+# astronaut_sim_gui.py
+
 import os
-from ament_index_python.packages import get_package_share_directory
-class FailurePopup(QDialog):
-    def __init__(self, image_path, node, title, subsystem):
-        super().__init__()
-        self.setWindowTitle(title)
-        self.setFixedSize(420, 480)
-        self.node = node
-        self.subsystem = subsystem
+import random
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QSpinBox, QMessageBox, QTextEdit
+from PyQt5.QtCore import QTimer
+from rclpy.parameter import Parameter
+from rclpy.action import ActionClient
+from space_station_eclss.action import AirRevitalisation, WaterRecovery
+from space_station_eclss.srv import RequestProductWater, O2Request
 
-        layout = QVBoxLayout()
-
-        image_label = QLabel()
-        pixmap = QPixmap(image_path).scaled(400, 400, Qt.KeepAspectRatio)
-        image_label.setPixmap(pixmap)
-        image_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(image_label)
-
-        btn_layout = QHBoxLayout()
-        diag_btn = QPushButton("Self Diagnose")
-        warn_btn = QPushButton("Issue Warning")
-
-        diag_btn.clicked.connect(self.publish_self_diagnose)
-        warn_btn.clicked.connect(self.issue_warning)
-
-        btn_layout.addWidget(diag_btn)
-        btn_layout.addWidget(warn_btn)
-        layout.addLayout(btn_layout)
-
-        self.setLayout(layout)
-
-    def publish_self_diagnose(self):
-        topic = f"/{self.subsystem.lower()}/self_diagnosis"
-        pub = self.node.create_publisher(Bool, topic, 10)
-        msg = Bool()
-        msg.data = True
-        pub.publish(msg)
-        self.accept()
-
-
-    def issue_warning(self):
-        self.node.get_logger().warn(f"Astronaut confirmed failure in {self.subsystem}")
-        self.accept()
 
 class AstronautSimGui(QWidget):
     def __init__(self, node):
         super().__init__()
         self.node = node
-        self.setWindowTitle("Astronaut Mode")
-        self.inputs = {}
-        self.co2_level = 400.0
-        self.urine_volume = 0.0
-        self.tick = 0
-        self.day = 1
-
-        self.subsystems = ["ARS", "OGS", "WRS"]
-        self.package_dir = get_package_share_directory('space_station_eclss')
-        self.failure_images = {
-            "ARS": os.path.join(self.package_dir, "assets", "Co2_failure.png"),
-            "OGS": os.path.join(self.package_dir, "assets", "Oxygen_failure.png"),
-            "WRS": os.path.join(self.package_dir, "assets", "wrs_failure.png"),
-        }
+        self.setWindowTitle("Astronaut Simulation")
+        self.setFixedSize(500, 400)
 
         layout = QVBoxLayout()
-        for name, default in [
-            ("crew_size", 4), ("events_per_day", 7), ("number_of_days", 1),
-            ("mode", "rest"), ("calorie_intake", 2000.0), ("potable_water_intake", 2.5)
-        ]:
-            layout.addWidget(QLabel(name))
-            if isinstance(default, int):
-                box = QSpinBox(); box.setValue(default); box.setMaximum(10000)
-            elif isinstance(default, float):
-                box = QDoubleSpinBox(); box.setValue(default); box.setDecimals(2); box.setMaximum(10000.0)
-            else:
-                box = QComboBox(); box.addItems(["rest", "exercise"])
-            self.inputs[name] = box
-            layout.addWidget(box)
+        self.inputs = {}
+
+        layout.addWidget(QLabel("Crew Size"))
+        crew_box = QSpinBox(); crew_box.setValue(4); crew_box.setMaximum(10)
+        self.inputs["crew_size"] = crew_box; layout.addWidget(crew_box)
+
+        layout.addWidget(QLabel("Number of Days"))
+        day_box = QSpinBox(); day_box.setValue(3); day_box.setMaximum(100)
+        self.inputs["number_of_days"] = day_box; layout.addWidget(day_box)
 
         self.sim_button = QPushButton("Start Simulation")
         self.sim_button.clicked.connect(self.start_simulation)
@@ -94,115 +34,169 @@ class AstronautSimGui(QWidget):
 
         self.status = QLabel("Status: Ready")
         layout.addWidget(self.status)
+
+        self.log_box = QTextEdit()
+        self.log_box.setReadOnly(True)
+        layout.addWidget(self.log_box)
+
         self.setLayout(layout)
-
         self.timer = QTimer()
-        self.timer.timeout.connect(self.simulate_event)
 
-        self.ars_client = ActionClient(self.node, AirRevitalisation, "air_revitalisation")
-        self.ogs_client = ActionClient(self.node, OxygenGeneration, "oxygen_generation")
-        self.wrs_client = ActionClient(self.node, WaterRecovery, "water_recovery_systems")
+        self.astronaut = Astronaut(node=self.node, gui=self)
+        self.timer.timeout.connect(self.astronaut.simulate_event)
 
-        self.node.create_subscription(DiagnosticStatus, "/ars/heartbeat", self.diagnostic_callback, 10)
-        self.node.create_subscription(DiagnosticStatus, "/ogs/diagnostics", self.diagnostic_callback, 10)
-        self.node.create_subscription(DiagnosticStatus, "/wrs/diagnostics", self.diagnostic_callback, 10)
+    def log(self, msg: str):
+        self.log_box.append(msg)
+        self.node.get_logger().info(msg)
 
-    def diagnostic_callback(self, msg: DiagnosticStatus):
-        print(f"[ASTRO-GUI] Received diagnostic: {msg.name} | Level={msg.level} | Msg={msg.message}")
-        if msg.level >= DiagnosticStatus.ERROR:
-            for sub in self.subsystems:
-                if sub in msg.name.upper():
-                    popup = FailurePopup(self.failure_images[sub], self.node, f"{sub} FAILURE Detected", sub)
-                    popup.exec_()
+    def show_completion_popup(self):
+        popup = QMessageBox(self)
+        popup.setWindowTitle("Simulation Complete")
+        popup.setText("All events completed successfully.")
+        popup.setIcon(QMessageBox.Information)
+        popup.exec_()
 
     def start_simulation(self):
-        # Set parameters on node
-        param_map = {
-            "crew_size": Parameter.Type.INTEGER,
-            "events_per_day": Parameter.Type.INTEGER,
-            "number_of_days": Parameter.Type.INTEGER,
-            "mode": Parameter.Type.STRING,
-            "calorie_intake": Parameter.Type.DOUBLE,
-            "potable_water_intake": Parameter.Type.DOUBLE,
-        }
-        params = []
-        for name, widget in self.inputs.items():
-            value = widget.value() if hasattr(widget, 'value') else widget.currentText()
-            params.append(Parameter(name, param_map[name], value))
-        self.node.set_parameters(params)
-
-        self.tick = 0
-        self.day = 1
-        self.status.setText("Status: Running simulation...")
+        crew_size = self.inputs["crew_size"].value()
+        num_days = self.inputs["number_of_days"].value()
+        self.node.set_parameters([
+            Parameter("crew_size", Parameter.Type.INTEGER, crew_size),
+            Parameter("number_of_days", Parameter.Type.INTEGER, num_days)
+        ])
+        self.astronaut.configure(crew_size, num_days)
+        self.status.setText("Status: Running...")
+        self.log("Simulation started.")
         self.timer.start(2000)
 
+
+class Astronaut:
+    def __init__(self, node, gui):
+        self.node = node
+        self.gui = gui
+
+        self.co2_level = 400.0
+        self.urine_volume = 0.0
+        self.tick = 0
+        self.day = 1
+
+        self.crew_size = 1
+        self.total_days = 1
+        self.exercise_event = 3
+
+        self.ars_client = ActionClient(node, AirRevitalisation, "air_revitalisation")
+        self.wrs_client = ActionClient(node, WaterRecovery, "water_recovery_systems")
+        self.water_client = node.create_client(RequestProductWater, "wrs/product_water_request")
+        self.o2_client = node.create_client(O2Request, "ogs/request_o2")
+
+    def configure(self, crew_size, number_of_days):
+        self.crew_size = crew_size
+        self.total_days = number_of_days
+        self.co2_level = 400.0
+        self.tick = 0
+        self.day = 1
+        self.urine_volume = 0.0
+
+    def log(self, msg):
+        self.gui.log(msg)
+
     def simulate_event(self):
-        total_days = int(self.inputs["number_of_days"].value())
-        events_per_day = int(self.inputs["events_per_day"].value())
-        if self.day > total_days:
-            self.timer.stop()
-            self.status.setText("Status: Simulation Complete")
-            self.node.get_logger().info("[Sim] All days complete.")
+        if self.day > self.total_days:
+            self.gui.timer.stop()
+            self.gui.status.setText("Status: Simulation Complete")
+            self.log("[Sim] All days complete.")
+            self.gui.show_completion_popup()
             return
 
         self.tick += 1
-        self.co2_level += random.uniform(200.0, 600.0)
-        self.urine_volume += 0.2
-        self.node.get_logger().info(f"[Sim] Day {self.day}, Event {self.tick}: CO2={self.co2_level:.2f}, Urine={self.urine_volume:.2f}")
+        self.log(f"[Sim] Day {self.day}, Event {self.tick}")
+
+        # === Dynamic Activity Mode ===
+        high_metabolism = random.random() < 0.25  # 25% chance
+        mode_tag = " (High Metabolism)" if high_metabolism else ""
+
+        # === CO2 Simulation ===
+        base_co2 = 100.0 if not high_metabolism else 160.0
+        exercise_boost = 80.0 if self.tick == self.exercise_event else 0.0
+        co2_generated = (base_co2 + exercise_boost) * self.crew_size
+
+        if exercise_boost > 0:
+            self.log("[Sim] Astronauts exercised this event.")
+
+        self.co2_level += co2_generated
+        self.log(f"[CO2{mode_tag}] Current level: {self.co2_level:.2f} g")
 
         if self.co2_level >= 2000.0:
-            self.call_ars()
-            self.co2_level = 400.0
+            goal = AirRevitalisation.Goal()
+            goal.initial_co2_mass = self.co2_level
+            goal.initial_moisture_content = 0.8 * 2.5 * self.crew_size
+            goal.initial_contaminants = 5.0
+            if self.ars_client.server_is_ready():
+                self.ars_client.send_goal_async(goal).add_done_callback(self.handle_ars_result)
+                self.log("[ARS] Vents open. CO2 goal sent.")
+                self.co2_level = 400.0
+            else:
+                self.log("[ARS] Server not ready. Skipping CO2 goal.")
 
-        if self.urine_volume >= 1.0:
-            self.call_wrs()
-            self.urine_volume = 0.0
+        # === Water Request ===
+        daily_gallons = 12.0 if not high_metabolism else 15.0
+        daily_liters = daily_gallons * 3.78541
+        water_per_event = daily_liters / 7.0
 
-        self.call_ogs()
+        if self.water_client.service_is_ready():
+            req = RequestProductWater.Request()
+            req.amount = water_per_event
+            self.water_client.call_async(req).add_done_callback(self.handle_water_response)
+        else:
+            self.log("[Water] Service not ready. Skipping.")
 
-        # # Simulate rotating failure
-        # if random.random() < 0.2:
-        #     fail_sub = self.subsystems[self.tick % 3]
-        #     popup = FailurePopup(self.failure_images[fail_sub], self.node, f"{fail_sub} FAILURE Simulated", fail_sub)
-        #     popup.exec_()
+        self.urine_volume += water_per_event * (0.9 if high_metabolism else 0.85)
 
-        if self.tick >= events_per_day:
+        # === WRS ===
+        hygiene_water = (1.59 if not high_metabolism else 2.0) * self.crew_size
+        excess_use = (0.2 if not high_metabolism else 0.5) * self.crew_size
+        total_waste = self.urine_volume + hygiene_water + excess_use
+
+        wrs_goal = WaterRecovery.Goal()
+        wrs_goal.urine_volume = total_waste
+        if self.wrs_client.server_is_ready():
+            self.wrs_client.send_goal_async(wrs_goal).add_done_callback(self.handle_wrs_result)
+        else:
+            self.log("[WRS] Server not ready. Skipping WRS goal.")
+
+        self.urine_volume = 0.0
+
+        # === O2 Request ===
+        if self.o2_client.service_is_ready():
+            req = O2Request.Request()
+            req.o2_req = (800.0 if not high_metabolism else 1000.0) * self.crew_size
+            self.o2_client.call_async(req).add_done_callback(self.handle_o2_response)
+        else:
+            self.log("[O2] Service not ready. Skipping.")
+
+        # === Day End ===
+        if self.tick >= 7:
             self.day += 1
             self.tick = 0
-            self.node.get_logger().info(f"[Sim] Day {self.day - 1} completed.")
-
-    def call_ars(self):
-        goal = AirRevitalisation.Goal()
-        goal.initial_co2_mass = float(self.co2_level)
-        goal.initial_moisture_content = 0.8 * float(self.inputs["potable_water_intake"].value()) * int(self.inputs["crew_size"].value())
-        goal.initial_contaminants = 5.0
-        self.ars_client.wait_for_server()
-        self.ars_client.send_goal_async(goal).add_done_callback(self.handle_ars_result)
+            self.log('<span style="color:blue;">[Sim] Day {} completed.</span>'.format(self.day - 1))
 
     def handle_ars_result(self, future):
         result = future.result().get_result()
-        msg = f"[ARS RESULT] Success={result.success}, CO2 Vented={result.total_co2_vented:.2f}, Msg={result.summary_message}"
-        self.node.get_logger().info(msg)
-
-    def call_wrs(self):
-        goal = WaterRecovery.Goal()
-        goal.urine_volume = float(self.urine_volume)
-        self.wrs_client.wait_for_server()
-        self.wrs_client.send_goal_async(goal).add_done_callback(self.handle_wrs_result)
+        self.log(f"[ARS] CO2 Vented: {result.total_co2_vented:.2f}g | Msg: {result.summary_message}")
 
     def handle_wrs_result(self, future):
         result = future.result().get_result()
-        msg = f"[WRS RESULT] Success={result.success}, Purified={result.total_purified_water:.2f}L, Msg={result.summary_message}"
-        self.node.get_logger().info(msg)
+        self.log(f"[WRS] Water: {result.total_purified_water:.2f}L | Msg: {result.summary_message}")
 
-    def call_ogs(self):
-        goal = OxygenGeneration.Goal()
-        goal.input_water_mass = float(self.inputs["potable_water_intake"].value())
-        goal.iodine_concentration = 0.3
-        self.ogs_client.wait_for_server()
-        self.ogs_client.send_goal_async(goal).add_done_callback(self.handle_ogs_result)
+    def handle_o2_response(self, future):
+        result = future.result()
+        if result.success:
+            self.log(f"[O2] Granted: {result.o2_resp:.2f}g")
+        else:
+            self.log(f"[O2] Request failed: {result.message}")
 
-    def handle_ogs_result(self, future):
-        result = future.result().get_result()
-        msg = f"[OGS RESULT] Success={result.success}, O2={result.total_o2_generated:.2f}g, CH4={result.total_ch4_vented:.2f}g, Msg={result.summary_message}"
-        self.node.get_logger().info(msg)
+    def handle_water_response(self, future):
+        result = future.result()
+        if result.success:
+            self.log(f"[Water] Granted: {result.water_granted:.2f}L")
+        else:
+            self.log("[Water] Request failed.")

@@ -133,6 +133,8 @@ void WRSActionServer::execute(const std::shared_ptr<GoalHandleWRS> goal_handle)
 
 
     product_water_reserve_ += after_ionization;
+    RCLCPP_INFO(this->get_logger(), "Purified %.2f L, Current reserve: %.2f L",
+                after_ionization, product_water_reserve_);
     purified_total += after_ionization;
 
     feedback->time_step = cycles;
@@ -140,6 +142,8 @@ void WRSActionServer::execute(const std::shared_ptr<GoalHandleWRS> goal_handle)
     feedback->current_purification_efficiency = after_ionization / input;
     feedback->failure_detected = false;
     feedback->unit_name = "WRS";
+
+    
     goal_handle->publish_feedback(feedback);
 
     std::this_thread::sleep_for(500ms);
@@ -152,13 +156,22 @@ void WRSActionServer::execute(const std::shared_ptr<GoalHandleWRS> goal_handle)
   result->summary_message = "WRS processing complete";
   result->total_purified_water = purified_total;
   result->total_cycles = cycles;
+
+  RCLCPP_INFO(this->get_logger(),
+      "[WRS RESULT] Success: %s, Total purified water: %.2f L, Cycles: %d, Msg: %s",
+      result->success ? "true" : "false",
+      result->total_purified_water,
+      result->total_cycles,
+      result->summary_message.c_str()
+  );
+
   goal_handle->succeed(result);
   publish_diagnostics("WRS", false, result->summary_message);
 
   // After successful WRS execution, send water to OGS
   if (ogs_client_->wait_for_action_server(2s)) {
     space_station_eclss::action::OxygenGeneration::Goal ogs_goal;
-    ogs_goal.input_water_mass = purified_total * 0.8f;
+    ogs_goal.input_water_mass = purified_total * 0.9f;
 
     auto send_goal_options = rclcpp_action::Client<space_station_eclss::action::OxygenGeneration>::SendGoalOptions();
     send_goal_options.result_callback = [this](const GoalHandleOGS::WrappedResult & result) {

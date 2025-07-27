@@ -21,7 +21,8 @@ public:
 private:
   void declare_parameters();
   void execute(const std::shared_ptr<GoalHandleARS> goal_handle);
-  void publish_bed_heartbeat(const std::string &bed, bool ok, const std::string &msg);
+  void publish_bed_heartbeat(const std::string &bed, bool ok, const std::string &msg,
+                             const std::string &hardware_id = "ARS");
   bool simulate_desiccant_bed(float &h2o, float cap, float rate, float max_temp, const std::string &name, float &temp);
   bool simulate_adsorbent_bed(float &co2, float cap, float rate, float max_temp, const std::string &name, float &temp);
   void monitor_combustion_and_contaminants();
