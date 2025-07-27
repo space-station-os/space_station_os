@@ -1,7 +1,20 @@
 #!/bin/bash
 
 SESSION="openmct_rosbridge"
-OPENMCT_DIR="$HOME/ssos_ws/src/space_station_os/space_station_mission_control/openmct-ros"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEFAULT_DIR="$HOME/ssos_ws"
+
+if [[ "$SCRIPT_DIR" == "$DEFAULT_DIR"* ]]; then
+  WS_DIR="$DEFAULT_DIR"
+elif [ -n "$1" ]; then
+  WS_DIR="$1"
+else
+  read -p "Enter your ROS 2 workspace directory (e.g. ~/ros2_ws): " WS_DIR
+fi
+
+INSTALL_DIR="$WS_DIR/install"
+OPENMCT_DIR="$(find "$WS_DIR/src" -type d -name openmct-ros | head -n 1)"
 
 # Kill if session already exists
 tmux has-session -t $SESSION 2>/dev/null
@@ -14,7 +27,7 @@ fi
 tmux new-session -d -s $SESSION -n main
 
 # Pane 1: Launch rosbridge_websocket
-tmux send-keys -t $SESSION 'source ~/ssos_ws/install/setup.bash' C-m
+tmux send-keys -t $SESSION "source $INSTALL_DIR/setup.bash" C-m
 tmux send-keys -t $SESSION 'ros2 launch rosbridge_server rosbridge_websocket_launch.xml' C-m
 
 # Split window horizontally and run OpenMCT
