@@ -1,0 +1,25 @@
+air_revitalisation:
+  ros__parameters:
+    sim_time: 10
+    enable_failure: true
+
+    max_co2_storage: 3947.0
+    contaminant_limit: 100.0
+
+    des1_capacity: 100.0
+    des1_removal: 1.5
+    des1_temp_limit: 120.0
+
+    des2_capacity: 100.0
+    des2_removal: 1.5
+    des2_temp_limit: 120.0
+
+    ads1_capacity: 100.0
+    ads1_removal: 2.5
+    ads1_temp_limit: 404.0
+
+    ads2_capacity: 100.0
+    ads2_removal: 2.5
+    ads2_temp_limit: 404.0
+    co2_leak_rate: 5.0      # ppm/s
+    co2_leak_threshold: 20.0

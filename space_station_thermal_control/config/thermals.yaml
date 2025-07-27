@@ -1,0 +1,19 @@
+thermal_solver_node:
+  ros__parameters:
+    sink_link: "base_link"
+    cooling_trigger_threshold: 400.0
+    max_temp_threshold: 500.0
+    cooling_rate: 0.05
+    thermal_update_dt: 0.5
+
+    init_temp_low: 295.0
+    init_temp_high: 310.0
+
+    capacity_low: 500.0
+    capacity_high: 1500.0
+
+    power_low: 30.0
+    power_high: 60.0
+
+    conductance_low: 0.05
+    conductance_high: 2.0
