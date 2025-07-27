@@ -21,7 +21,7 @@ class AstronautSimGui(QWidget):
         self.inputs = {}
 
         layout.addWidget(QLabel("Crew Size"))
-        crew_box = QSpinBox(); crew_box.setValue(4); crew_box.setMaximum(100)
+        crew_box = QSpinBox(); crew_box.setValue(4); crew_box.setMaximum(10)
         self.inputs["crew_size"] = crew_box; layout.addWidget(crew_box)
 
         layout.addWidget(QLabel("Number of Days"))
