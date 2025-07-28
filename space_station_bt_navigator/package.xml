@@ -8,7 +8,7 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <depend>rclcpp</depend>
-  <depend>rclcpp_action</depend>
+  <depend>rclcpp_lifecycle</depend>
   <depend>space_station_bt</depend>
   <depend>space_station_bt_nodes</depend>
   <depend>space_station_utils</depend>

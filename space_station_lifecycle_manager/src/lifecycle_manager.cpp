@@ -9,8 +9,7 @@ namespace space_station_lifecycle_manager
 LifecycleManager::LifecycleManager(const rclcpp::NodeOptions & options)
 : rclcpp::Node("lifecycle_manager", options)
 {
-  declare_parameter<std::vector<std::string>>("managed_nodes", std::vector<std::string>{});
-  get_parameter("managed_nodes", managed_nodes_);
+  this->declare_parameter<std::vector<std::string>>("managed_nodes", std::vector<std::string>{});
 }
 
 bool LifecycleManager::changeState(const std::string & node_name, uint8_t transition)
@@ -32,6 +31,7 @@ bool LifecycleManager::changeState(const std::string & node_name, uint8_t transi
 
 bool LifecycleManager::startup()
 {
+  this->get_parameter("managed_nodes", managed_nodes_);
   for (const auto & node : managed_nodes_) {
     if (!changeState(node, lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE)) {
       return false;

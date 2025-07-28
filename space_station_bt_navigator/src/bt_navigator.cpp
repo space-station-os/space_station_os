@@ -1,14 +1,17 @@
 #include "space_station_bt_navigator/bt_navigator.hpp"
 #include "behaviortree_cpp/bt_factory.h"
 
+using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
+
 namespace space_station_bt_navigator
 {
 
 BtNavigator::BtNavigator(const rclcpp::NodeOptions & options)
-: rclcpp::Node("bt_navigator", options),
-  bt_engine_({"space_station_bt_nodes"})
+: rclcpp_lifecycle::LifecycleNode("bt_navigator", options)
 {
-  space_station_utils::get_parameter_or(this, "failsafe", false);
+  // space_station_utils::get_parameter_or(this, "failsafe", false);
+
+  this->declare_parameter<bool>("failsafe", false);
 }
 
 space_station_bt::BehaviorTreeEngine::Status BtNavigator::execute()
@@ -27,10 +30,39 @@ space_station_bt::BehaviorTreeEngine::Status BtNavigator::execute()
        </root>)";
 
   auto blackboard = BT::Blackboard::create();
-  bool fs = space_station_utils::get_parameter_or(this, "failsafe", false);
-  blackboard->set("failsafe", fs);
+
+  blackboard->set("failsafe", failsafe_);
+
   auto tree = bt_engine_.createTreeFromText(xml, blackboard);
   return bt_engine_.run(&tree);
+}
+
+CallbackReturn BtNavigator::on_configure(const rclcpp_lifecycle::State &)
+{
+  bt_engine_ = std::make_shared<space_station_bt::BehaviorTreeEngine>(std::vector<std::string>{"space_station_bt_nodes"});
+  get_parameter("failsafe", failsafe_);
+  return CallbackReturn::SUCCESS;
+}
+
+CallbackReturn BtNavigator::on_activate(const rclcpp_lifecycle::State &)
+{
+  return CallbackReturn::SUCCESS;
+}
+
+CallbackReturn BtNavigator::on_deactivate(const rclcpp_lifecycle::State &)
+{
+  return CallbackReturn::SUCCESS;
+}
+
+CallbackReturn BtNavigator::on_cleanup(const rclcpp_lifecycle::State &)
+{
+  bt_engine_.reset();
+  return CallbackReturn::SUCCESS;
+}
+
+CallbackReturn BtNavigator::on_shutdown(const rclcpp_lifecycle::State &)
+{
+  return CallbackReturn::SUCCESS;
 }
 
 }  // namespace space_station_bt_navigator

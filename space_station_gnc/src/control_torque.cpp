@@ -157,7 +157,9 @@ private:
         // torque_thr_msg.y = torque_thr_cmd.y();
         // torque_thr_msg.z = torque_thr_cmd.z();
         // torque_thr_pub_->publish(torque_thr_msg);
+        RCLCPP_INFO(this->get_logger(), "Before check _________________________");
         if (!thrusterMat.isReady()) return;
+        RCLCPP_INFO(this->get_logger(), "After check __________________________");
         thrusterMat.bodyToThruster(torque_thr_cmd, thruster_force);
         size_t idx = 0;
         for (auto& val : ind_thr_msg.data) {
@@ -244,7 +246,7 @@ private:
     Eigen::Vector3d t_bias, t_bias_norm, t_att;
     Eigen::Matrix<double,3,3> N;
 
-    std::atomic<bool> unload = false; // Flag to indicate if unloading is required
+    std::atomic<bool> unload = false;
 
     ThrusterMatrix thrusterMat;
 };

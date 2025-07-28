@@ -114,6 +114,46 @@ An example tree demonstrating a failsafe that unloads the CMGs is provided in
 For an in-depth walkthrough of the BT engine, navigator and node plugins,
 refer to **behaviourTree.md** in this repository.
 
+### Running the Behavior Tree demo
+
+After building the workspace and sourcing the `install` setup script, start the
+demo which includes the lifecycle manager:
+
+```bash
+ros2 run space_station_bt_navigator bt_demo
+```
+
+The `LifecycleManager` configures and activates the `BtNavigator` before the
+tree begins execution and will shut it down when the demo finishes. `BtNavigator`
+is itself a lifecycle node so you can drive its transitions with the standard
+`ros2 lifecycle` command line tool.
+
+### Controlling lifecycle nodes manually
+
+You can also drive lifecycle transitions yourself. For example:
+
+```bash
+# Configure and activate the navigator
+ros2 lifecycle set /bt_navigator configure
+ros2 lifecycle set /bt_navigator activate
+
+# Deactivate and cleanup when done
+ros2 lifecycle set /bt_navigator deactivate
+ros2 lifecycle set /bt_navigator cleanup
+```
+
+### Additional packages
+
+The behavior tree stack relies on three helper packages that mirror the
+Navigation2 architecture:
+
+- `space_station_utils` provides small header-only helpers such as the
+  `PluginLoader` wrapper and parameter utilities.
+- `space_station_core` defines abstract plugin interfaces that subsystems can
+  implement.
+- `space_station_lifecycle_manager` offers a node to configure and activate a
+  list of lifecycle-enabled nodes before execution.
+
 ---
 
 ##  Contributing

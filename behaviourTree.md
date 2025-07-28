@@ -26,7 +26,7 @@ Key API functiosn:
 
 ## BtNavigator
 
-`BtNavigator` is a ros2 node. During construction it initializes `BehaviorTreeEngine` and declares all parameters needed by the tree (e.g. `failsafe`). The `execute()` loads the behavior tree XML, creates a blackboard with parameter data, and calls `run()` on the engine.
+`BtNavigator` is a lifecycle node. During configuration it creates a `BehaviorTreeEngine` and declares parameters such as `failsafe`. When activated it spawns a thread to run the behavior tree by calling `execute()`.
 
 This can be launched on its own or with other nodes. When the tree is running, individual plugins interact with other subsystems through topics, services or mainly actions.
 
