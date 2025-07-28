@@ -13,7 +13,7 @@ ENV ROS_DOMAIN_ID=23
 ENV DISPLAY=:0
 ENV LIBGL_ALWAYS_SOFTWARE=1 
 
-# Install system packages
+# Install system packages + Node.js + npm
 RUN apt update && apt install -y \
     git \
     curl \
@@ -44,20 +44,20 @@ RUN apt update && apt install -y \
     ros-jazzy-gz-ros2-control \
     ros-jazzy-gz-ros2-control-demos \
     ros-dev-tools \
-    && rm -rf /var/lib/apt/lists/*
+ && curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
+ && apt install -y nodejs \
+ && npm install -g npm@11.5.1 \
+ && rm -rf /var/lib/apt/lists/*
 
 # Install CasADi
-# CasADi is a symbolic framework for automatic differentiation and numerical optimization.
-# It is used for trajectory optimization and control in robotics applications.
-# For more information, see: https://web.casadi.org/
 RUN pip3 install --break-system-packages casadi
 
+# GZ + URDF resources
 ENV GZ_VERSION=harmonic
 ENV GZ_SIM_RESOURCE_PATH=/usr/share/gz/harmonic:/root/ssos_ws/src/space_station_description/urdf:/root/ssos_ws/src/space_station_description/meshes
-# -----------------------------
+
 # ROS workspace setup
-# -----------------------------
-RUN sudo rosdep init || true &&  rosdep update
+RUN sudo rosdep init || true && rosdep update
 
 WORKDIR /root/ssos_ws
 RUN mkdir -p src
@@ -68,6 +68,7 @@ COPY . src/space_station_os
 # Install ROS dependencies
 RUN bash -c "source /opt/ros/jazzy/setup.bash && rosdep install --from-paths src --ignore-src -r -y"
 RUN rosdep resolve gz-harmonic || true
+
 # Build workspace
 RUN bash -c "source /opt/ros/jazzy/setup.bash && colcon build --symlink-install"
 
