@@ -129,9 +129,9 @@ def generate_launch_description():
         world_launch,
         gz_bridge_node,
         rviz_node,
-        robot_state_publisher_node,
         spawn_urdf_node,
         ros2_control_node,
+        robot_state_publisher_node,
         # imu_state,
         RegisterEventHandler(
             event_handler=OnProcessExit(

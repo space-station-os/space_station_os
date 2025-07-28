@@ -4,6 +4,13 @@
 <xacro:include filename="$(find space_station_description)/urdf/materials.xacro" />
 <xacro:include filename="$(find space_station_description)/urdf/space_station.trans" />
 <xacro:include filename="$(find space_station_description)/urdf/space_station.gazebo" />
+
+<xacro:property name="use_fixed_joint" value="true"/>
+
+<!-- <xacro:macro name="conditional_type" params="">
+  ${use_fixed_joint == 'true' ? 'fixed' : 'continuous'}
+</xacro:macro> -->
+
 <link name="base_link">
   <inertial>
     <origin xyz="0.000574324589074325 0.030373043905383902 0.008402956067706836" rpy="0 0 0"/>
@@ -634,7 +641,7 @@
   </collision>
 </link>
 
-<joint name="xp_th_1" type="continuous">
+<joint name="xp_th_1" type="${'fixed' if str(use_fixed_joint) == 'true' else 'continuous'}">
   <origin xyz="2.007871 -10.0 2.495824" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="th2_1"/>
@@ -642,7 +649,7 @@
   
 </joint>
 
-<joint name="xp_th_2" type="continuous">
+<joint name="xp_th_2" type="${'fixed' if str(use_fixed_joint) == 'true' else 'continuous'}">
   <origin xyz="2.020507 -10.0 -2.503833" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="th1_1"/>
@@ -658,7 +665,7 @@
   <limit upper="0.0" lower="0.0" effort="100" velocity="100"/>
 </joint>
 
-<joint name="xp_th_3" type="continuous">
+<joint name="xp_th_3" type="${'fixed' if str(use_fixed_joint) == 'true' else 'continuous'}">
   <origin xyz="-1.984128 -9.9 2.498452" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="th4_1"/>
@@ -674,7 +681,7 @@
   <limit upper="0.0" lower="0.0" effort="100" velocity="100"/>
 </joint>
 
-<joint name="xp_th_4" type="continuous">
+<joint name="xp_th_4" type="${'fixed' if str(use_fixed_joint) == 'true' else 'continuous'}">
   <origin xyz="-1.991465 -10.0 -2.509155" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="th3_1"/>
@@ -682,7 +689,7 @@
   
 </joint>
 
-<joint name="yn_th_1" type="continuous">
+<joint name="yn_th_1" type="${'fixed' if str(use_fixed_joint) == 'true' else 'continuous'}">
   <origin xyz="4.5 -9.0 0.0" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="th9_1"/>
@@ -690,28 +697,28 @@
   
 </joint>
 
-<joint name="rsa_1" type="continuous">
+<joint name="rsa_1" type="${'fixed' if str(use_fixed_joint) == 'true' else 'continuous'}">
   <origin xyz="4.5 -6.0 0.0" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="rsa_1_1"/>
   <axis xyz="1.0 0.0 0.0"/>
 </joint>
 
-<joint name="rsa_2" type="continuous">
+<joint name="rsa_2" type="${'fixed' if str(use_fixed_joint) == 'true' else 'continuous'}">
   <origin xyz="4.5 0.0 0.0" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="rsa_2_1"/>
   <axis xyz="1.0 0.0 0.0"/>
 </joint>
 
-<joint name="rsa_3" type="continuous">
+<joint name="rsa_3" type="${'fixed' if str(use_fixed_joint) == 'true' else 'continuous'}">
   <origin xyz="4.5 6.0 0.0" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="rsa_3_1"/>
   <axis xyz="1.0 0.0 0.0"/>
 </joint>
 
-<joint name="yn_th_2" type="continuous">
+<joint name="yn_th_2" type="${'fixed' if str(use_fixed_joint) == 'true' else 'continuous'}">
   <origin xyz="4.5 9.0 0.0" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="th10_1"/>
@@ -727,7 +734,7 @@
   
 </joint>
 
-<joint name="zn_th_1" type="continuous">
+<joint name="zn_th_1" type="${'fixed' if str(use_fixed_joint) == 'true' else 'continuous'}">
   <origin xyz="-0.026882 -7.996277 4.4" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="th14_1"/>
@@ -735,7 +742,7 @@
   
 </joint>
 
-<joint name="zn_th_2" type="continuous">
+<joint name="zn_th_2" type="${'fixed' if str(use_fixed_joint) == 'true' else 'continuous'}">
   <origin xyz="0.0 8.0 4.4" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="th13_1"/>
@@ -751,7 +758,7 @@
   <limit upper="0.0" lower="0.0" effort="100" velocity="100"/>
 </joint>
 
-<joint name="yp_th_1" type="continuous">
+<joint name="yp_th_1" type="${'fixed' if str(use_fixed_joint) == 'true' else 'continuous'}">
   <origin xyz="-4.5 -9.0 0.0" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="th11_1"/>
@@ -759,7 +766,7 @@
   
 </joint>
 
-<joint name="lsa_1" type="continuous">
+<joint name="lsa_1" type="${'fixed' if str(use_fixed_joint) == 'true' else 'continuous'}">
   <origin xyz="-4.5 -6.0 0.0" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="lsa_1_1"/>
@@ -774,14 +781,14 @@
   <limit upper="0.0" lower="0.0" effort="100" velocity="100"/>
 </joint>
 
-<joint name="lsa_2" type="continuous">
+<joint name="lsa_2" type="${'fixed' if str(use_fixed_joint) == 'true' else 'continuous'}">
   <origin xyz="-4.5 0.0 0.0" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="lsa_2_1"/>
   <axis xyz="-1.0 0.0 0.0"/>
 </joint>
 
-<joint name="yp_th_2" type="continuous">
+<joint name="yp_th_2" type="${'fixed' if str(use_fixed_joint) == 'true' else 'continuous'}">
   <origin xyz="-4.5 9.0 0.0" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="th12_1"/>
@@ -789,7 +796,7 @@
   
 </joint>
 
-<joint name="lsa_3" type="continuous">
+<joint name="lsa_3" type="${'fixed' if str(use_fixed_joint) == 'true' else 'continuous'}">
   <origin xyz="-4.5 6.0 0.0" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="lsa_3_1"/>
@@ -797,7 +804,7 @@
   
 </joint>
 
-<joint name="zp_th_1" type="continuous">
+<joint name="zp_th_1" type="${'fixed' if str(use_fixed_joint) == 'true' else 'continuous'}">
   <origin xyz="0.00669 -7.997906 -4.4" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="th16_1"/>
@@ -805,7 +812,7 @@
   
 </joint>
 
-<joint name="zp_th_2" type="continuous">
+<joint name="zp_th_2" type="${'fixed' if str(use_fixed_joint) == 'true' else 'continuous'}">
   <origin xyz="0.001241 8.003055 -4.4" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="th15_1"/>
@@ -813,7 +820,7 @@
   
 </joint>
 
-<joint name="xn_th_1" type="continuous">
+<joint name="xn_th_1" type="${'fixed' if str(use_fixed_joint) == 'true' else 'continuous'}">
   <origin xyz="-2.0 10.0 2.5" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="th8_1"/>
@@ -821,7 +828,7 @@
   
 </joint>
 
-<joint name="xn_th_2" type="continuous">
+<joint name="xn_th_2" type="${'fixed' if str(use_fixed_joint) == 'true' else 'continuous'}">
   <origin xyz="-1.982378 10.0 -2.506934" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="th7_1"/>
@@ -829,7 +836,7 @@
   
 </joint>
 
-<joint name="xn_th_3" type="continuous">
+<joint name="xn_th_3" type="${'fixed' if str(use_fixed_joint) == 'true' else 'continuous'}">
   <origin xyz="2.000104 10.0 -2.503617" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="th6_1"/>
@@ -844,7 +851,7 @@
   <axis xyz="0.0 1.0 0.0"/>
 </joint>
 
-<joint name="xn_th_4" type="continuous">
+<joint name="xn_th_4" type="${'fixed' if str(use_fixed_joint) == 'true' else 'continuous'}">
   <origin xyz="2.0 10.0 2.5" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="th5_1"/>

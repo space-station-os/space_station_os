@@ -1,16 +1,18 @@
 # **Space Station OS – Setup & Demo Guide**
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/space-station-os/space_station_os/main/assets/logo/SSOSlogo.jpg" alt="SSOS Logo" width="594"/>
-</p>
+
+
+https://github.com/user-attachments/assets/5b82c516-075d-44ac-b440-fb73bedc1e91
+
+
 
 [![ROS 2 Humble CI](https://github.com/space-station-os/space_station_os/actions/workflows/ros2_humble_ci.yml/badge.svg)](https://github.com/space-station-os/space_station_os/actions/workflows/ros2_humble_ci.yml)
 
 ---
 
-## 🚀 Quick Start with Docker (Recommended)
+##  Quick Start with Docker (with GUI support)
 
-If you prefer not to build everything locally, use our **prebuilt Docker image** to get up and running instantly.
+If you prefer not to build everything locally, use our **prebuilt Docker image** to get up and running instantly — including GUI support for the astronaut simulation.
 
 ### 1. Pull the image
 
@@ -18,19 +20,35 @@ If you prefer not to build everything locally, use our **prebuilt Docker image**
 docker pull ghcr.io/space-station-os/space_station_os:latest
 ```
 
-> No need to install ROS 2 manually. Docker must be installed and running.
-
-### 2. Run the container
-
-```bash
-docker run -it --rm ghcr.io/space-station-os/space_station_os:latest
-```
-
-You'll be dropped into a ready-to-use environment with ROS 2 Humble and all Space Station OS packages pre-built.
+> Docker must be installed and running. No need to install ROS 2 or dependencies manually.
 
 ---
 
-## 🔧 Local Installation (Build from Source)
+### 2. Allow GUI access
+
+Before running the container, allow local Docker containers to access your X server:
+
+```bash
+xhost +local:root
+```
+
+---
+
+### 3. Run the container with GUI support
+
+```bash
+docker run -it --rm \
+  --env="DISPLAY=$DISPLAY" \
+  --env="QT_X11_NO_MITSHM=1" \
+  --env="LIBGL_ALWAYS_SOFTWARE=1" \
+  --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
+  --network=host \
+  ghcr.io/space-station-os/space_station_os:latest
+```
+
+---
+
+##  Local Installation (Build from Source)
 
 Use this method if you want to modify the source code or don't want to use Docker.
 
@@ -61,6 +79,9 @@ Go back to the workspace root and build everything:
 ```bash
 cd ~/ssos_ws
 colcon build --symlink-install
+sudo rosdep init
+rosdep update 
+rosdep install --from-paths src --ignore-src -r -y
 source install/setup.bash
 ```
 
@@ -71,104 +92,9 @@ source install/setup.bash
 > ```
 
 ---
+# TO RUN THE DEMOS
 
-## 🛰️ Running Demo 1: ISS Incident Simulation
-
-You need **3 terminals** for this demo.
-
-### Terminal 1 – Run a Scenario
-
-Choose one:
-
-```bash
-ros2 run space_station_gnc demo1a_nauka_incident_estimate     # Real-world based
-ros2 run space_station_gnc demo1b_crisis_mainengine           # High-severity test
-ros2 run space_station_gnc demo1c_small_incident              # CMG logic test
-```
-
-### Terminal 2 – Launch GNC Core
-
-```bash
-ros2 launch space_station_gnc gnc_core.launch.py
-```
-
-### Terminal 3 – Launch RViz
-
-```bash
-ros2 launch space_station_gnc gnc_rviz.launch.py
-```
-
-Set `Fixed Frame` to `world`, add `RobotModel`, and choose `/robot_description`.
-
----
-
-## 🧩 Environmental Control and Life Support System (ECLSS)
-
-ECLSS simulates the life support systems needed to maintain habitable space environments.
-
-### Subsystems Implemented:
-
-* **ARS** – CO₂ and contaminant removal
-  🔗 [Air Revitalization System Docs](https://github.com/space-station-os/space_station_os/blob/main/space_station_eclss/src/ars_systems/README.md)
-
-* **ORS** – Oxygen generation from water
-  🔗 [Oxygen Recovery System Docs](https://github.com/space-station-os/space_station_os/blob/main/space_station_eclss/src/ors_systems/README.md)
-
-* **WRS** – Water recycling & purification
-  🔗 [Water Recovery System Docs](https://github.com/space-station-os/space_station_os/blob/main/space_station_eclss/src/wrs_systems/README.md)
-
-### Launch All Systems
-
-```bash
-ros2 launch space_station_eclss eclss.launch.py
-```
-
----
-
-## 🛰️ Space Station Gazebo Simulation
-
-Visualize the Haven-2 model in Gazebo:
-
-```bash
-ros2 launch space_station_description gazebo.launch.py
-```
-
-### Teleoperation
-
-```bash
-ros2 run space_station_description mux
-ros2 run space_station_description teleop
-```
-
----
-
-## 🐳 Building the Docker Image Locally (Optional)
-
-If the prebuilt image doesn’t work, you can build it manually.
-
-### 1. Clone the repo
-
-```bash
-git clone https://github.com/space-station-os/space_station_os.git
-cd space_station_os
-```
-
-### 2. Build the image
-
-```bash
-docker build -t space_station_os:latest .
-```
-
-### 3. Run the container
-
-```bash
-docker run -it --rm space_station_os:latest
-```
-
----
-
-
-
+([Check out our wiki](https://github.com/space-station-os/space_station_os/wiki))
 ##  Contributing
 
 See the project backlog:
