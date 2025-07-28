@@ -2,7 +2,7 @@
 #define THERMAL_SOLVER_NODE_HPP_
 
 #include <rclcpp/rclcpp.hpp>
-#include <urdf/model.h>
+
 #include <unordered_map>
 #include <vector>
 #include <string>
@@ -18,6 +18,10 @@
 #include "space_station_thermal_control/msg/thermal_link_flows.hpp"
 #include "space_station_thermal_control/srv/node_heat_flow.hpp"
 #include <chrono>
+#include <yaml-cpp/yaml.h>
+#include "ament_index_cpp/get_package_share_directory.hpp"
+
+
 
 using namespace std::chrono_literals;
 struct ThermalNode
@@ -43,7 +47,7 @@ public:
   ~ThermalSolverNode();
 
 private:
-  void parseURDF(const std::string &urdf_string);
+  void parseYAMLConfig(const std::string &yaml_path);
   void updateSimulation();
   double compute_dTdt(const std::string &name, const std::unordered_map<std::string, double> &temps);
   void coolingCallback();
@@ -66,7 +70,7 @@ private:
   double avg_temperature_ = 0.0;
   double avg_internal_power_ = 0.0;
   std::unordered_map<std::string, double> initial_temperatures_;
-
+  std::string config_path_;
   std::default_random_engine rng_;
 };
 

@@ -1,21 +1,11 @@
 #include "space_station_thermal_control/thermal_solver.hpp"
 
-#include <std_msgs/msg/string.hpp>
-#include <diagnostic_msgs/msg/diagnostic_status.hpp>
-#include <urdf/model.h>
-#include <random>
+
 
 ThermalSolverNode::ThermalSolverNode()
 : Node("thermal_solver_node")
 {
-  urdf_sub_ = this->create_subscription<std_msgs::msg::String>(
-    "/robot_description",
-    rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable(),
-    [this](const std_msgs::msg::String::SharedPtr msg)
-    {
-      parseURDF(msg->data);
-    });
-
+  RCLCPP_INFO(this->get_logger(), "Initializing Thermal Solver Node...");
   node_pub_ = this->create_publisher<space_station_thermal_control::msg::ThermalNodeDataArray>(
     "/thermal/nodes/state", 10);
   link_pub_ = this->create_publisher<space_station_thermal_control::msg::ThermalLinkFlowsArray>(
@@ -42,55 +32,68 @@ ThermalSolverNode::ThermalSolverNode()
         result.successful = true;
         return result;
       });
+  this->declare_parameter<std::string>("thermal_config_file", "./config/thermal_nodes.yaml");
+  std::string relative_path = this->get_parameter("thermal_config_file").as_string();
+
+  std::string package_share_dir = ament_index_cpp::get_package_share_directory("space_station_thermal_control");
+  std::string config_path = package_share_dir + "/" + relative_path;
+
+  parseYAMLConfig(config_path);
 
   timer_ = this->create_wall_timer(100ms, std::bind(&ThermalSolverNode::updateSimulation, this));
 }
 
 ThermalSolverNode::~ThermalSolverNode() {}
 
-void ThermalSolverNode::parseURDF(const std::string &urdf_string)
+
+void ThermalSolverNode::parseYAMLConfig(const std::string &yaml_path)
 {
-  urdf::Model model;
-  if (!model.initString(urdf_string)) {
-    RCLCPP_ERROR(this->get_logger(), "Failed to parse URDF");
+  YAML::Node config = YAML::LoadFile(yaml_path);
+  if (!config || !config.IsSequence()) {
+    RCLCPP_ERROR(this->get_logger(), "Invalid YAML configuration.");
     return;
   }
 
-  std::uniform_real_distribution<double> temp_dist(290.0, 310.0);
-  std::uniform_real_distribution<double> capacity_dist(500.0, 1500.0);
-  std::uniform_real_distribution<double> power_dist(30.0, 60.0);
-  std::uniform_real_distribution<double> cond_dist(0.05, 2.0);
-
   thermal_nodes_.clear();
   thermal_links_.clear();
+  initial_temperatures_.clear();
 
-  for (const auto &joint_pair : model.joints_) {
-    auto joint = joint_pair.second;
-    if (!joint || joint->parent_link_name.empty() || joint->child_link_name.empty())
-      continue;
+  for (const auto &entry : config) {
+    std::string node_name = entry["node_name"].as<std::string>();
+    std::string parent_link = entry["parent_link"].as<std::string>();
+    double heat_capacity = entry["heat_capacity"].as<double>();
+    double internal_power = entry["internal_power"].as<double>();
+    double conductance = entry["conductance"].as<double>();
+
+    if (!thermal_nodes_.count(parent_link) && parent_link != "base_link") {
+      RCLCPP_WARN(this->get_logger(), "Parent link '%s' not defined as a node.", 
+      parent_link.c_str());
+    }
 
     ThermalNode node;
-    node.name = joint->name;
-    node.temperature = temp_dist(rng_);
-    node.heat_capacity = capacity_dist(rng_);
-    node.internal_power = power_dist(rng_);
-    thermal_nodes_[joint->name] = node;
-    initial_temperatures_[joint->name] = node.temperature;
+    node.name = node_name;
+    node.temperature = 293.15 + static_cast<double>(rand() % 10); // Init near room temp
+    node.heat_capacity = heat_capacity;
+    node.internal_power = internal_power;
+    thermal_nodes_[node_name] = node;
+    initial_temperatures_[node_name] = node.temperature;
 
     ThermalLink link;
-    link.from = joint->child_link_name;
-    link.to = joint->parent_link_name;
-    link.conductance = cond_dist(rng_);
-    link.joint_name = joint->name;
+    link.from = node_name;
+    link.to = parent_link;
+    link.conductance = conductance;
+    link.joint_name = node_name;
     thermal_links_.push_back(link);
 
     RCLCPP_INFO(this->get_logger(), "Added node %s and link %s -> %s",
-                joint->name.c_str(), link.from.c_str(), link.to.c_str());
+                node_name.c_str(), link.from.c_str(), link.to.c_str());
   }
 
-  RCLCPP_INFO(this->get_logger(), "Thermal graph initialized with %zu nodes and %zu links.",
+  RCLCPP_INFO(this->get_logger(), "YAML thermal config loaded: %zu nodes, %zu links.",
               thermal_nodes_.size(), thermal_links_.size());
 }
+
+
 
 double ThermalSolverNode::compute_dTdt(const std::string &name,
                                        const std::unordered_map<std::string, double> &temps)
