@@ -28,7 +28,7 @@ jobs:
       - name: Build and push Docker image to GHCR
         uses: docker/build-push-action@v5
         with:
-          context: ./docker/ros2-dev
+          context: .
           file: ./docker/ros2-dev/Dockerfile
           push: true
           tags: |
