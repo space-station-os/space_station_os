@@ -1,16 +1,13 @@
 # **Space Station OS – Setup & Demo Guide**
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/space-station-os/space_station_os/main/assets/logo/SSOSlogo.jpg" alt="SSOS Logo" width="594"/>
-</p>
 
-[![Watch the demo](https://img.youtube.com/vi/3SkXipaJXfI/hqdefault.jpg)](https://www.youtube.com/watch?v=3SkXipaJXfI)
+[🎬 Watch Concept Movie](assets/videos/Space%20Station%20OS%20Concept%20Movie.mp4)
 
 [![ROS 2 Humble CI](https://github.com/space-station-os/space_station_os/actions/workflows/ros2_humble_ci.yml/badge.svg)](https://github.com/space-station-os/space_station_os/actions/workflows/ros2_humble_ci.yml)
 
 ---
 
-## 🚀 Quick Start with Docker (with GUI support)
+##  Quick Start with Docker (with GUI support)
 
 If you prefer not to build everything locally, use our **prebuilt Docker image** to get up and running instantly — including GUI support for the astronaut simulation.
 
@@ -48,7 +45,7 @@ docker run -it --rm \
 
 ---
 
-## 🔧 Local Installation (Build from Source)
+##  Local Installation (Build from Source)
 
 Use this method if you want to modify the source code or don't want to use Docker.
 
@@ -92,123 +89,9 @@ source install/setup.bash
 > ```
 
 ---
+# TO RUN THE DEMOS
 
-## 🛰️ Running Demo 1: ISS Incident Simulation
-
-You need **3 terminals** for this demo.
-
-### Terminal 1 – Run a Scenario
-
-Choose one:
-
-```bash
-ros2 run space_station_gnc demo1a_nauka_incident_estimate     # Real-world based
-ros2 run space_station_gnc demo1b_crisis_mainengine           # High-severity test
-ros2 run space_station_gnc demo1c_small_incident              # CMG logic test
-```
-
-### Terminal 2 – Launch GNC Core
-
-```bash
-ros2 launch space_station_gnc gnc_core.launch.py
-```
-
-### Terminal 3 – Launch RViz
-
-```bash
-ros2 launch space_station_gnc gnc_rviz.launch.py
-```
-
-Set `Fixed Frame` to `world`, add `RobotModel`, and choose `/robot_description`.
-
----
-
-## 🧩 Environmental Control and Life Support System (ECLSS)
-
-ECLSS simulates the life support systems needed to maintain habitable space environments.
-
-### Subsystems Implemented:
-
-* **ARS** – CO₂ and contaminant removal
-  🔗 [Air Revitalization System Docs](https://github.com/space-station-os/space_station_os/blob/main/space_station_eclss/src/ars_systems/README.md)
-
-* **ORS** – Oxygen generation from water
-  🔗 [Oxygen Recovery System Docs](https://github.com/space-station-os/space_station_os/blob/main/space_station_eclss/src/ors_systems/README.md)
-
-* **WRS** – Water recycling & purification
-  🔗 [Water Recovery System Docs](https://github.com/space-station-os/space_station_os/blob/main/space_station_eclss/src/wrs_systems/README.md)
-
-### Launch All Systems
-
-```bash
-ros2 launch space_station_eclss eclss.launch.py
-```
-
----
-
-## 🛰️ Space Station Gazebo Simulation
-
-Visualize the Haven-2 model in Gazebo:
-
-```bash
-ros2 launch space_station_description gazebo.launch.py
-```
-
-### Teleoperation
-
-```bash
-ros2 run space_station_description mux
-ros2 run space_station_description teleop
-```
-
----
-## 🐳 Building the Docker Image Locally (Optional)
-
-If the prebuilt image doesn’t work, you can build and run the environment manually with full GUI support.
-
----
-
-### 1. Clone the repo
-
-```bash
-git clone https://github.com/space-station-os/space_station_os.git
-cd space_station_os
-```
-
----
-
-### 2. Build the image
-
-```bash
-docker build -t space_station_os:latest .
-```
-
----
-
-### 3. Allow GUI access
-
-Before launching the container, allow it to access your display:
-
-```bash
-xhost +local:root
-```
-
----
-
-### 4. Run the container (with GUI support)
-
-```bash
-docker run -it --rm \
-  --env="DISPLAY=$DISPLAY" \
-  --env="QT_X11_NO_MITSHM=1" \
-  --env="LIBGL_ALWAYS_SOFTWARE=1" \
-  --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
-  --network=host \
-  space_station_os:latest
-```
-
----
-
+([Check out our wiki](https://github.com/space-station-os/space_station_os/wiki))
 ##  Contributing
 
 See the project backlog:
