@@ -1,7 +1,7 @@
 # **Space Station OS – Setup & Demo Guide**
 
 
-[🎬 Watch Concept Movie](assets/videos/Space%20Station%20OS%20Concept%20Movie.mp4)
+<iframe width="560" height="315" src="https://www.youtube.com/embed/3SkXipaJXfI?si=siNVKHm4j097TJLL" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 [![ROS 2 Humble CI](https://github.com/space-station-os/space_station_os/actions/workflows/ros2_humble_ci.yml/badge.svg)](https://github.com/space-station-os/space_station_os/actions/workflows/ros2_humble_ci.yml)
 
