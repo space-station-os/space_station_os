@@ -17,7 +17,6 @@ WS_DIR=$(eval echo "$WS_DIR")
 
 INSTALL_DIR="$WS_DIR/install"
 OPENMCT_DIR="$(find "$WS_DIR/src" -type d -name openmct-ros | head -n 1)"
-echo $OPENMCT_DIR
 echo "[INFO] Ensuring npm dependencies are installed..."
 cd "$OPENMCT_DIR"
 npm install

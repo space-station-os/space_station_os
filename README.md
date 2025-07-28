@@ -1,5 +1,9 @@
 # **Space Station OS – Setup & Demo Guide**
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/space-station-os/space_station_os/main/assets/logo/SSOSlogo.jpg" alt="SSOS Logo" width="594"/>
+</p>
+
 [![Watch the demo](https://img.youtube.com/vi/3SkXipaJXfI/hqdefault.jpg)](https://www.youtube.com/watch?v=3SkXipaJXfI)
 
 [![ROS 2 Humble CI](https://github.com/space-station-os/space_station_os/actions/workflows/ros2_humble_ci.yml/badge.svg)](https://github.com/space-station-os/space_station_os/actions/workflows/ros2_humble_ci.yml)
