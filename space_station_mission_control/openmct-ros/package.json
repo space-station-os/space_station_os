@@ -9,7 +9,7 @@
     "lint": "eslint src example",
     "lint:fix": "eslint src example --fix",
     "build:dist": "NODE_ENV=production webpack",
-    "build:example": "npm install nasa/openmct#master --no-save",
+    "build:example": "npm install https://github.com/nasa/openmct/archive/refs/heads/master.zip --no-save",
     "start": "NODE_ENV=dev webpack-dev-server",
     "prepare": "npm run build:dist",
     "postinstall": "npm run build:example"
