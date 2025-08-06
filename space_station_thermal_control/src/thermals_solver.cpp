@@ -71,6 +71,37 @@ ThermalSolverNode::ThermalSolverNode()
 
 ThermalSolverNode::~ThermalSolverNode() {}
 
+void ThermalSolverNode::parseYAMLConfig(const std::string &filepath)
+{
+  RCLCPP_INFO(this->get_logger(), "Parsing thermal config: %s", filepath.c_str());
+
+  YAML::Node config = YAML::LoadFile(filepath);
+
+  for (const auto &entry : config) {
+    ThermalNode node;
+    node.heat_capacity = entry["heat_capacity"].as<double>();
+    node.internal_power = entry["internal_power"].as<double>();
+    node.temperature = 293.15 + std::rand() % 10;  
+    std::string name = entry["node_name"].as<std::string>();
+    std::string parent_link = entry["parent_link"].as<std::string>();
+    double conductance = entry["conductance"].as<double>();
+
+    thermal_nodes_[name] = node;
+    initial_temperatures_[name] = node.temperature;
+
+    ThermalLink link;
+    link.from = name;
+    link.to = parent_link;
+    link.joint_name = name;  
+    link.conductance = conductance;
+
+    thermal_links_.push_back(link);
+  }
+
+  RCLCPP_INFO(this->get_logger(), "Loaded %zu thermal nodes and %zu thermal links.",
+              thermal_nodes_.size(), thermal_links_.size());
+}
+
 void ThermalSolverNode::coolingCallback()
 {
   if (enable_failure_ && avg_temperature_ > max_temp_threshold_) {
