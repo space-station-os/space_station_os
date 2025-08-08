@@ -1,0 +1,31 @@
+
+
+- ros_topic_name: "/co2_storage"
+  ros_type_name: "std_msgs/msg/Float64"
+  packet_apid: 42
+  communication_type: "TM"
+
+- ros_topic_name: "/o2_storage"
+  ros_type_name: "std_msgs/msg/Float64"
+  packet_apid: 43
+  communication_type: "TM"
+
+- ros_topic_name: "/wrs/product_water_reserve"
+  ros_type_name: "std_msgs/msg/Float64"
+  packet_apid: 44
+  communication_type: "TM"
+
+- ros_service_name: "/ogs/request_o2"
+  ros_type_name: "space_station_eclss/srv/RequestO2"
+  packet_apid: 78
+  communication_type: "TC"
+
+- ros_service_name: "/wrs/product_water_request"
+  ros_type_name: "space_station_eclss/srv/RequestProductWater"
+  packet_apid: 79
+  communication_type: "TC"
+
+- ros_topic_name: "/gnc/pose_all"
+  ros_type_name: "geometry_msgs/msg/PoseStamped"
+  packet_apid: 45
+  communication_type: "TM"
