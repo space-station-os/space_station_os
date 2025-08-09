@@ -26,6 +26,231 @@
 //std::string mode_demo;
 
 
+namespace Math {
+    constexpr double PI = 3.141592653589793;
+    constexpr double TWO_PI = 2.0 * PI;
+
+    inline constexpr double deg2rad(double deg) { return deg / 180.0 * Math::PI; }
+    inline constexpr double rad2deg(double rad) { return rad / Math::PI * 180.0; }
+
+}
+
+
+namespace OrbitLib {
+
+    // The Earth radius [m]
+    constexpr double EARTH_RADIUS = 6378.14 * 1e3;
+    // [m^3 s^-2]
+    constexpr double G_ME = 3.986004418e14;
+
+    // Ditstance from the Sun to the Earth [m]
+    constexpr double SUN_EARTH_DISTANCE = 149600000 * 1e3;
+
+    // J2
+    constexpr double J2 = 1.08263e-3;
+
+    // Earth Constant (WGS84)
+    // major axis [m]
+    const double WGS84_A = 6378137.0;
+    // flattening
+    const double WGS84_F = 1.0 / 298.257223563;
+    // square of eccentricity
+    const double WGS84_E2 = WGS84_F * (2 - WGS84_F);
+    // Earth rotation angular velocity [rad/s]
+    const double EARTH_OMEGA = 7.2921150e-5;
+
+    // ======== Mean motion [rad/s] -> semi-major axix [m] ========
+    double mean_motion_to_a(double n) {
+        return std::pow(G_ME / (n * n), 1.0 / 3.0);
+    }
+
+    // ======== Calculate true anomaly by solving kepler equation ========
+    double mean_to_true_anomaly(double M, double e, double tol = 1e-8) {
+        M = std::fmod(M, Math::TWO_PI);
+        double E = M;
+        for (int i = 0; i < 100; ++i) {
+            double f = E - e * sin(E) - M;
+            double df = 1 - e * cos(E);
+            double dE = f / df;
+            E -= dE;
+            if (fabs(dE) < tol) break;
+        }
+        double cosE = cos(E);
+        double sinE = sin(E);
+        double true_anom = atan2(sqrt(1 - e * e) * sinE, cosE - e);
+        return true_anom;
+    }
+
+    // ======== Extract kepler elements from line 2 of TLE ========
+    void extract_element_from_tle_line2(
+        std::string line2,
+        double& mean_motion_rev_per_day,
+        double& eccentricity_no_decimal,
+        double& inclination_deg,
+        double& raan_deg,
+        double& argp_deg,
+        double& mean_anomaly_deg
+    ) {
+        inclination_deg = std::stod(line2.substr(8, 8));
+        raan_deg = std::stod(line2.substr(17, 8));
+        eccentricity_no_decimal = std::stod("0." + line2.substr(26, 7));
+        argp_deg = std::stod(line2.substr(34, 8));
+        mean_anomaly_deg = std::stod(line2.substr(43, 8));
+        mean_motion_rev_per_day = std::stod(line2.substr(52, 11));
+    }
+
+    // ======== Calculate ECI position and velocity from TLE elements ========
+    void convert_tle_element_to_eci(
+        double mean_motion_rev_per_day,
+        double eccentricity_no_decimal,
+        double inclination_deg,
+        double raan_deg,
+        double argp_deg,
+        double mean_anomaly_deg,
+        Eigen::Vector3d& position,
+        Eigen::Vector3d& velocity
+    ) {
+        double n = mean_motion_rev_per_day * Math::TWO_PI / 86400.0; // rad/s
+        double a = mean_motion_to_a(n); // [m]
+        double e = eccentricity_no_decimal;
+        double i = Math::deg2rad(inclination_deg);
+        double raan = Math::deg2rad(raan_deg);
+        double argp = Math::deg2rad(argp_deg);
+        double M = Math::deg2rad(mean_anomaly_deg);
+        double nu = mean_to_true_anomaly(M, e);
+
+        // Other related values
+        double p = a * (1 - e * e);
+        double r = p / (1 + e * cos(nu));
+        double x_p = r * cos(nu);
+        double y_p = r * sin(nu);
+
+        double vx_p = -sqrt(OrbitLib::G_ME / p) * sin(nu);
+        double vy_p = sqrt(OrbitLib::G_ME / p) * (e + cos(nu));
+
+        // Rotation matrix (Z-X-Z rotation)
+        Eigen::Matrix3d r_mat =
+            Eigen::AngleAxisd(raan, Eigen::Vector3d::UnitZ()).toRotationMatrix() *
+            Eigen::AngleAxisd(i, Eigen::Vector3d::UnitX()).toRotationMatrix() *
+            Eigen::AngleAxisd(argp, Eigen::Vector3d::UnitZ()).toRotationMatrix();
+
+        // Tranclate position and velocity into ECI
+        Eigen::Vector3d r_p(x_p, y_p, 0.0);
+        Eigen::Vector3d v_p(vx_p, vy_p, 0.0);
+        position = r_mat * r_p;
+        velocity = r_mat * v_p;
+    }
+
+
+    void convert_tle_to_eci(
+        std::string tle_line2, 
+        Eigen::Vector3d& ss_position_eci, Eigen::Vector3d& ss_velocity_eci
+    ) {
+
+        double mean_motion_rev_per_day;
+        double eccentricity_no_decimal;
+        double inclination_deg;
+        double raan_deg;
+        double argp_deg;
+        double mean_anomaly_deg;
+
+        // Extract TLE element
+        OrbitLib::extract_element_from_tle_line2(
+            tle_line2,
+            mean_motion_rev_per_day,
+            eccentricity_no_decimal,
+            inclination_deg,
+            raan_deg,
+            argp_deg,
+            mean_anomaly_deg
+        );
+
+        OrbitLib::convert_tle_element_to_eci(
+            mean_motion_rev_per_day,
+            eccentricity_no_decimal,
+            inclination_deg,
+            raan_deg,
+            argp_deg,
+            mean_anomaly_deg,
+            ss_position_eci, ss_velocity_eci
+        );
+
+    }
+
+    // ======== UTC -> GMST (simple. Error is small if a several days.) ========
+    double unix_time_to_gmst(int64_t unix_seconds, int microseconds) {
+        // Seconds since UNIX epoch (1970-01-01T00:00:00 UTC) to J2000 starting point
+        // Julian Day of Unix Epoch
+        const double JD_UNIX_EPOCH = 2440587.5;   
+        // Julian Day of J2000 Epoch
+        const double JD_J2000 = 2451545.0;        
+        double dt_days = (double)(unix_seconds) / 86400.0 + (double)(microseconds) / (86400.0 * 1e6);
+        double jd = JD_UNIX_EPOCH + dt_days;
+        double d = jd - JD_J2000;
+
+        // GMST in seconds
+        double gmst_sec = 67310.54841 + (876600.0 * 3600.0 + 8640184.812866) * d / 36525.0
+            + 0.093104 * (d / 36525.0) * (d / 36525.0)
+            - 6.2e-6 * (d / 36525.0) * (d / 36525.0) * (d / 36525.0);
+
+        gmst_sec = fmod(gmst_sec, 86400.0);
+        if (gmst_sec < 0) gmst_sec += 86400.0;
+
+        double gmst_rad = Math::TWO_PI * (gmst_sec / 86400.0);
+        return gmst_rad; // [rad]
+    }
+
+    void eci_to_geodetic(
+        const Eigen::Vector3d& position_eci_m,
+        int64_t unix_seconds,
+        int microseconds,
+        double& latitude_deg,
+        double& longitude_deg,
+        double& altitude_m
+    ) {
+        // Step1: ECI -> ECEF rotation
+        double gmst = unix_time_to_gmst(unix_seconds, microseconds);
+        Eigen::Matrix3d R;
+        R <<
+            cos(gmst), sin(gmst), 0,
+            -sin(gmst), cos(gmst), 0,
+            0, 0, 1;
+        Eigen::Vector3d position_ecef_m = R * position_eci_m;
+
+        double x = position_ecef_m.x();
+        double y = position_ecef_m.y();
+        double z = position_ecef_m.z();
+
+        // Step2: ECEF -> lat & lon & alt
+        double r = sqrt(x * x + y * y);
+        double lon = atan2(y, x);
+
+        // Set tempolary phis as initial value
+        double lat = atan2(z, r);
+        double alt = 0.0;
+
+        double N = 0.0;
+        double lat_prev = 0.0;
+        // Convergence condition
+        const double tol = 1e-8; 
+
+        for (int iter = 0; iter < 10; ++iter) {
+            lat_prev = lat;
+            N = WGS84_A / sqrt(1 - WGS84_E2 * sin(lat) * sin(lat));
+            alt = r / cos(lat) - N;
+            lat = atan2(z, r * (1 - WGS84_E2 * (N / (N + alt))));
+            if (fabs(lat - lat_prev) < tol) {
+                break;
+            }
+        }
+
+        latitude_deg = Math::rad2deg(lat);
+        longitude_deg = Math::rad2deg(lon);
+        altitude_m = alt;
+    }
+}
+
+
 Eigen::Matrix3d quat2dcm(const Eigen::Vector4d& quat_vec) {
 
     const Eigen::Vector4d& q = quat_vec;
@@ -74,19 +299,16 @@ public:
         // this->declare_parameter<std::vector<double>>("initial.angacc", {0,0,0});
 
 
-
         this->Ttorque_ = this->get_parameter("timing.torque_dt").as_double();
         this->Tpubatt_ = this->get_parameter("timing.pub_dt").as_double();
         this->N2disp   = this->get_parameter("timing.publish_every").as_int();
 
-        auto pos0 = this->get_parameter("initial.position").as_double_array();
-        this->pos_eci_cur = Eigen::Vector3d(pos0[0], pos0[1], pos0[2]);
+        std::string tle_line2;
+        this->get_parameter("initial.tle_line2", tle_line2);
 
-        auto vel0 = this->get_parameter("initial.velocity").as_double_array();
-        this->vel_eci_cur = Eigen::Vector3d(vel0[0], vel0[1], vel0[2]);
+        OrbitLib::convert_tle_to_eci(tle_line2, this->pos_eci_cur, this->vel_eci_cur);
 
-        auto acc0 = this->get_parameter("initial.acceleration").as_double_array();
-        this->acc_eci_cur = Eigen::Vector3d(acc0[0], acc0[1], acc0[2]);
+        this->acc_eci_cur = this->calc_acc(this->pos_eci_cur, Eigen::Vector3d::Zero());
 
         this->pub_pos_eci = this->create_publisher<geometry_msgs::msg::Vector3>("gnc/pos_eci", 10);
         // this->pub_vel_eci = this->create_publisher<geometry_msgs::msg::Vector3>("gnc/vel_eci", 10);
@@ -128,7 +350,7 @@ public:
         this->bias_thruster_input = Eigen::VectorXd(this->n_thruster);
     }
 
-    private:
+private:
 
     const size_t n_thruster = 12;
     
