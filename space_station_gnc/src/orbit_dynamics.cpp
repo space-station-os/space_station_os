@@ -80,25 +80,20 @@ public:
         this->N2disp   = this->get_parameter("timing.publish_every").as_int();
 
         auto pos0 = this->get_parameter("initial.position").as_double_array();
-        this->pos_eci_cur = Eigen::Vector3(pos0[0], pos0[1], pos0[2]);
+        this->pos_eci_cur = Eigen::Vector3d(pos0[0], pos0[1], pos0[2]);
 
         auto vel0 = this->get_parameter("initial.velocity").as_double_array();
-        this->vel_eci_cur = Eigen::Vector3(vel0[0], vel0[1], vel0[2]);
+        this->vel_eci_cur = Eigen::Vector3d(vel0[0], vel0[1], vel0[2]);
 
         auto acc0 = this->get_parameter("initial.acceleration").as_double_array();
-        this->acc_eci_cur = Eigen::Vector3(acc0[0], acc0[1], acc0[2]);
+        this->acc_eci_cur = Eigen::Vector3d(acc0[0], acc0[1], acc0[2]);
 
         this->pub_pos_eci = this->create_publisher<geometry_msgs::msg::Vector3>("gnc/pos_eci", 10);
         // this->pub_vel_eci = this->create_publisher<geometry_msgs::msg::Vector3>("gnc/vel_eci", 10);
         // this->pub_acc_eci = this->create_publisher<geometry_msgs::msg::Vector3>("gnc/acc_eci", 10);
         
-        broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
-
         this->i2disp = 0; //publish rate: Npublish * Ttorque
-        this->should_pub_att = false;
 
-        printq(attcur);
-        
         // ---- Dynamics Parameter ----
         
         //TODO: handled by parameter surver?
@@ -109,25 +104,25 @@ public:
 
         this->sub_t_fwd_sim = this->create_subscription<std_msgs::msg::Float64>(
             "gnc/t_fwd_sim", 1, 
-            std::bind(&AttitudeDynamicsNode::callback_t_fwd_sim, this, std::placeholders::_1));
+            std::bind(&OrbitDynamicsNode::callback_t_fwd_sim, this, std::placeholders::_1));
 
         this->sub_torque_control = this->create_subscription<geometry_msgs::msg::Vector3>(
             "gnc/thr_torque_cmd", 1, 
-            std::bind(&AttitudeDynamicsNode::callback_attitude_dynamics, this, std::placeholders::_1));
+            std::bind(&OrbitDynamicsNode::callback_attitude_dynamics, this, std::placeholders::_1));
         
         this->sub_bias_thruster_control = this->create_subscription<std_msgs::msg::Float32MultiArray>(
             "gnc/bias_thruster_cmd", 1, 
-            std::bind(&AttitudeDynamicsNode::callback_bias_thruster_inp, this, std::placeholders::_1));
+            std::bind(&OrbitDynamicsNode::callback_bias_thruster_inp, this, std::placeholders::_1));
         
-        this->sub_attitude_quat = this->create_subscription<std_msgs::msg::Quaternion>(
+        this->sub_attitude_quat = this->create_subscription<geometry_msgs::msg::Quaternion>(
             "gnc/attitude_LVLH", 1, 
-            std::bind(&AttitudeDynamicsNode::callback_attitude_quat, this, std::placeholders::_1));
+            std::bind(&OrbitDynamicsNode::callback_attitude_quat, this, std::placeholders::_1));
         
         // ---- Publish timer ----
 
         timer_pos_ = this->create_wall_timer(
             std::chrono::milliseconds((int)(Tpubatt_*1000.0)), 
-            std::bind(&AttitudeDynamicsNode::callback_timer_pub_pos, this));
+            std::bind(&OrbitDynamicsNode::callback_timer_pub_pos, this));
 
         // ---- Initialize variables ----
         this->bias_thruster_input = Eigen::VectorXd(this->n_thruster);
@@ -141,7 +136,7 @@ public:
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr sub_t_fwd_sim;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_bias_thruster_control;
     rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr sub_torque_control;
-    rclcpp::Publisher<geometry_msgs::msg::Quaternion>::SharedPtr sub_attitude_quat;
+    rclcpp::Subscription<geometry_msgs::msg::Quaternion>::SharedPtr sub_attitude_quat;
 
     bool received_ = false;
 
@@ -154,6 +149,7 @@ public:
     //define parameters for dynamics
     // as well as CoG offset issue is a big TODO
     double mu;               ///< Gravitational parameter (m^3/s^2)
+    double total_mass;
 
     // Position, velocity and acceleration of space station at Earth Centered Inertial Frame (ECI) [m], [m/s], [m/s^2]
     Eigen::Vector3d pos_eci_cur;
@@ -182,9 +178,9 @@ public:
     void callback_timer_pub_pos() {
 
         geometry_msgs::msg::Vector3 pos_eci_msg;
-        pos_eci_msg.x = this->pos_eci_cur.x;
-        vel_eci_msg.y = this->vel_eci_cur.y;
-        acc_eci_msg.z = this->acc_eci_cur.z;
+        pos_eci_msg.x = this->pos_eci_cur[0];
+        pos_eci_msg.y = this->vel_eci_cur[1];
+        pos_eci_msg.z = this->acc_eci_cur[2];
         this->pub_pos_eci->publish(pos_eci_msg);
     }
 
@@ -252,7 +248,7 @@ public:
     }
 
     
-    void callback_attitude_quat(const geometry_msgs::msg::Quaterniond msg)
+    void callback_attitude_quat(const geometry_msgs::msg::Quaternion::SharedPtr msg)
     {
         this->attitude_quat[0] = msg->x;
         this->attitude_quat[1] = msg->y;
