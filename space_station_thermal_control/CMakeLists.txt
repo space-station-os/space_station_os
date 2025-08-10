@@ -102,7 +102,10 @@ install(DIRECTORY config/
    DESTINATION share/${PROJECT_NAME}/config
  )
 
-
+install(PROGRAMS
+ src/thermal_visualization.py
+ DESTINATION lib/${PROJECT_NAME}
+)
 
 
 

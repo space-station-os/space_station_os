@@ -43,6 +43,13 @@ def generate_launch_description():
             output='screen',
             parameters=[thermal_config_file],
             emulate_tty=True
+        ),
         
-    )
+        Node(
+            package='space_station_thermal_control',
+            executable='thermal_visualization.py',
+            name='thermal_visualization',
+            output='screen',
+            emulate_tty=True
+        )
     ])
