@@ -21,7 +21,27 @@
 
 ## ROS Nodes
 
+### AttitudeDynamicsNode
+
+Initial parameters:
+- `timing.torque_dt`: simulation timestep [s]
+- `timing.pub_dt`: publish timestep [s]
+- `timing.publish_every`: ?
+- `initial.attitude`: atitude quaternion [N/A]
+- `initial.angvel`: angular velocity [rad/s?]
+- `initial.angacc`: angluar acceleration [rad/s^2]
+- `dynamics.total_mu`: constraint mu [?]
+
+Principal functions:
+- simulate attitude dynamics
+  - Subscribe thruster torque
+  - Publish attitude
+  - simulate attitude dynamics
+    - by RK4
+    - thruster force and gravity gradient are considered
+
 ### OrbitDynamicsNode
+
 Initial parameters:
 - `timing.torque_dt`: simulation timestep [s]
 - `timing.pub_dt`: publish timestep [s]
@@ -29,3 +49,12 @@ Initial parameters:
 - `initial.tle_line2`: TLE line2. Position and velocity are calculated by it.
 - `dynamics.total_mass`: total mass [kg]
 - `dynamics.total_mu`: constraint mu [?]
+
+Principal functions:
+- simulate orbit dynamics
+  - Subscribe thruster torque
+  - Publish attitude
+  - initial values are given by line #2 of TLE (two line element) format
+  - simulate attitude dynamics
+    - by Euler method
+    - thruster force and gravity are considered
