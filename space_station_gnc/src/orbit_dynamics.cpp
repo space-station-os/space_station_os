@@ -20,8 +20,6 @@
 #include <thread>
 #include <Eigen/Dense>
 #include <vector>
-#include "L_p_func.cpp"
-#include "space_station_gnc/action/unloading.hpp"
 #include "space_station_gnc/thruster_matrix.hpp"
 //std::string mode_demo;
 
@@ -277,14 +275,11 @@ Eigen::Matrix3d quat2dcm(const Eigen::Vector4d& quat_vec) {
 class OrbitDynamicsNode : public rclcpp::Node
 {
 public:
-    using unloading =  space_station_gnc::action::Unloading;
-    using GoalHandleUnloading = rclcpp_action::ClientGoalHandle<unloading>;
     OrbitDynamicsNode(const rclcpp::NodeOptions & options) : Node("orbit_physics_motion", options)
     {
         // -------- Iintial parameters --------
         this->Ttorque_ = this->get_parameter("timing.torque_dt").as_double();
         this->Tpubatt_ = this->get_parameter("timing.pub_dt").as_double();
-        this->N2disp   = this->get_parameter("timing.publish_every").as_int();
 
         std::string tle_line2;
         this->get_parameter("initial.tle_line2", tle_line2);
@@ -309,10 +304,6 @@ public:
             "gnc/t_fwd_sim", 1, 
             std::bind(&OrbitDynamicsNode::callback_t_fwd_sim, this, std::placeholders::_1));
 
-        this->sub_torque_control = this->create_subscription<geometry_msgs::msg::Vector3>(
-            "gnc/thr_torque_cmd", 1, 
-            std::bind(&OrbitDynamicsNode::callback_orbit_dynamics, this, std::placeholders::_1));
-        
         this->sub_bias_thruster_control = this->create_subscription<std_msgs::msg::Float32MultiArray>(
             "gnc/bias_thruster_cmd", 1, 
             std::bind(&OrbitDynamicsNode::callback_bias_thruster_inp, this, std::placeholders::_1));
@@ -323,9 +314,16 @@ public:
         
         // ---- Publish timer ----
 
-        timer_pos_ = this->create_wall_timer(
+        this->timer_pos_ = this->create_wall_timer(
             std::chrono::milliseconds((int)(Tpubatt_*1000.0)), 
-            std::bind(&OrbitDynamicsNode::callback_timer_pub_pos, this));
+            std::bind(&OrbitDynamicsNode::callback_timer_pub_pos, this)
+        );
+
+        // ToDo
+        // this->timer_dynamics_update = this->create_wall_timer(
+        //     std::chrono::seconds(dynamics_update_dt)), 
+        //     std::bind(&OrbitDynamicsNode::dynamics_update, this)
+        // );
 
         // ---- Initialize variables ----
         this->bias_thruster_input = Eigen::VectorXd(this->n_thruster);
@@ -341,7 +339,6 @@ private:
     // 
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr sub_t_fwd_sim;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_bias_thruster_control;
-    rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr sub_torque_control;
     rclcpp::Subscription<geometry_msgs::msg::Quaternion>::SharedPtr sub_attitude_quat;
 
     // ---- Publisher ----
@@ -349,7 +346,11 @@ private:
     // rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr pub_vel_eci;
     // rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr pub_acc_eci;
 
+    // ---- Timer ----
+    // timer for publish position
     rclcpp::TimerBase::SharedPtr timer_pos_;
+    // timer for dynamics callback function (ToDo)
+    // rclcpp::TimerBase::SharedPtr timer_dynamics_update;
 
     // ---- Parameters for dynamics ----
     // Gravitational parameter (m^3/s^2)
@@ -374,10 +375,10 @@ private:
     // ---- Define parameters for simulation ----
     //same as T_callback
     double Ttorque_; 
-
-    // publish rate: Npublish * Ttorque
-    int N2disp; 
+    // publish rate
     double Tpubatt_; 
+    // dynamics update timestep [s]
+    double dynamics_update_dt;
 
     // -------- Callback functions --------
 
@@ -389,6 +390,10 @@ private:
         pos_eci_msg.z = this->acc_eci_cur[2];
         this->pub_pos_eci->publish(pos_eci_msg);
     }
+
+    // ToDo
+    // void dynamics_update(){
+    // }
 
     //forcing the simulation forward
     void callback_t_fwd_sim(const std_msgs::msg::Float64::SharedPtr msg){
@@ -476,12 +481,6 @@ private:
             ++idx;
         }
 
-    }
-
-    void callback_orbit_dynamics(const geometry_msgs::msg::Vector3::SharedPtr msg)
-    {
-        //compute attitude update
-        forward_orbit_dynamics(this->Ttorque_); //Ttorque_ is simulation time period
     }
 
 };
