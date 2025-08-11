@@ -281,24 +281,7 @@ public:
     using GoalHandleUnloading = rclcpp_action::ClientGoalHandle<unloading>;
     OrbitDynamicsNode(const rclcpp::NodeOptions & options) : Node("orbit_physics_motion", options)
     {
-        // // dynamics parameters
-        // this->declare_parameter<double>("dynamics.J.xx", 280e6);
-        // this->declare_parameter<double>("dynamics.J.yy", 140e6);
-        // this->declare_parameter<double>("dynamics.J.zz", 420e6);
-        // this->declare_parameter<double>("dynamics.mu", 3.986e14);
-        // this->declare_parameter<double>("dynamics.r_orbit", 7e6);
-        
-        // // timing parameters
-        // this->declare_parameter<double>("timing.torque_dt", 0.1);
-        // this->declare_parameter<double>("timing.pub_dt", 0.1);
-        // this->declare_parameter<int>   ("timing.publish_every", 10);
-        
-        // // initial state parameters
-        // this->declare_parameter<std::vector<double>>("initial.attitude", {0,0,0,1});
-        // this->declare_parameter<std::vector<double>>("initial.angvel", {0,0,0});
-        // this->declare_parameter<std::vector<double>>("initial.angacc", {0,0,0});
-
-
+        // -------- Iintial parameters --------
         this->Ttorque_ = this->get_parameter("timing.torque_dt").as_double();
         this->Tpubatt_ = this->get_parameter("timing.pub_dt").as_double();
         this->N2disp   = this->get_parameter("timing.publish_every").as_int();
@@ -352,27 +335,33 @@ public:
 
 private:
 
+    // -------- Variables --------
+    // The number of the thrusters
     const size_t n_thruster = 12;
     
-    //ros2 stuff
+    // ---- Subscription ----
+    // 
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr sub_t_fwd_sim;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_bias_thruster_control;
     rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr sub_torque_control;
     rclcpp::Subscription<geometry_msgs::msg::Quaternion>::SharedPtr sub_attitude_quat;
 
-    bool received_ = false;
-
+    // ---- Publisher ----
     rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr pub_pos_eci;
     // rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr pub_vel_eci;
     // rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr pub_acc_eci;
 
     rclcpp::TimerBase::SharedPtr timer_pos_;
 
-    //define parameters for dynamics
-    // as well as CoG offset issue is a big TODO
-    double mu;               ///< Gravitational parameter (m^3/s^2)
+    // ---- Parameters for dynamics ----
+    // Gravitational parameter (m^3/s^2)
+    double mu;
+    // Total mass [kg]
     double total_mass;
 
+    // Thruster model
+    ThrusterMatrix thrusterMat;
+    
     // Position, velocity and acceleration of space station at Earth Centered Inertial Frame (ECI) [m], [m/s], [m/s^2]
     Eigen::Vector3d pos_eci_cur;
     Eigen::Vector3d vel_eci_cur;
@@ -384,16 +373,15 @@ private:
     // Attitude Quaternion
     Eigen::Vector4d attitude_quat;
 
-    //define parameters for simulation
-    double Tstep_rk; // in seconds
-    double Ttorque_; //same as T_callback
-    //int Nstep; // number of steps for simulation, Ttorque_/Tstep_
+    // ---- Define parameters for simulation ----
+    //same as T_callback
+    double Ttorque_; 
 
-    int N2disp; // publish rate: Npublish * Ttorque
-    int i2disp; // index for i2disp
+    // publish rate: Npublish * Ttorque
+    int N2disp; 
+    // index for i2disp
+    int i2disp; 
     double Tpubatt_; 
-
-    ThrusterMatrix thrusterMat;
 
     // -------- Callback functions --------
 
@@ -433,12 +421,14 @@ private:
     Eigen::Vector3d calc_acc(const Eigen::Vector3d& pos_eci, const Eigen::Vector3d& thruster_force_eci){
         // Calculate acceleration
 
-        // by gravity
-        double r = pos_eci.norm();  // 距離 [m]
+        // ---- gravity term ----
+        // Distance [m]
+        double r = pos_eci.norm();  
         Eigen::Vector3d acc_gravity = -this->mu / (r * r * r) * pos_eci;
 
-        // by thruster
+        // ---- thruster term ----
         Eigen::Vector3d acc_thruster = thruster_force_eci / this->total_mass;
+        
         return acc_gravity + acc_thruster;
     }
 
