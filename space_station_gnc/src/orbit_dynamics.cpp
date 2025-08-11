@@ -313,7 +313,7 @@ public:
 
         this->sub_torque_control = this->create_subscription<geometry_msgs::msg::Vector3>(
             "gnc/thr_torque_cmd", 1, 
-            std::bind(&OrbitDynamicsNode::callback_attitude_dynamics, this, std::placeholders::_1));
+            std::bind(&OrbitDynamicsNode::callback_orbit_dynamics, this, std::placeholders::_1));
         
         this->sub_bias_thruster_control = this->create_subscription<std_msgs::msg::Float32MultiArray>(
             "gnc/bias_thruster_cmd", 1, 
@@ -408,8 +408,8 @@ private:
         //int divide = 64;
         int divide = (int)(t_sim2forward / this->Ttorque_); 
         for(int ii = 0; ii < divide; ii++){
-            //forward_attitude_dynamics(t_sim/(double)(divide));
-            forward_attitude_dynamics(this->Ttorque_);
+            //forward_orbit_dynamics(t_sim/(double)(divide));
+            forward_orbit_dynamics(this->Ttorque_);
             if(ii % 60 == 1){
                 std::this_thread::sleep_for(std::chrono::duration<double>(0.1)); 
             }
@@ -433,7 +433,7 @@ private:
     }
 
 
-    void forward_attitude_dynamics(double Tfwd_sec){
+    void forward_orbit_dynamics(double Tfwd_sec){
 
         // integrate by Euler method
         Eigen::Vector3d pos_eci_old = this->pos_eci_cur;
@@ -482,10 +482,10 @@ private:
 
     }
 
-    void callback_attitude_dynamics(const geometry_msgs::msg::Vector3::SharedPtr msg)
+    void callback_orbit_dynamics(const geometry_msgs::msg::Vector3::SharedPtr msg)
     {
         //compute attitude update
-        forward_attitude_dynamics(this->Ttorque_); //Ttorque_ is simulation time period
+        forward_orbit_dynamics(this->Ttorque_); //Ttorque_ is simulation time period
     }
 
 };
