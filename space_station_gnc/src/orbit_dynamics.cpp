@@ -155,7 +155,7 @@ void OrbitDynamicsNode::on_forward_time(const std_msgs::msg::Float64::SharedPtr 
             std::this_thread::sleep_for(std::chrono::milliseconds(1)); // avoid starving executor
         }
     }
-    RCLCPP_INFO(this->get_logger(), "Fast‑forwarded %.2f s in %d steps", t_forward, steps);
+    
 }
 
 // ----- Dynamics core -----
