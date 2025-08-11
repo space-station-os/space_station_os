@@ -103,7 +103,7 @@ install(DIRECTORY config/
  )
 
 install(PROGRAMS
- src/thermal_visualization.py
+ scripts/thermal_visualization.py
  DESTINATION lib/${PROJECT_NAME}
 )
 
