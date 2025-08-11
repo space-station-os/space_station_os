@@ -343,6 +343,7 @@ private:
 
     // ---- Publisher ----
     rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr pub_pos_eci;
+    // ToDo
     // rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr pub_vel_eci;
     // rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr pub_acc_eci;
 
@@ -418,25 +419,45 @@ private:
         RCLCPP_INFO(this->get_logger(),"forwarded");
     }
 
-
+    /**
+     * @fn
+     * @brief Calculate acceleration to space station at ECI
+     * @param pos_eci: space station position at ECI
+     * @param thruster_force_eci: thruster force to space station body at ECI
+     * @return acceleration to space station at ECI
+     * @detail Calculate acceleration to space station at ECI. Gravity and thruster force are considered. J2, air drag or solar radiation are not considered.
+     */
     Eigen::Vector3d calc_acc(const Eigen::Vector3d& pos_eci, const Eigen::Vector3d& thruster_force_eci){
         // Calculate acceleration
+        //
 
         // ---- gravity term ----
+        // gravity force is calculated by the distance between space station and the Earth.
+        // ECI is the Earth-centered frame, so norm of position vector at ECI means it.
+        // And acceleration is calculated by using the constant
         // Distance [m]
         double r = pos_eci.norm();  
         Eigen::Vector3d acc_gravity = -this->mu / (r * r * r) * pos_eci;
 
         // ---- thruster term ----
+        // thruster force is calculated by EoM, ma=F
         Eigen::Vector3d acc_thruster = thruster_force_eci / this->total_mass;
         
         return acc_gravity + acc_thruster;
     }
 
 
+    /**
+     * @fn
+     * @brief Update space station position, velocity and acceleration
+     * @param pos_eci: space station position at ECI
+     * @param thruster_force_eci: thruster force to space station body at ECI
+     * @return acceleration to space station at ECI
+     * @detail integrate elements by Euler method.
+     */
     void forward_orbit_dynamics(double Tfwd_sec){
 
-        // integrate by Euler method
+        // restore current values
         Eigen::Vector3d pos_eci_old = this->pos_eci_cur;
         Eigen::Vector3d vel_eci_old = this->vel_eci_cur;
         Eigen::Vector3d acc_eci_old = this->acc_eci_cur;
@@ -452,7 +473,7 @@ private:
         // Transform BF->ECI
         Eigen::Vector3d thruster_force_eci = att_dcm * thruster_force_bf;
 
-        // update position & velocity
+        // update position & velocity by Euler method
         this->pos_eci_cur = pos_eci_old + vel_eci_old*Tfwd_sec;
         this->vel_eci_cur = vel_eci_old + acc_eci_old*Tfwd_sec;
 
@@ -469,6 +490,7 @@ private:
         this->attitude_quat[3] = msg->w;
     }
 
+    
     void callback_bias_thruster_inp(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
     {
         size_t idx = 0;
@@ -480,7 +502,6 @@ private:
             this->bias_thruster_input(idx) = value;
             ++idx;
         }
-
     }
 
 };
