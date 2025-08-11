@@ -1,0 +1,31 @@
+orbit_dynamics_node:
+  ros__parameters:
+    timing:
+      dynamics_dt: 0.25        # seconds
+      publish_dt: 0.5          # seconds
+
+    dynamics:
+      mu: 3.986004418e14       # Earth GM
+      total_mass: 420000.0     # kg (ISS-ish)
+      use_rk4: true            # switch to RK4
+
+    frames:
+      eci_frame_id: "ECI"
+
+    topics:
+      bias_thruster_cmd: "gnc/bias_thruster_cmd"
+      attitude_quat: "gnc/attitude_body_to_eci"   # geometry_msgs/Quaternion (x,y,z,w)
+      t_fwd_sim: "gnc/t_fwd_sim"
+      pos_eci: "gnc/pos_eci"
+      vel_eci: "gnc/vel_eci"
+      acc_eci: "gnc/acc_eci"
+      pose_eci: "gnc/pose_eci"
+      path_eci: "gnc/path_eci"
+
+    viz:
+      path_max_points: 5000
+
+    initial:
+      # Full TLE line 2 string, e.g. ISS (ZARYA) sample (ensure it matches line2 format)
+      tle_line2: "2 25544  51.6416  27.1234 0005667  85.6561  45.1242 15.49312345 12345"
+      compute_acc_on_start: true
