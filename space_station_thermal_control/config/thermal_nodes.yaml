@@ -1,0 +1,293 @@
+- node_name: "ARS"
+  parent_link: "base_link"
+  heat_capacity: 1200.0
+  internal_power: 40.0
+  conductance: 1.2
+
+- node_name: "OGS"
+  parent_link: "base_link"
+  heat_capacity: 1000.0
+  internal_power: 50.0
+  conductance: 1.0
+
+- node_name: "WRS"
+  parent_link: "base_link"
+  heat_capacity: 900.0
+  internal_power: 45.0
+  conductance: 0.8
+
+- node_name: "CommArray"
+  parent_link: "base_link"
+  heat_capacity: 800.0
+  internal_power: 35.0
+  conductance: 0.6
+
+- node_name: "MainComputer"
+  parent_link: "base_link"
+  heat_capacity: 950.0
+  internal_power: 60.0
+  conductance: 1.1
+
+- node_name: "Camera1"
+  parent_link: "MainComputer"
+  heat_capacity: 250.0
+  internal_power: 15.0
+  conductance: 0.3
+
+- node_name: "Camera2"
+  parent_link: "MainComputer"
+  heat_capacity: 250.0
+  internal_power: 15.0
+  conductance: 0.3
+
+- node_name: "Spectrometer"
+  parent_link: "LabModule"
+  heat_capacity: 600.0
+  internal_power: 25.0
+  conductance: 0.7
+
+- node_name: "Microscope"
+  parent_link: "LabModule"
+  heat_capacity: 500.0
+  internal_power: 20.0
+  conductance: 0.5
+
+- node_name: "LabModule"
+  parent_link: "base_link"
+  heat_capacity: 1100.0
+  internal_power: 50.0
+  conductance: 1.3
+
+- node_name: "3DPrinter"
+  parent_link: "LabModule"
+  heat_capacity: 700.0
+  internal_power: 45.0
+  conductance: 0.9
+
+- node_name: "BatteryUnit1"
+  parent_link: "PowerHub"
+  heat_capacity: 850.0
+  internal_power: 30.0
+  conductance: 1.0
+
+- node_name: "BatteryUnit2"
+  parent_link: "PowerHub"
+  heat_capacity: 850.0
+  internal_power: 30.0
+  conductance: 1.0
+
+- node_name: "PowerHub"
+  parent_link: "base_link"
+  heat_capacity: 1300.0
+  internal_power: 55.0
+  conductance: 1.5
+
+- node_name: "CoolingPump"
+  parent_link: "base_link"
+  heat_capacity: 600.0
+  internal_power: 25.0
+  conductance: 0.7
+
+- node_name: "NavigationSystem"
+  parent_link: "base_link"
+  heat_capacity: 700.0
+  internal_power: 35.0
+  conductance: 0.9
+
+- node_name: "FlightController"
+  parent_link: "NavigationSystem"
+  heat_capacity: 650.0
+  internal_power: 40.0
+  conductance: 0.9
+
+- node_name: "DisplayPanel1"
+  parent_link: "FlightController"
+  heat_capacity: 300.0
+  internal_power: 20.0
+  conductance: 0.4
+
+- node_name: "DisplayPanel2"
+  parent_link: "FlightController"
+  heat_capacity: 300.0
+  internal_power: 20.0
+  conductance: 0.4
+
+- node_name: "ServerRack"
+  parent_link: "MainComputer"
+  heat_capacity: 1200.0
+  internal_power: 80.0
+  conductance: 1.2
+
+- node_name: "AIProcessor"
+  parent_link: "ServerRack"
+  heat_capacity: 600.0
+  internal_power: 50.0
+  conductance: 0.8
+
+- node_name: "MemoryBank"
+  parent_link: "ServerRack"
+  heat_capacity: 700.0
+  internal_power: 25.0
+  conductance: 0.7
+
+- node_name: "Gyroscope"
+  parent_link: "NavigationSystem"
+  heat_capacity: 300.0
+  internal_power: 15.0
+  conductance: 0.5
+
+- node_name: "StorageDrive"
+  parent_link: "MainComputer"
+  heat_capacity: 400.0
+  internal_power: 10.0
+  conductance: 0.3
+
+- node_name: "DockingControl"
+  parent_link: "base_link"
+  heat_capacity: 750.0
+  internal_power: 30.0
+  conductance: 0.6
+
+- node_name: "CabinLights"
+  parent_link: "base_link"
+  heat_capacity: 300.0
+  internal_power: 10.0
+  conductance: 0.2
+
+- node_name: "ThermalCam"
+  parent_link: "LabModule"
+  heat_capacity: 350.0
+  internal_power: 20.0
+  conductance: 0.4
+
+- node_name: "BioMonitor"
+  parent_link: "LabModule"
+  heat_capacity: 500.0
+  internal_power: 25.0
+  conductance: 0.6
+
+- node_name: "CO2Scrubber"
+  parent_link: "ARS"
+  heat_capacity: 950.0
+  internal_power: 35.0
+  conductance: 1.0
+
+- node_name: "AirFilter"
+  parent_link: "ARS"
+  heat_capacity: 600.0
+  internal_power: 15.0
+  conductance: 0.5
+
+- node_name: "WaterPump"
+  parent_link: "WRS"
+  heat_capacity: 550.0
+  internal_power: 20.0
+  conductance: 0.6
+
+- node_name: "UrineProcessor"
+  parent_link: "WRS"
+  heat_capacity: 650.0
+  internal_power: 30.0
+  conductance: 0.7
+
+- node_name: "O2Electrolyzer"
+  parent_link: "OGS"
+  heat_capacity: 800.0
+  internal_power: 40.0
+  conductance: 1.0
+
+- node_name: "O2Tank"
+  parent_link: "OGS"
+  heat_capacity: 900.0
+  internal_power: 10.0
+  conductance: 0.6
+
+- node_name: "SolarCharger"
+  parent_link: "PowerHub"
+  heat_capacity: 1000.0
+  internal_power: 55.0
+  conductance: 1.1
+
+- node_name: "ExternalCam1"
+  parent_link: "CommArray"
+  heat_capacity: 300.0
+  internal_power: 15.0
+  conductance: 0.3
+
+- node_name: "ExternalCam2"
+  parent_link: "CommArray"
+  heat_capacity: 300.0
+  internal_power: 15.0
+  conductance: 0.3
+
+- node_name: "SolarPanel1"
+  parent_link: "base_link"
+  heat_capacity: 1200.0
+  internal_power: 10.0
+  conductance: 0.5
+
+- node_name: "SolarPanel2"
+  parent_link: "base_link"
+  heat_capacity: 1200.0
+  internal_power: 10.0
+  conductance: 0.5
+
+- node_name: "BatteryCoolingUnit"
+  parent_link: "BatteryUnit1"
+  heat_capacity: 500.0
+  internal_power: 20.0
+  conductance: 0.9
+
+- node_name: "MedicalScanner"
+  parent_link: "LabModule"
+  heat_capacity: 700.0
+  internal_power: 40.0
+  conductance: 0.7
+
+- node_name: "CrewMonitor"
+  parent_link: "MainComputer"
+  heat_capacity: 400.0
+  internal_power: 25.0
+  conductance: 0.6
+
+- node_name: "HumiditySensor"
+  parent_link: "WRS"
+  heat_capacity: 200.0
+  internal_power: 10.0
+  conductance: 0.2
+
+- node_name: "PressureSensor"
+  parent_link: "ARS"
+  heat_capacity: 200.0
+  internal_power: 10.0
+  conductance: 0.2
+
+- node_name: "DataRelay"
+  parent_link: "CommArray"
+  heat_capacity: 800.0
+  internal_power: 30.0
+  conductance: 0.8
+
+- node_name: "FireDetector"
+  parent_link: "base_link"
+  heat_capacity: 300.0
+  internal_power: 5.0
+  conductance: 0.2
+
+- node_name: "CoolingManifold"
+  parent_link: "CoolingPump"
+  heat_capacity: 850.0
+  internal_power: 30.0
+  conductance: 1.1
+
+- node_name: "RedundantComputer"
+  parent_link: "MainComputer"
+  heat_capacity: 1000.0
+  internal_power: 45.0
+  conductance: 1.0
+
+- node_name: "BackupStorage"
+  parent_link: "StorageDrive"
+  heat_capacity: 400.0
+  internal_power: 10.0
+  conductance: 0.3
