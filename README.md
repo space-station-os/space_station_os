@@ -1,6 +1,10 @@
 # **Space Station OS – Setup & Demo Guide**
 
-[![Watch the Concept video](https://raw.githubusercontent.com/space_station_os/space_station_os/main/src/space_station_os/assets/logo/SSOSlogo.jpg)](https://raw.githubusercontent.com/space_station_os/space_station_os/main/src/space_station_os/assets/videos/SpaceStationOSConceptMovie.mp4)
+
+
+https://github.com/user-attachments/assets/5b82c516-075d-44ac-b440-fb73bedc1e91
+
+
 
 [![ROS 2 Humble CI](https://github.com/space-station-os/space_station_os/actions/workflows/ros2_humble_ci.yml/badge.svg)](https://github.com/space-station-os/space_station_os/actions/workflows/ros2_humble_ci.yml)
 

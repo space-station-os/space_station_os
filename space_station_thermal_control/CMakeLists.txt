@@ -60,7 +60,11 @@ rosidl_target_interfaces(radiator ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 
 add_executable(thermal_nodes src/thermals_solver.cpp)
+
 ament_target_dependencies(thermal_nodes rosidl_default_generators rclcpp ament_index_cpp sensor_msgs space_station_eclss diagnostic_msgs yaml-cpp )
+
+ament_target_dependencies(thermal_nodes rosidl_default_generators rclcpp sensor_msgs space_station_eclss diagnostic_msgs yaml-cpp )
+
 rosidl_target_interfaces(thermal_nodes ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(thermal_nodes
   yaml-cpp
@@ -102,7 +106,10 @@ install(DIRECTORY config/
    DESTINATION share/${PROJECT_NAME}/config
  )
 
-
+install(PROGRAMS
+ scripts/thermal_visualization.py
+ DESTINATION lib/${PROJECT_NAME}
+)
 
 
 
