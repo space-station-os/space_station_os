@@ -18,11 +18,20 @@ from space_station.comms import CommsWidget
 from space_station.system_status import SystemStatusWidget
 from space_station.left_panel import LeftPanel
 
+# NEW: importlib.resources for robust, package-relative paths
+try:
+    # Py3.9+ recommended API
+    from importlib.resources import files, as_file
+    _USE_NEW_RESOURCES_API = True
+except ImportError:
+    # Fallback for older Python (still fine if you’re on 3.8)
+    import importlib.resources as pkg_resources
+    _USE_NEW_RESOURCES_API = False
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self,node):
         super().__init__()
-
+        self.node = node
         self.setWindowTitle("Space Station Operations Dashboard")
         self.resize(1200, 800)
 
@@ -51,11 +60,11 @@ class MainWindow(QMainWindow):
 
         # Tab bar
         self.tabs = QTabWidget()
-        self.tabs.addTab(EclssWidget(), "ECLSS")
-        self.tabs.addTab(ThermalWidget(), "THERMAL")
+        self.tabs.addTab(EclssWidget(self.node), "ECLSS")
+        self.tabs.addTab(ThermalWidget(self.node), "THERMAL")
         self.tabs.addTab(GncWidget(), "GNC")
         self.tabs.addTab(CommsWidget(), "COMMS")
-        self.tabs.addTab(SystemStatusWidget(), "SYSTEM STATUS")
+        self.tabs.addTab(SystemStatusWidget(self.node), "SYSTEM STATUS")
 
         # Horizontal split: Left panel + Tab content
         split_layout = QHBoxLayout()
@@ -69,7 +78,7 @@ class MainWindow(QMainWindow):
         footer = QHBoxLayout()
         self.crew_label = QLabel("👨‍🚀 Crew: 4")
         self.day_label = QLabel("📅 Mission Day: 125")
-        self.shutdown_button = QPushButton("⏻ Shutdown GUI")
+        self.shutdown_button = QPushButton("Shutdown GUI")
         self.diagnose_button = QPushButton("🛠 Run Diagnose")
 
         self.shutdown_button.clicked.connect(self.play_shutdown_video)
@@ -97,18 +106,22 @@ class MainWindow(QMainWindow):
         self.dark_mode = not self.dark_mode
 
     def play_shutdown_video(self):
-      
-        shutdown_path = os.path.join(os.path.dirname(__file__), 'assets', 'exit_vid.mp4')
-
-        def exit_app():
+        """
+        Load exit_vid.mp4 from the package data.
+        """
+        def after_video():
             QApplication.quit()
 
-        if os.path.exists(shutdown_path):
-            self.hide()  # Hide current window while video plays
-            video = VideoPlayer(shutdown_path, on_finished_callback=exit_app)
-            video.play()  # Blocking call; will quit after video ends
+        if _USE_NEW_RESOURCES_API:
+            video_resource = files("space_station.assets") / "exit_vid.mp4"
+            # as_file() yields a real filesystem path even if packaged in a zip
+            with as_file(video_resource) as path:
+                player = VideoPlayer(str(path), on_finished_callback=after_video)
+                player.play()  # Blocking until finished
         else:
-            print("Shutdown video not found. Exiting directly.")
-            exit_app()
+            # Legacy API
+            with pkg_resources.path("space_station.assets", "exit_vid.mp4") as path:
+                player = VideoPlayer(str(path), on_finished_callback=after_video)
+                player.play()  # Blocking until finished
 
 
