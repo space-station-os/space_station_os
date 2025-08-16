@@ -124,4 +124,3 @@ class MainWindow(QMainWindow):
                 player = VideoPlayer(str(path), on_finished_callback=after_video)
                 player.play()  # Blocking until finished
 
-

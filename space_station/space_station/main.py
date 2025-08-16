@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import sys
 import threading
 import rclpy
@@ -9,13 +8,11 @@ from PyQt5.QtWidgets import QApplication
 from space_station.main_window import MainWindow
 from space_station.video_player import VideoPlayer
 
-# NEW: importlib.resources for robust, package-relative paths
+# importlib.resources setup
 try:
-    # Py3.9+ recommended API
     from importlib.resources import files, as_file
     _USE_NEW_RESOURCES_API = True
 except ImportError:
-    # Fallback for older Python (still fine if you’re on 3.8)
     import importlib.resources as pkg_resources
     _USE_NEW_RESOURCES_API = False
 
@@ -26,52 +23,58 @@ class GuiNode(Node):
 
 
 def play_video_splash():
-    """
-    Load Ssos_begin.mp4 from the package data:
-    package: space_station.assets
-    file:    Ssos_begin.mp4
-    """
+    """Play Ssos_begin.mp4 using the Qt-based VideoPlayer (requires QApplication)."""
     def after_video():
         print("Splash video completed. Launching GUI...")
 
     if _USE_NEW_RESOURCES_API:
         video_resource = files("space_station.assets") / "Ssos_begin.mp4"
-        # as_file() yields a real filesystem path even if packaged in a zip
         with as_file(video_resource) as path:
             player = VideoPlayer(str(path), on_finished_callback=after_video)
-            player.play()  # Blocking until finished
+            player.play()  # blocking until finished
     else:
-        # Legacy API
         with pkg_resources.path("space_station.assets", "Ssos_begin.mp4") as path:
             player = VideoPlayer(str(path), on_finished_callback=after_video)
-            player.play()  # Blocking until finished
+            player.play()  # blocking until finished
 
 
-def ros_spin(node):
-    rclpy.spin(node)  # keeps subscriptions alive in background
+def ros_spin(node: Node):
+    rclpy.spin(node)
 
 
 def main():
-    # Step 1: Play splash screen
+    # 1) Start Qt first because VideoPlayer is Qt-based
+    app = QApplication(sys.argv)
+
+    # 2) Play splash (blocking)
     play_video_splash()
 
-    # Step 2: Init ROS and GUI
+    # 3) Init ROS and start a shared Node
     rclpy.init(args=None)
     node = GuiNode()
 
+    # 4) Start ROS spinning in a background thread
     ros_thread = threading.Thread(target=ros_spin, args=(node,), daemon=True)
     ros_thread.start()
 
-    # Step 3: Launch Qt GUI
-    app = QApplication(sys.argv)
+    # 5) Create and show the main window (pass the shared node)
     window = MainWindow(node)
     window.show()
 
+    # 6) Run Qt event loop
+    exit_code = 0
     try:
-        sys.exit(app.exec_())
+        exit_code = app.exec_()
     finally:
-        node.destroy_node()
+        # 7) Clean shutdown of ROS and join the spin thread
+        try:
+            node.destroy_node()
+        except Exception:
+            pass
         rclpy.shutdown()
+        ros_thread.join(timeout=1.0)
+
+    sys.exit(exit_code)
 
 
 if __name__ == "__main__":
