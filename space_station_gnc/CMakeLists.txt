@@ -110,6 +110,7 @@ install(TARGETS
   torque_collector
   physics_motion
   physics_sensor
+  orbit_dynamics
   sense_estimate
   control_torque
   thruster_matrix
