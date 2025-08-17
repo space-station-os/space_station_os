@@ -10,11 +10,17 @@ from space_station_eclss.action import AirRevitalisation, WaterRecovery
 from space_station_eclss.srv import O2Request, RequestProductWater
 import random
 
+from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
 # Constants
 MAX_O2_STORAGE = 60000.0  # grams
 MAX_WATER_STORAGE = 2000.0  # liters
 MAX_CO2_STORAGE = 7000.0  # mmHg
-
+STATE_QOS = QoSProfile(
+    history=HistoryPolicy.KEEP_LAST,
+    depth=1,
+    reliability=ReliabilityPolicy.BEST_EFFORT,   
+    durability=DurabilityPolicy.TRANSIENT_LOCAL 
+)
 class EclssWidget(QWidget):
     def __init__(self, node: Node, parent=None):
         super().__init__(parent)

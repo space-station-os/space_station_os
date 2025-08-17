@@ -13,6 +13,15 @@ from space_station_thermal_control.msg import (
     ThermalNodeDataArray, ThermalLinkFlowsArray, TankStatus, InternalLoopStatus
 )
 
+from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
+
+
+STATE_QOS = QoSProfile(
+    history=HistoryPolicy.KEEP_LAST,
+    depth=1,
+    reliability=ReliabilityPolicy.BEST_EFFORT,   
+    durability=DurabilityPolicy.TRANSIENT_LOCAL  
+)
 # ---------- Zoomable view ----------
 class ZoomableGraphicsView(QGraphicsView):
     MIN_SCALE = 0.2

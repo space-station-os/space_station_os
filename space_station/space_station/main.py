@@ -43,30 +43,24 @@ def ros_spin(node: Node):
 
 
 def main():
-    # 1) Start Qt first because VideoPlayer is Qt-based
+ 
     app = QApplication(sys.argv)
 
-    # 2) Play splash (blocking)
+   
     play_video_splash()
-
-    # 3) Init ROS and start a shared Node
     rclpy.init(args=None)
     node = GuiNode()
-
-    # 4) Start ROS spinning in a background thread
     ros_thread = threading.Thread(target=ros_spin, args=(node,), daemon=True)
     ros_thread.start()
 
-    # 5) Create and show the main window (pass the shared node)
+
     window = MainWindow(node)
     window.show()
 
-    # 6) Run Qt event loop
     exit_code = 0
     try:
         exit_code = app.exec_()
     finally:
-        # 7) Clean shutdown of ROS and join the spin thread
         try:
             node.destroy_node()
         except Exception:

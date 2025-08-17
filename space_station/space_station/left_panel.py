@@ -1,82 +1,101 @@
-# space_station/left_panel.py
-
 from PyQt5.QtWidgets import (
-    QWidget, QLabel, QVBoxLayout, QFrame
+    QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QTextEdit, QLabel
 )
 from PyQt5.QtGui import QFont
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal
 
 
 class LeftPanel(QWidget):
+    """
+    Minimal panel: ONLY the AI Assist UI.
+    - Transcript (read-only)
+    - Input box + Ask button
+    Colored, labeled lines:
+      Astronaut:  <cyan>
+      SSOS-AI:    <lime>
+    """
+
+    ask_ai = pyqtSignal(str)  # Emitted when the astronaut submits a question
+
     def __init__(self, parent=None):
         super().__init__(parent)
 
         layout = QVBoxLayout()
-        layout.setSpacing(15)
+        layout.setSpacing(10)
+        layout.setContentsMargins(10, 10, 10, 10)
 
-        # Header
-        header = QLabel("System Overview")
+        header = QLabel("AI Assist")
         header.setFont(QFont("Arial", 12, QFont.Bold))
         header.setStyleSheet("color: white;")
         layout.addWidget(header)
 
-        # Placeholder data
-        self.co2_label = QLabel("CO₂ Level: 3.8 mmHg")
-        self.o2_label = QLabel("O₂ Reserve: 85%")
-        self.temp_label = QLabel("Cabin Temp: 22.1°C")
+        # Transcript (renders basic HTML)
+        self.ai_output = QTextEdit()
+        self.ai_output.setReadOnly(True)
+        self.ai_output.setStyleSheet(
+            "background:#0b0b0b; color:#ddd; border:1px solid #333; font-size:12px;"
+        )
+        self.ai_output.setFixedHeight(220)
+        self.ai_output.setPlaceholderText("Ask a question below…")
+        layout.addWidget(self.ai_output)
 
-        for label in [self.co2_label, self.o2_label, self.temp_label]:
-            label.setStyleSheet("color: lightgray;")
-            layout.addWidget(label)
-
-        layout.addWidget(self.separator())
-
-        # Failures
-        failure_header = QLabel("Failure Status")
-        failure_header.setFont(QFont("Arial", 12, QFont.Bold))
-        failure_header.setStyleSheet("color: white;")
-        layout.addWidget(failure_header)
-
-        self.failure_label = QLabel("All systems nominal")
-        self.failure_label.setStyleSheet("color: lightgreen;")
-        layout.addWidget(self.failure_label)
-
-        layout.addWidget(self.separator())
-
-        # Active Goals
-        goals_header = QLabel("Active Goals")
-        goals_header.setFont(QFont("Arial", 12, QFont.Bold))
-        goals_header.setStyleSheet("color: white;")
-        layout.addWidget(goals_header)
-
-        self.goals_label = QLabel("None currently")
-        self.goals_label.setStyleSheet("color: lightgray;")
-        layout.addWidget(self.goals_label)
+        # Input row
+        row = QHBoxLayout()
+        self.ai_input = QLineEdit()
+        self.ai_input.setPlaceholderText("e.g., How much oxygen do I have?")
+        self.ai_input.returnPressed.connect(self._emit_question)
+        ask_btn = QPushButton("Ask")
+        ask_btn.clicked.connect(self._emit_question)
+        row.addWidget(self.ai_input)
+        row.addWidget(ask_btn)
+        layout.addLayout(row)
 
         layout.addStretch()
         self.setLayout(layout)
 
-    def separator(self):
-        line = QFrame()
-        line.setFrameShape(QFrame.HLine)
-        line.setFrameShadow(QFrame.Sunken)
-        line.setStyleSheet("color: gray;")
-        return line
+    # ---- Public slots ----
+    def append_ai_response(self, text: str):
+        """
+        Called by the AI agent signal. We wrap it with label + color.
+        """
+        safe = self._escape(text)
+        html = (
+            "<div style='margin:6px 0;'>"
+            "<span style='color:#9BEF00; font-weight:700;'>SSOS-AI:</span> "
+            f"<span style='color:#d7ffd7;'>{safe}</span>"
+            "</div>"
+        )
+        self.ai_output.append(html)
 
-    # Future methods to update labels from ROS 2 callbacks
-    def update_co2(self, value):
-        self.co2_label.setText(f"CO₂ Level: {value:.2f} mmHg")
+    # ---- Helpers ----
+    def _emit_question(self):
+        q = self.ai_input.text().strip()
+        if not q:
+            return
+        # Show astronaut line in cyan and emit to agent
+        safe = self._escape(q)
+        html = (
+            "<div style='margin:6px 0;'>"
+            "<span style='color:#00E5FF; font-weight:700;'>Astronaut:</span> "
+            f"<span style='color:#d0f6ff;'>{safe}</span>"
+            "</div>"
+        )
+        self.ai_output.append(html)
+        self.ask_ai.emit(q)
+        self.ai_input.clear()
 
-    def update_o2(self, percent):
-        self.o2_label.setText(f"O₂ Reserve: {percent:.1f}%")
+    def _escape(self, s: str) -> str:
+        # minimal HTML escape
+        return (
+            s.replace("&", "&amp;")
+             .replace("<", "&lt;")
+             .replace(">", "&gt;")
+             .replace("\n", "<br>")
+        )
 
-    def update_temp(self, temp):
-        self.temp_label.setText(f"Cabin Temp: {temp:.1f}°C")
-
-    def update_failure(self, msg, is_critical=False):
-        color = "red" if is_critical else "yellow"
-        self.failure_label.setText(msg)
-        self.failure_label.setStyleSheet(f"color: {color};")
-
-    def update_goal_summary(self, summary):
-        self.goals_label.setText(summary)
+    # -------- No-ops preserved for compatibility --------
+    def update_co2(self, value): pass
+    def update_o2(self, percent): pass
+    def update_temp(self, temp): pass
+    def update_failure(self, msg, is_critical=False): pass
+    def update_goal_summary(self, summary): pass
