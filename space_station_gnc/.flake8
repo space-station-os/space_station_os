@@ -1,0 +1,11 @@
+[flake8]
+max-line-length = 120
+extend-ignore = E203,W503
+exclude = build,install,log,.git,**/__pycache__,**/*.pyc
+per-file-ignores =
+    scripts/jacob_cmgs_casadi.py: F401,F403,F405,E501,E231,E302,W391,W292,W293
+    launch/gnc_core.launch.py:   F401,E501,E302,W391,W293
+    launch/gnc_rviz.launch.py:   F841,E501,E302,W291
+    launch/gnc_rviz_thruster.launch.py: E501,E302,W291
+    setup.py: W391
+
