@@ -29,7 +29,7 @@ OrbitDynamicsNode::OrbitDynamicsNode(const rclcpp::NodeOptions &options)
     this->declare_parameter<std::string>("frames.eci_frame_id", "ECI");
     this->declare_parameter<int>("viz.path_max_points", 2000);
 
-    // Initialization
+    // urdf_filepath
     this->declare_parameter<std::string>("initial.tle_line2", "");
     this->declare_parameter<bool>("initial.compute_acc_on_start", true);
 
@@ -141,6 +141,8 @@ void OrbitDynamicsNode::on_quaternion(const geometry_msgs::msg::Quaternion::Shar
 }
 
 void OrbitDynamicsNode::on_forward_time(const std_msgs::msg::Float64::SharedPtr msg) {
+    RCLCPP_INFO(this->get_logger(), "Subscribed: gnc/t_fwd_sim");
+    
     double t_forward = msg->data;
     if (t_forward <= 0.0) return;
     if (dynamics_dt_ <= 0.0) {
@@ -161,7 +163,8 @@ void OrbitDynamicsNode::on_forward_time(const std_msgs::msg::Float64::SharedPtr 
 // ----- Dynamics core -----
 void OrbitDynamicsNode::step_dynamics_once() {
     const double dt = dynamics_dt_;
-    const Eigen::Vector3d F_eci = current_thruster_force_eci();
+    // const Eigen::Vector3d F_eci = current_thruster_force_eci();
+    const Eigen::Vector3d F_eci = Eigen::Vector3d::Zero();
 
     if (use_rk4_) {
         // State: [r, v]; r' = v; v' = a(r, F)
@@ -200,6 +203,7 @@ void OrbitDynamicsNode::step_dynamics_once() {
         a_eci_  = calc_acc(r_eci_, F_eci);
     }
 
+    this->sim_t += dt;
     append_to_path();
 }
 
