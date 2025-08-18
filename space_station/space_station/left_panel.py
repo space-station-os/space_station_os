@@ -35,7 +35,7 @@ class LeftPanel(QWidget):
         self.ai_output.setStyleSheet(
             "background:#0b0b0b; color:#ddd; border:1px solid #333; font-size:12px;"
         )
-        self.ai_output.setFixedHeight(220)
+        self.ai_output.setFixedHeight(320)
         self.ai_output.setPlaceholderText("Ask a question below…")
         layout.addWidget(self.ai_output)
 

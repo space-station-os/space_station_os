@@ -20,7 +20,7 @@ _THERMAL_MSGS_OK = True
 try:
  
     from space_station_thermal_control.msg import ThermalNodeDataArray, ThermalLinkFlowsArray
-    from space_station_thermal_control.msg import ExternalLoopStatus,InternalLoopStatus
+    from space_station_thermal_control.msg import ExternalLoopStatus,InternalLoopStatus,TankStatus
 except Exception:
     _THERMAL_MSGS_OK = False
     ThermalNodeDataArray = None
@@ -96,7 +96,14 @@ class SsosAIAgent(QObject):
                     "total_abs_heat_flow": None,
                     "top": []               # top 3 by |heat_flow|: [{a,b,flow,cond}]
                 },
-                "diag": {"level": 0, "name": "", "message": ""}  # /thermals/diagnostics
+                "diag": {"level": 0, "name": "", "message": ""},
+                "ammonia": {
+                    "tank_capacity_l": None,
+                    "tank_temperature_c": None,
+                    "tank_pressure_pa": None,
+                    "tank_heater_on": None
+                },
+
             }
         }
 
@@ -176,7 +183,16 @@ class SsosAIAgent(QObject):
             )
         except Exception:
             self.sub_solar_cmd = None
-        # Ammonia status unknown type -> skipping to avoid hard dep
+        try:
+            self.sub_ammonia = self.node.create_subscription(
+                TankStatus,
+                "/tcs/ammonia_status",
+                self._on_ammonia_status,
+                qos
+            )
+        except Exception:
+            self.sub_ammonia = None
+
 
     # ----- ECLSS callbacks -----
     def _on_co2(self, msg: Float64):
@@ -204,13 +220,16 @@ class SsosAIAgent(QObject):
         with self._lock:
             self._cache["thermal"]["internal_loop_c"] = float(msg.temperature)
 
+    def _on_ammonia_status(self, msg: TankStatus):
+        with self._lock:
+            self._cache["thermal"]["ammonia"] = {
+                "tank_capacity_l": float(msg.tank_capacity),
+                "tank_temperature_c": float(msg.tank_temperature.temperature),
+                "tank_pressure_pa": float(msg.tank_pressure.fluid_pressure),
+                "tank_heater_on": bool(msg.tank_heater_on),
+            }
     def _on_external_loop_status(self, msg: Any):
-        # ExternalLoopStatus fields from your spec:
-        # float64 received_heat_kj
-        # float64 loop_inlet_temp
-        # float64 loop_outlet_temp
-        # float64 ammonia_inlet_temp
-        # float64 ammonia_outlet_temp
+       
         with self._lock:
             self._cache["thermal"]["external_loop"] = {
                 "received_heat_kj": float(getattr(msg, "received_heat_kj", 0.0)),
@@ -279,11 +298,17 @@ class SsosAIAgent(QObject):
             self._cache["thermal"]["links"] = summary
 
     def _on_thermal_diag(self, msg: DiagnosticStatus):
+        diag = {
+            "level": int(msg.level),
+            "name": msg.name,
+            "message": msg.message
+        }
         with self._lock:
-            self._cache["thermal"]["diag"] = {
-                "level": int(msg.level), "name": msg.name, "message": msg.message
-            }
-
+            current = self._cache["thermal"].get("extra_diagnostics", [])
+            updated = [d for d in current if d["name"] != msg.name] + [diag]
+            self._cache["thermal"]["extra_diagnostics"] = updated
+            self._cache["thermal"]["diag"] = diag  
+    
     def _intent_and_subset(self, question: str) -> Tuple[str, dict]:
         """
         Very lightweight intent router: decide which parts of the snapshot to expose
@@ -301,7 +326,11 @@ class SsosAIAgent(QObject):
         want_list    = any(k in q for k in ["list", "all", "show all"])
         want_links   = any(k in q for k in ["heat flow", "links", "conductance"])
         want_internal= any(k in q for k in ["internal loop", "internal heat"])
-        want_external= any(k in q for k in ["external loop", "ammonia", "radiator", "received heat", "inlet", "outlet", "vent"])
+        want_external = any(k in q for k in [
+            "external loop", "ammonia", "radiator", "received heat", "inlet",
+            "outlet", "vent", "tank", "heater", "pressure"
+        ])
+
 
         # Default: if the question is generic like "system status", prefer ECLSS summary + diag
         generic_status = ("status" in q or "overall" in q or "system" in q) and not any(
@@ -341,9 +370,13 @@ class SsosAIAgent(QObject):
         if any([want_nodes, want_links, want_internal, want_external]):
             filtered["thermal"] = {}
             if want_internal: filtered["thermal"]["internal_loop_c"] = th.get("internal_loop_c", 0.0)
-            if want_external: filtered["thermal"]["external_loop"] = th.get("external_loop", {})
+            if want_external:
+                filtered["thermal"]["external_loop"] = th.get("external_loop", {})
+                filtered["thermal"]["ammonia"] = th.get("ammonia", {})
+                filtered["thermal"]["extra_diagnostics"] = th.get("extra_diagnostics", [])
             if want_nodes:    filtered["thermal"]["nodes"] = th.get("nodes", {})
             if want_links:    filtered["thermal"]["links"] = th.get("links", {})
+
 
         return ("direct", filtered)
     # ----- Public API called by LeftPanel -----
@@ -427,7 +460,12 @@ class SsosAIAgent(QObject):
         if links.get("total_abs_heat_flow") is None: links["total_abs_heat_flow"] = 0.0
         if links.get("top") is None: links["top"] = []
 
-        # Diagnostics defaults already present
+        am = th.get("ammonia", {})
+        for key in ["tank_capacity_l", "tank_temperature_c", "tank_pressure_pa"]:
+            if am.get(key) is None:
+                am[key] = 0.0
+        am["tank_heater_on"] = bool(am.get("tank_heater_on", False))
+       
         return snap
 
     def _fallback_summary(self, s: Dict[str, Any]) -> str:
@@ -454,4 +492,13 @@ class SsosAIAgent(QObject):
             parts.append(f"SysDiag {s['diag'].get('name','')}={s['diag'].get('message','')}")
         if th.get("diag", {}).get("level", 0) > 0:
             parts.append(f"ThermDiag {th['diag'].get('name','')}={th['diag'].get('message','')}")
+            
+            
+        am = th.get("ammonia", {})
+        if am:
+            parts.append(f"Ammonia {am.get('tank_temperature_c', 0.0):.1f}°C")
+            if am.get("tank_heater_on"):
+                parts.append("Heater ON")
+                
+                
         return " | ".join(parts)

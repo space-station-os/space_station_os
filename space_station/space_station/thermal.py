@@ -14,6 +14,9 @@ from space_station_thermal_control.msg import (
 )
 
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+import matplotlib.pyplot as plt
+from collections import deque
 
 
 STATE_QOS = QoSProfile(
@@ -167,7 +170,7 @@ class ThermalWidget(QWidget):
         self.node_items = {}  # name -> ThermalNodeItem
         self.link_items = {}  # "a__b" -> ThermalLinkItem
         self.layout_computed = False
-
+        
         # QTimer in GUI thread
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._update_display)
@@ -195,12 +198,29 @@ class ThermalWidget(QWidget):
 
     def _tank_cb(self, msg: TankStatus):
         with self._lock:
+            self.node.get_logger().info(f"Ammonia tank: {msg.tank_temperature.temperature}K, {msg.tank_pressure.fluid_pressure}Pa")
             self.tank_status = {
                 'capacity': msg.tank_capacity,
                 'temperature': msg.tank_temperature.temperature,
                 'pressure': msg.tank_pressure.fluid_pressure,
                 'heater_on': msg.tank_heater_on
             }
+    def _create_temp_plot(self):
+        self.temp_history = deque(maxlen=100)
+        self.temp_time = deque(maxlen=100)
+
+        fig, self.temp_ax = plt.subplots(figsize=(3.5, 2.5), dpi=100)
+        self.temp_line, = self.temp_ax.plot([], [], 'r-')
+
+        self.temp_ax.set_title("Avg Thermal Node Temp (K)")
+        self.temp_ax.set_xlabel("Time (s)")
+        self.temp_ax.set_ylabel("Temperature (K)")
+        self.temp_ax.set_ylim(270, 340)
+        self.temp_ax.grid(True)
+
+        canvas = FigureCanvas(fig)
+        return canvas
+
 
     def _loop_cb(self, msg: InternalLoopStatus):
         with self._lock:
@@ -264,8 +284,8 @@ class ThermalWidget(QWidget):
         self.ammonia_heater_label = QLabel("--")
         self.loop_a_temp_label = QLabel("--")
         self.loop_b_temp_label = QLabel("--")
-        tanks_layout.addRow("Ammonia Temp:", self.ammonia_temp_label)
-        tanks_layout.addRow("Ammonia Pressure:", self.ammonia_pressure_label)
+        tanks_layout.addRow("Ammonia Temp (°C):", self.ammonia_temp_label)
+        tanks_layout.addRow("Ammonia Pressure (Pa):", self.ammonia_pressure_label)  
         tanks_layout.addRow("Heater Status:", self.ammonia_heater_label)
         tanks_layout.addRow("Loop A Temp:", self.loop_a_temp_label)
         tanks_layout.addRow("Loop B Temp:", self.loop_b_temp_label)
@@ -289,16 +309,13 @@ class ThermalWidget(QWidget):
             l.hide(); v.hide(); details_layout.addRow(l, v)
         info_layout.addWidget(details_group)
 
-        legend_group = QGroupBox("Legend")
-        legend_layout = QVBoxLayout(legend_group)
-        legend_label = QLabel(
-            "<b>Node Colors:</b><br>• Blue = Cold (275K)<br>• Red = Hot (325K)<br><br>"
-            "<b>Node Size:</b><br>• Larger = Higher heat capacity<br><br>"
-            "<b>Arrow Width:</b><br>• Thicker = Higher heat flow<br><br>"
-        )
-        legend_label.setStyleSheet("background-color: #f0f0f0; padding: 10px;")
-        legend_layout.addWidget(legend_label)
-        info_layout.addWidget(legend_group)
+        plot_group = QGroupBox("Avg Node Temp (Live)")
+        plot_layout = QVBoxLayout()
+        self.temp_plot = self._create_temp_plot()
+        plot_layout.addWidget(self.temp_plot)
+        plot_group.setLayout(plot_layout)
+        info_layout.addWidget(plot_group)
+
 
         splitter.addWidget(info_frame)
 
@@ -337,6 +354,17 @@ class ThermalWidget(QWidget):
                 l.update_line()
 
         self._update_tank_info(tank, loop)
+        
+        if node_ok and nodes:
+            temps = [n["temperature"] for n in nodes.values()]
+            avg_temp = sum(temps) / len(temps)
+            self.temp_history.append(avg_temp)
+            self.temp_time.append(len(self.temp_time))
+
+            self.temp_line.set_data(self.temp_time, self.temp_history)
+            self.temp_ax.set_xlim(0, max(10, len(self.temp_time)))
+            self.temp_ax.figure.canvas.draw()
+
 
     def _update_graph(self, nodes, links):
         declared = set(nodes.keys())
@@ -481,7 +509,9 @@ class ThermalWidget(QWidget):
 
     def _update_tank_info(self, tank, loop):
         if tank:
-            self.ammonia_temp_label.setText(f"{tank['temperature']:.1f}°C")
+            # Convert from Kelvin to Celsius
+            temp_c = tank['temperature'] - 273.15
+            self.ammonia_temp_label.setText(f"{temp_c:.1f}°C")
             self.ammonia_pressure_label.setText(f"{tank['pressure']:.0f} Pa")
             self.ammonia_heater_label.setText("ON" if tank['heater_on'] else "OFF")
         if loop:
