@@ -50,7 +50,7 @@ add_executable(physics_sensor src/physics_sensor.cpp)
 add_executable(orbit_dynamics src/orbit_dynamics.cpp)
 add_executable(sense_estimate src/sense_estimate.cpp)
 add_executable(control_torque src/control_torque.cpp)
-add_executable(orbit_dynamics_mock tests/orbit_dynamics/orbit_dynamics_mock.cpp)
+add_executable(orbit_dynamics_mock src/orbit_dynamics_mock.cpp)
 add_library(thruster_matrix STATIC src/thruster_matrix.cpp)
 ament_target_dependencies(space_station_gnc_node rclcpp std_msgs)
 ament_target_dependencies(demo1a_nauka_incident_estimate rclcpp std_msgs tf2_geometry_msgs tf2 tf2_ros OpenCV)
@@ -145,6 +145,10 @@ install(DIRECTORY config
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(PROGRAMS
+  scripts/draw_3d_position.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
