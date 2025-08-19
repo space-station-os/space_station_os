@@ -24,7 +24,7 @@ class LeftPanel(QWidget):
         layout.setSpacing(10)
         layout.setContentsMargins(10, 10, 10, 10)
 
-        header = QLabel("AI Assist")
+        header = QLabel("SSOS-NOVA")
         header.setFont(QFont("Arial", 12, QFont.Bold))
         header.setStyleSheet("color: white;")
         layout.addWidget(header)

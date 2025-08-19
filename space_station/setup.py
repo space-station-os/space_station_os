@@ -24,7 +24,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'space_station = space_station.main:main',
+            'space_station = space_station.main_window:main',
         ],
     },
 )

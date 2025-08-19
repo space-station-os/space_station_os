@@ -29,9 +29,9 @@ except Exception:
     InternalLoopStatus = None
 
 
-load_dotenv()
 
 
+load_dotenv(override=True)
 class SsosAIAgent(QObject):
     """
     Reads ROS 2 telemetry via shared GUI node (ECLSS + Thermal),
@@ -51,11 +51,11 @@ class SsosAIAgent(QObject):
     ):
         super().__init__(parent)
         self.node = ros_node
-
+        
         # Resolve config (env overrides are supported)
         self.base_url = base_url or os.environ.get("SSOS_LLM_BASE_URL", "https://integrate.api.nvidia.com/v1")
         self.model    = model    or os.environ.get("SSOS_LLM_MODEL", "openai/gpt-oss-20b")
-        self.api_key  = api_key  or os.environ.get("NVIDIA_API_KEY")
+        self.api_key  = api_key  or os.getenv("NVIDIA_API_KEY")
         self.request_timeout_s = request_timeout_s
 
         if not self.api_key:
