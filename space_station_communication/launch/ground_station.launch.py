@@ -8,8 +8,6 @@ def generate_launch_description():
 
         get_package_share_directory('space_station_communication'),
 
-        get_package_share_directory('demo_ros_ccsds_bridge'),
-
         'config',
         'bridge.yaml'
     )
@@ -18,9 +16,6 @@ def generate_launch_description():
         Node(
 
             package='space_station_communication',
-
-            package='demo_ros_ccsds_bridge',
-
             executable='ground_receiver',
             name='ros2_ccsds_bridge',
             output='screen',
