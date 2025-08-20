@@ -22,6 +22,7 @@ def generate_launch_description():
                 os.path.join(space_station_pkg, 'launch', 'thermals.launch.py')
             ),
         ),
+        
 
         Node(
             package='space_station',

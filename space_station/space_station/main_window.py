@@ -133,7 +133,7 @@ class MainWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.tabs.addTab(EclssWidget(self.node), "ECLSS")
         self.tabs.addTab(ThermalWidget(self.node), "THERMAL")
-        self.tabs.addTab(GncWidget(), "GNC")
+        self.tabs.addTab(GncWidget(self.node), "GNC")
         self.tabs.addTab(CommsWidget(), "COMMS")
         self.tabs.addTab(SystemStatusWidget(self.node), "SYSTEM STATUS")
 
