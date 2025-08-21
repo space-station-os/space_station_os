@@ -1,0 +1,11 @@
+<root main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <Fallback name="root">
+      <Sequence name="nominal">
+        <FailsafeCondition failsafe="{failsafe}"/>
+        <ExampleAction name="DoWork"/>
+      </Sequence>
+      <UnloadCMG name="Unload"/>
+    </Fallback>
+  </BehaviorTree>
+</root>
