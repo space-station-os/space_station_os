@@ -8,10 +8,11 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QPixmap
-
+from PyQt5.QtWebSockets import QWebSocket
+from PyQt5.QtWidgets import QFormLayout
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
-
+from rclpy.node import Node
 from space_station.video_player import VideoPlayer
 from space_station.theme import load_dark_theme, load_light_theme
 
@@ -51,8 +52,7 @@ class MainWindow(QMainWindow):
         self._ros_ctx = rclpy.context.Context()
         rclpy.init(args=None, context=self._ros_ctx)
 
-        # Create node and executor with the same context
-        from rclpy.node import Node
+   
         self.node: Node = rclpy.create_node('space_station_gui_node', context=self._ros_ctx)
         self.executor = SingleThreadedExecutor(context=self._ros_ctx)
         self.executor.add_node(self.node)
@@ -134,7 +134,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(EclssWidget(self.node), "ECLSS")
         self.tabs.addTab(ThermalWidget(self.node), "THERMAL")
         self.tabs.addTab(GncWidget(self.node), "GNC")
-        self.tabs.addTab(CommsWidget(), "COMMS")
+        self.tabs.addTab(CommsWidget(self.node), "COMMS")
         self.tabs.addTab(SystemStatusWidget(self.node), "SYSTEM STATUS")
 
         # Split with LeftPanel

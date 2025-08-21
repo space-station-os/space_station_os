@@ -1,5 +1,3 @@
-
-
 - ros_topic_name: "/co2_storage"
   ros_type_name: "std_msgs/msg/Float64"
   packet_apid: 42
@@ -15,17 +13,42 @@
   packet_apid: 44
   communication_type: "TM"
 
-- ros_service_name: "/ogs/request_o2"
-  ros_type_name: "space_station_eclss/srv/RequestO2"
-  packet_apid: 78
-  communication_type: "TC"
-
-- ros_service_name: "/wrs/product_water_request"
-  ros_type_name: "space_station_eclss/srv/RequestProductWater"
-  packet_apid: 79
-  communication_type: "TC"
-
 - ros_topic_name: "/gnc/pose_all"
   ros_type_name: "geometry_msgs/msg/PoseStamped"
   packet_apid: 45
+  communication_type: "TM"
+
+- ros_topic_name: "/tcs/external_loop_a/status"
+  ros_type_name: "space_station_thermal_control/msg/ExternalLoopStatus"
+  packet_apid: 46
+  communication_type: "TM"
+
+- ros_topic_name: "/tcs/internal_loop_heat"
+  ros_type_name: "sensor_msgs/msg/Temperature"
+  packet_apid: 47
+  communication_type: "TM"
+
+- ros_topic_name: "/thermal/nodes/state"
+  ros_type_name: "space_station_thermal_control/msg/ThermalNodeDataArray"
+  packet_apid: 48
+  communication_type: "TM"
+
+- ros_topic_name: "/thermal/links/flux"
+  ros_type_name: "space_station_thermal_control/msg/ThermalLinkFlowsArray"
+  packet_apid: 49
+  communication_type: "TM"
+
+- ros_topic_name: "/thermals/diagnostics"
+  ros_type_name: "diagnostic_msgs/msg/DiagnosticStatus"
+  packet_apid: 50
+  communication_type: "TM"
+
+- ros_topic_name: "/comms/uplink"
+  ros_type_name: "std_msgs/msg/Bool"
+  packet_apid: 51
+  communication_type: "TM"
+
+- ros_topic_name: "/comms/downlink"
+  ros_type_name: "std_msgs/msg/Bool"
+  packet_apid: 52
   communication_type: "TM"

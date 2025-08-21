@@ -29,7 +29,7 @@ class VideoPlayer:
             ret, frame = cap.read()
             if not ret:
                 break
-            frame = cv2.resize(frame, (1200, 800))
+            frame = cv2.resize(frame, (640, 480))
             cv2.imshow(window_name, frame)
 
             if cv2.waitKey(30) & 0xFF == 27: 

@@ -1,8 +1,7 @@
-# ground_receiver_node.py
-
 import rclpy
 from rclpy.node import Node
 from rclpy.serialization import deserialize_message
+from std_msgs.msg import Bool
 from importlib import import_module
 from spacepackets.ccsds import SpacePacketHeader
 import yaml
@@ -11,7 +10,13 @@ import websockets
 import json
 import base64
 import threading
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
+qos=QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=20,
+            reliability=ReliabilityPolicy.RELIABLE
+        )
 class GroundReceiverNode(Node):
     def __init__(self):
         super().__init__('ground_receiver_node')
@@ -24,6 +29,7 @@ class GroundReceiverNode(Node):
         self.receive_uri = self.get_parameter('receive_uri').get_parameter_value().string_value
 
         self.apid_map = self.load_apid_mapping(config_path)
+        self.downlink_pub = self.create_publisher(Bool, "/comms/downlink", qos)
 
     def load_apid_mapping(self, path):
         with open(path, 'r') as f:
@@ -71,12 +77,20 @@ class GroundReceiverNode(Node):
         except Exception as e:
             self.get_logger().warn(f"[FORWARD] Failed to send: {e}")
 
+    def publish_downlink_status(self, status: bool):
+        msg = Bool()
+        msg.data = status
+        self.downlink_pub.publish(msg)
+        self.get_logger().info(f"[Downlink Status] {'Receiving' if status else 'Disconnected'}")
+
     async def websocket_listener(self):
         self.get_logger().info(f"[GROUND] Listening to Starlink on {self.receive_uri}")
         while rclpy.ok():
             try:
                 async with websockets.connect(self.receive_uri) as ws:
-                    self.get_logger().info("[GROUND] Connected to Starlink WebSocket")
+                    self.get_logger().info("[GROUND]  Connected to Starlink WebSocket")
+                    self.publish_downlink_status(True)
+
                     async for msg in ws:
                         try:
                             topic, decoded_msg, ts = self.decode_packet(msg)
@@ -89,17 +103,16 @@ class GroundReceiverNode(Node):
                             self.get_logger().error(f"[GROUND] Failed to decode: {e}")
             except Exception as e:
                 self.get_logger().warn(f"[GROUND] Starlink connection failed: {e}")
+                self.publish_downlink_status(False)
                 await asyncio.sleep(3.0)
 
 def main(args=None):
     rclpy.init(args=args)
     node = GroundReceiverNode()
 
-    # ROS in background
     ros_thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
     ros_thread.start()
 
-    # Async loop in main thread
     try:
         asyncio.run(node.websocket_listener())
     except KeyboardInterrupt:

@@ -5,7 +5,7 @@ import threading
 import json
 from typing import Dict, List, Any, Optional
 from PyQt5.QtCore import QObject, pyqtSignal
-
+import yaml 
 from numpy import full
 import rclpy
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
@@ -15,6 +15,8 @@ from sensor_msgs.msg import Temperature
 from dotenv import load_dotenv
 from openai import OpenAI  
 from typing import Tuple
+from std_msgs.msg import Bool
+from ament_index_python.packages import get_package_share_directory
 
 _THERMAL_MSGS_OK = True
 try:
@@ -103,6 +105,11 @@ class SsosAIAgent(QObject):
                     "tank_pressure_pa": None,
                     "tank_heater_on": None
                 },
+                "comms":{
+                    "uplink_ok": False,
+                    "downlink_ok": False,
+                    "tm_topics": []
+                }
 
             }
         }
@@ -193,7 +200,30 @@ class SsosAIAgent(QObject):
         except Exception:
             self.sub_ammonia = None
 
+        self.sub_uplink = self.node.create_subscription(Bool, "/comms/uplink", self._on_uplink, qos)
+        self.sub_downlink = self.node.create_subscription(Bool, "/comms/downlink", self._on_downlink, qos)
 
+        
+        
+        try:
+            pkg_dir = get_package_share_directory('space_station_communication')
+            apid_config_path = os.path.join(pkg_dir, 'config', 'bridge.yaml')
+            topics = []
+
+            with open(apid_config_path, 'r') as file:
+                raw = yaml.safe_load(file)
+                topics = [entry['ros_topic_name'] for entry in raw if entry['communication_type'] == 'TM']
+
+            with self._lock:
+                self._cache["comms"]["tm_topics"] = topics
+
+        except Exception as e:
+            self.node.get_logger().warn(f"Failed to load comms topics from bridge.yaml: {e}")
+
+
+
+    
+        
     # ----- ECLSS callbacks -----
     def _on_co2(self, msg: Float64):
         with self._lock:
@@ -308,6 +338,15 @@ class SsosAIAgent(QObject):
             updated = [d for d in current if d["name"] != msg.name] + [diag]
             self._cache["thermal"]["extra_diagnostics"] = updated
             self._cache["thermal"]["diag"] = diag  
+            
+    def _on_uplink(self, msg: Bool):
+        with self._lock:
+            self._cache["comms"]["uplink_ok"] = msg.data
+
+    def _on_downlink(self, msg: Bool):
+        with self._lock:
+            self._cache["comms"]["downlink_ok"] = msg.data
+
     
     def _intent_and_subset(self, question: str) -> Tuple[str, dict]:
         """
@@ -330,6 +369,8 @@ class SsosAIAgent(QObject):
             "external loop", "ammonia", "radiator", "received heat", "inlet",
             "outlet", "vent", "tank", "heater", "pressure"
         ])
+        want_comms = any(k in q for k in ["uplink", "downlink", "comms", "relay", "starlink"])
+
 
 
         # Default: if the question is generic like "system status", prefer ECLSS summary + diag
@@ -377,6 +418,9 @@ class SsosAIAgent(QObject):
             if want_nodes:    filtered["thermal"]["nodes"] = th.get("nodes", {})
             if want_links:    filtered["thermal"]["links"] = th.get("links", {})
 
+        if want_comms:
+            filtered["comms"] = self._cache.get("comms", {})
+            return ("comms", filtered)
 
         return ("direct", filtered)
     # ----- Public API called by LeftPanel -----
@@ -417,6 +461,23 @@ class SsosAIAgent(QObject):
             answer = completion.choices[0].message.content.strip()
         except Exception:
             answer = f"AI unavailable. Snapshot subset: {json.dumps(subset)}"
+            
+            
+        if intent == "comms":
+            uplink = subset["comms"].get("uplink_ok", False)
+            downlink = subset["comms"].get("downlink_ok", False)
+            topics = subset["comms"].get("tm_topics", [])
+
+            parts = []
+            parts.append(f"Uplink: {' Connected' if uplink else ' Disconnected'}")
+            parts.append(f"Downlink: {' Receiving' if downlink else ' Not Receiving'}")
+            if topics:
+                parts.append("Streaming topics:\n" + "\n".join(f"• {t}" for t in topics))
+            else:
+                parts.append("No TM topics listed")
+
+            answer = "\n".join(parts)
+
 
         # Emit as minimal HTML (bold key value pairs render nicely in QTextEdit)
         self.ai_reply.emit(answer) 

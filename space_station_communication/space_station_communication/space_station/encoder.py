@@ -11,16 +11,21 @@ import json
 import base64
 import time
 import threading
-
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+from std_msgs.msg import Bool
 from spacepackets.ccsds import SpacePacketHeader, PacketType, SequenceFlags
-
+qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=20,
+            reliability=ReliabilityPolicy.RELIABLE
+        )
 class TelemetryEncoderNode(Node):
     def __init__(self):
         super().__init__('telemetry_encoder')
         self.declare_parameter('apid_config', 'config/apid_mapping.yaml')
         self.declare_parameter('starlink_uri', 'ws://localhost:8080')  
 
-        self.packet_queue = Queue()
+        self.packet_queue = Queue(maxsize=1000)
         self.seq_count = 0
 
         config_path = self.get_parameter('apid_config').get_parameter_value().string_value
@@ -28,6 +33,8 @@ class TelemetryEncoderNode(Node):
         self.mapping = self.load_apid_mapping(config_path)
 
         self.subscribers = []
+        self.uplink_pub = self.create_publisher(Bool, "/comms/uplink", qos)
+
         self.create_subscribers()
 
     def load_apid_mapping(self, path):
@@ -69,7 +76,6 @@ class TelemetryEncoderNode(Node):
 
         packet_bytes = header.pack() + serialized
 
-     
         encoded = base64.b64encode(packet_bytes).decode('utf-8')
         out_msg = {
             "topic": topic,
@@ -77,8 +83,7 @@ class TelemetryEncoderNode(Node):
             "timestamp": time.time(),
             "ccsds_encoded": encoded
         }
-        self.packet_queue = Queue(maxsize=1000)
-        self.packet_queue.put(json.dumps(out_msg))
+
         if not self.packet_queue.full():
             self.packet_queue.put(json.dumps(out_msg))
         else:
@@ -89,9 +94,13 @@ class TelemetryEncoderNode(Node):
             return None
         return self.packet_queue.get()
 
-    async def ws_sender_loop(self):
-      
+    def publish_uplink_status(self, status: bool):
+        msg = Bool()
+        msg.data = status
+        self.uplink_pub.publish(msg)
+        self.get_logger().info(f"[Uplink Status] {'Connected' if status else 'Disconnected'}")
 
+    async def ws_sender_loop(self):
         await asyncio.sleep(1.0)  
         self.get_logger().info(f"Starlink sender loop started. Target: {self.starlink_uri}")
 
@@ -100,6 +109,7 @@ class TelemetryEncoderNode(Node):
                 self.get_logger().info(f"Trying to connect to Starlink WebSocket at {self.starlink_uri}")
                 async with websockets.connect(self.starlink_uri) as ws:
                     self.get_logger().info(" Connected to Starlink WebSocket")
+                    self.publish_uplink_status(True)
 
                     while rclpy.ok():
                         packet = self.get_next_packet()
@@ -108,20 +118,19 @@ class TelemetryEncoderNode(Node):
                             continue
 
                         await ws.send(packet)
-                        self.get_logger().info(f"🛰️ Sent packet: {packet[:80]}...")
+                        self.get_logger().info(f" Sent packet: {packet[:80]}...")
             except Exception as e:
-                self.get_logger().warn(f"Starlink unreachable. Retrying in 3s... ({e})")
+                self.get_logger().warn(f" Starlink unreachable. Retrying in 3s... ({e})")
+                self.publish_uplink_status(False)
                 await asyncio.sleep(3.0)
 
 def main(args=None):
     rclpy.init(args=args)
     node = TelemetryEncoderNode()
 
-    # Run rclpy in a separate thread
     ros_thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
     ros_thread.start()
 
-    # Start asyncio loop in main thread
     try:
         loop = asyncio.get_event_loop()
         loop.run_until_complete(node.ws_sender_loop())
