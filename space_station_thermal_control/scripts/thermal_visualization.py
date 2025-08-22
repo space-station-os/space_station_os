@@ -277,7 +277,7 @@ class ThermalVisualizationNode(Node):
                 'internal_power': node.internal_power
             }
         self.node_data_received = True
-        self.get_logger().info(f"Received thermal data for {len(self.thermal_nodes)} nodes")
+        self.get_logger().info(f"Received thermal data for {len(self.thermal_nodes)} nodes",once=True)
 
     def link_callback(self, msg):
         """Callback for thermal link data."""
@@ -290,7 +290,7 @@ class ThermalVisualizationNode(Node):
                 'heat_flow': link.heat_flow
             })
         self.link_data_received = True
-        self.get_logger().info(f"Received thermal data for {len(self.thermal_links)} links")
+        self.get_logger().info(f"Received thermal data for {len(self.thermal_links)} links",once=True)
 
     def tank_callback(self, msg):
         """Callback for tank status."""
@@ -383,7 +383,7 @@ class ThermalVisualizationGUI(QWidget):
         tanks_layout.addRow("Loop B Temp:", self.loop_b_temp_label)
         tanks_group.setLayout(tanks_layout)
         info_layout.addWidget(tanks_group)
-
+        self.hovered_item = None
         details_group = QGroupBox("")
         self.details_group = details_group
         details_layout = QFormLayout()
@@ -440,7 +440,7 @@ class ThermalVisualizationGUI(QWidget):
                 self.update_links()
             for link in self.link_items.values():
                 link.update_line()
-        # Always update info panel if something is hovered
+        
         if self.hovered_item is not None and self.hovered_type is not None:
             if self.hovered_type == 'node':
                 self.update_node_details(self.hovered_item)
@@ -604,8 +604,8 @@ class ThermalVisualizationGUI(QWidget):
         """Create/update link graphics for every reported link."""
         current_keys = set()
         for l in self.node.thermal_links:
-            a = l['node_a']
-            b = l['node_b']
+            a = l['node_b']
+            b = l['node_a']
             key = f"{a}__{b}"
             current_keys.add(key)
             if a not in self.node_items or b not in self.node_items:

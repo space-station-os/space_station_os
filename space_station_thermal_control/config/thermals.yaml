@@ -1,11 +1,12 @@
 thermal_solver_node:
   ros__parameters:
     thermal_config_file: "config/thermal_nodes.yaml"
+    enable_failure: True 
     sink_link: "base_link"
-    cooling_trigger_threshold: 400.0
-    max_temp_threshold: 500.0
+    cooling_trigger_threshold: 320.0
+    max_temp_threshold: 330.0
     cooling_rate: 0.05
-    thermal_update_dt: 0.5
+    thermal_update_dt: 0.3
 
     init_temp_low: 295.0
     init_temp_high: 310.0
