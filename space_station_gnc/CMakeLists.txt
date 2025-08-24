@@ -27,7 +27,8 @@ find_package(rosidl_default_generators REQUIRED)
 find_package(rosidl_default_runtime REQUIRED)
 find_package(action_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(urdf REQUIRED)
+find_package(urdf REQUIRED)        # provides target urdf::urdf
+find_package(yaml-cpp REQUIRED)    # YAML tables support
 
 # Generate interfaces
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -49,7 +50,13 @@ add_executable(physics_motion src/physics_motion.cpp)
 add_executable(physics_sensor src/physics_sensor.cpp)
 add_executable(sense_estimate src/sense_estimate.cpp)
 add_executable(control_torque src/control_torque.cpp)
+
+# Core library with YAML/URDF/Eigen dependencies
 add_library(thruster_matrix STATIC src/thruster_matrix.cpp)
+
+# --------------------------------------------------------------------------
+# Ament dependencies for targets
+# --------------------------------------------------------------------------
 ament_target_dependencies(space_station_gnc_node rclcpp std_msgs)
 ament_target_dependencies(demo1a_nauka_incident_estimate rclcpp std_msgs tf2_geometry_msgs tf2 tf2_ros OpenCV)
 ament_target_dependencies(demo1b_crisis_mainengine rclcpp std_msgs tf2_geometry_msgs tf2 tf2_ros OpenCV)
@@ -60,16 +67,27 @@ ament_target_dependencies(physics_sensor rclcpp std_msgs tf2 tf2_ros tf2_geometr
 ament_target_dependencies(sense_estimate rclcpp std_msgs tf2 tf2_ros nav_msgs tf2_geometry_msgs visualization_msgs)
 ament_target_dependencies(control_torque rclcpp std_msgs tf2 tf2_ros nav_msgs tf2_geometry_msgs visualization_msgs)
 ament_target_dependencies(thruster_matrix rclcpp)
-rosidl_get_typesupport_target(cpp_typesupport_target
-  ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
+
+# --------------------------------------------------------------------------
+# Public include path for the library (exported)
+# --------------------------------------------------------------------------
 target_include_directories(thruster_matrix
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
+
+# --------------------------------------------------------------------------
+# Linking
+# - Link the control nodes with the generated typesupport and thruster_matrix.
+# - Link thruster_matrix with Eigen, URDF, and YAML-CPP.
+# --------------------------------------------------------------------------
+rosidl_get_typesupport_target(cpp_typesupport_target
+  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
 target_link_libraries(control_torque
-  ${cpp_typesupport_target} 
+  ${cpp_typesupport_target}
   thruster_matrix)
 target_link_libraries(physics_motion
   ${cpp_typesupport_target}
@@ -77,8 +95,9 @@ target_link_libraries(physics_motion
 
 target_link_libraries(thruster_matrix
   Eigen3::Eigen
-  urdf::urdf)
-#   urdfdom_model)
+  urdf::urdf
+  yaml-cpp
+)
 
 ament_export_include_directories(
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -109,13 +128,18 @@ install(TARGETS
   thruster_matrix
   DESTINATION lib/${PROJECT_NAME})
 
+# Install public headers so downstream packages can include thruster_matrix.hpp
+install(DIRECTORY include/
+  DESTINATION include
+)
+
 #launch files
 install(
     DIRECTORY launch
     DESTINATION share/${PROJECT_NAME}/
 )
 
-# URDFfile 
+# URDFfile
 install(DIRECTORY urdf/
   DESTINATION share/${PROJECT_NAME}/urdf
 )
@@ -133,11 +157,36 @@ install(DIRECTORY config
 )
 
 
+# --------------------------------------------------------------------------
+# Testing
+# - Enable lint auto and add gtest-based unit tests if BUILD_TESTING is on.
+# --------------------------------------------------------------------------
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
+  set(AMENT_LINT_AUTO_EXCLUDE "flake8;lint_cmake;uncrustify")
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
+
+  # GoogleTest via ament
+  find_package(ament_cmake_gtest REQUIRED)
+
+  # Unit test for thruster_matrix (URDF/YAML/Eigen required)
+  ament_add_gtest(test_thruster_matrix
+    tests/unit/test_thruster_matrix.cpp
+  )
+  if(TARGET test_thruster_matrix)
+    target_include_directories(test_thruster_matrix PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+    target_link_libraries(test_thruster_matrix
+      thruster_matrix
+      Eigen3::Eigen
+      yaml-cpp
+      urdf::urdf
+    )
+  endif()
 endif()
+
 
 set(CONFIG_PATH "${CMAKE_CURRENT_SOURCE_DIR}/config/config.json")
 set(OUTPUT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -152,5 +201,12 @@ if(NOT result EQUAL 0)
   message(FATAL_ERROR "Matrix Code generation failed")
 endif()
 
+# --------------------------------------------------------------------------
+# Export include dirs for downstream consumers
+# --------------------------------------------------------------------------
+ament_export_include_directories(
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
 
 ament_package()
