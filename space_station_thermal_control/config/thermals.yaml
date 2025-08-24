@@ -1,5 +1,7 @@
 thermal_solver_node:
   ros__parameters:
+    thermal_config_file: "config/thermal_nodes.yaml"   # Path to YAML describing thermal nodes & links
+    sink_link: "base_link"                             # Reference sink link (heat sinks towards here)
     thermal_config_file: "config/thermal_nodes.yaml"
     sink_link: "base_link"
     cooling_trigger_threshold: 400.0
@@ -7,14 +9,59 @@ thermal_solver_node:
     cooling_rate: 0.05
     thermal_update_dt: 0.5
 
-    init_temp_low: 295.0
-    init_temp_high: 310.0
+    cooling_trigger_threshold: 400.0                   # [°C] Above this average temperature, cooling is triggered
+    max_temp_threshold: 500.0                          # [°C] Absolute safety cap; publish error if exceeded
+    cooling_rate: 0.05                                 # Fractional rate of heat removed during cooling
+    thermal_update_dt: 0.5                             # [s] Simulation timestep for RK4/Euler integration
 
-    capacity_low: 500.0
-    capacity_high: 1500.0
+    init_temp_low: 295.0                               # [K] Minimum initial node temperature (~22°C)
+    init_temp_high: 310.0                              # [K] Maximum initial node temperature (~37°C)
 
-    power_low: 30.0
-    power_high: 60.0
+    capacity_low: 500.0                                # [J/K] Lower bound for node heat capacity
+    capacity_high: 1500.0                              # [J/K] Upper bound for node heat capacity
 
-    conductance_low: 0.05
-    conductance_high: 2.0
+    power_low: 30.0                                    # [W] Lower bound for node internal power generation
+    power_high: 60.0                                   # [W] Upper bound for node internal power generation
+
+    conductance_low: 0.05                              # [W/K] Lower bound for thermal conductance between nodes
+    conductance_high: 2.0                              # [W/K] Upper bound for thermal conductance between nodes
+
+
+coolant_manager:
+  ros__parameters:
+    # ---- Thermal physics ----
+    cp_j_per_kg_c: 4186.0                              # [J/(kg·°C)] Specific heat capacity of water
+    loop_mass_kg: 25.0                                 # [kg] Internal loop water mass
+    initial_temperature_c: 10.0                        # [°C] Starting temperature of internal loop
+    min_internal_temp_c: 10.0                          # [°C] Clamp minimum internal temperature
+    max_internal_temp_c: 95.0                          # [°C] Clamp maximum internal temperature
+
+    # ---- Timing ----
+    control_period_s: 5.0                              # [s] Main control loop period
+    publish_period_s: 1.0                              # [s] Publishing period for loop temperatures
+
+    # ---- Water acquisition ----
+    water_request_liters: 100.0                        # [L] Default water request volume
+    refresh_period_cycles: 7                           # [cycles] Periodic refresh interval
+    refresh_volume_l: 50.0                             # [L] Volume replaced during refresh
+    recycle_every_goals: 10                            # [goals] After this many heatflow goals, recycle water
+    recycle_volume_l: 50.0                             # [L] Volume recycled each time
+
+    # ---- Heatflow model ----
+    heatflow_input_mode: "temp_c"                      # Interpret input as "temp_c" or "joules"
+    heat_boost_gain: 1.2                               # Multiplicative factor applied to incoming heat
+
+    # ---- Ammonia / tank behavior ----
+    pressure_base_pa: 101325.0                         # [Pa] Base tank pressure at reference state
+    pressure_gain_pa_per_c: 1500.0                     # [Pa/°C] Pressure increase per °C
+    pressure_ref_offset_c: 20.0                        # [°C] Reference offset for pressure calculation
+    max_ammonia_pressure_pa: 30000.0                 # [Pa] Safety limit for ammonia pressure
+
+    heater_on_below_c: -10.0                           # [°C] Turn heater ON below this temp
+    heater_off_above_c: -5.0                           # [°C] Turn heater OFF above this temp
+    heater_warm_rate_c_per_cycle: 1.5                  # [°C/cycle] Temperature rise when heater is active
+
+    # ---- Fault injection ----
+    enable_failures: false                             # Enable or disable fault injection
+    p_drop_water_req: 0.0                              # Probability of dropping water request [0–1]
+    p_drop_ammonia_grant: 0.0                          # Probability of denying ammonia grant [0–1]

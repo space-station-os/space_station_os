@@ -155,6 +155,8 @@ private:
     // ----- State -----
     // Elapsed time [s]
     double sim_t{0.0};
+
+
     const size_t n_thrusters_{12};
     Eigen::VectorXd thruster_forces_biased_{Eigen::VectorXd::Zero(12)}; // [N]
     Eigen::Vector3d r_eci_{Eigen::Vector3d::Zero()}; // [m]
