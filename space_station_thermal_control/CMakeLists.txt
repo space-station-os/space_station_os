@@ -51,7 +51,7 @@ ament_target_dependencies(coolant rosidl_default_generators rclcpp  std_srvs spa
 rosidl_target_interfaces(coolant ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 add_executable(external_loop src/external_loop.cpp)
-ament_target_dependencies(external_loop rosidl_default_generators rclcpp sensor_msgs space_station_eclss)
+ament_target_dependencies(external_loop rosidl_default_generators rclcpp sensor_msgs space_station_eclss diagnostic_msgs)
 rosidl_target_interfaces(external_loop ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 add_executable(radiator src/radiators.cpp)
