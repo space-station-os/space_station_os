@@ -51,8 +51,10 @@ add_executable(physics_sensor src/physics_sensor.cpp)
 add_executable(orbit_dynamics src/orbit_dynamics.cpp)
 add_executable(sense_estimate src/sense_estimate.cpp)
 add_executable(control_torque src/control_torque.cpp)
+add_executable(orbit_dynamics_mock src/orbit_dynamics_mock.cpp)
 
 # Core library with YAML/URDF/Eigen dependencies
+
 add_library(thruster_matrix STATIC src/thruster_matrix.cpp)
 
 # --------------------------------------------------------------------------
@@ -69,6 +71,12 @@ ament_target_dependencies(physics_sensor rclcpp std_msgs tf2 tf2_ros tf2_geometr
 ament_target_dependencies(sense_estimate rclcpp std_msgs tf2 tf2_ros nav_msgs tf2_geometry_msgs visualization_msgs)
 ament_target_dependencies(control_torque rclcpp std_msgs tf2 tf2_ros nav_msgs tf2_geometry_msgs visualization_msgs)
 ament_target_dependencies(thruster_matrix rclcpp)
+
+ament_target_dependencies(orbit_dynamics_mock rclcpp std_msgs tf2 tf2_ros tf2_geometry_msgs visualization_msgs)
+rosidl_get_typesupport_target(cpp_typesupport_target
+  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+
 
 
 # --------------------------------------------------------------------------
@@ -98,6 +106,12 @@ target_link_libraries(orbit_dynamics
   ${cpp_typesupport_target}
   thruster_matrix)
 
+target_link_libraries(orbit_dynamics_mock
+  ${cpp_typesupport_target}
+  thruster_matrix)
+
+
+
 target_link_libraries(thruster_matrix
   Eigen3::Eigen
   urdf::urdf
@@ -112,6 +126,8 @@ ament_export_include_directories(
 target_link_libraries(control_torque ${cpp_typesupport_target})
 target_link_libraries(physics_motion ${cpp_typesupport_target})
 target_link_libraries(orbit_dynamics ${cpp_typesupport_target})
+
+target_link_libraries(orbit_dynamics_mock ${cpp_typesupport_target})
 
 
 
@@ -129,9 +145,11 @@ install(TARGETS
   torque_collector
   physics_motion
   physics_sensor
+  orbit_dynamics
   sense_estimate
   control_torque
   thruster_matrix
+  orbit_dynamics_mock
   DESTINATION lib/${PROJECT_NAME})
 
 # Install public headers so downstream packages can include thruster_matrix.hpp
@@ -162,6 +180,10 @@ install(DIRECTORY config
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(PROGRAMS
+  scripts/draw_3d_position.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 # --------------------------------------------------------------------------
 # Testing
