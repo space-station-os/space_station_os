@@ -18,8 +18,8 @@
 #include <nav_msgs/msg/odometry.hpp>
 #include <tf2/LinearMath/Quaternion.h>
 
-class SenseEstimate : public rclcpp::Node
-{
+// NO sensor estimation algorithms are implemented in this file.Rather just republishing
+class SenseEstimate : public rclcpp::Node {
 public:
   SenseEstimate()
   : Node("sense_estimate")
