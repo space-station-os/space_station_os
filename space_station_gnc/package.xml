@@ -4,7 +4,7 @@
   <name>space_station_gnc</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="yuyuqq@todo.todo">yuyuqq</maintainer>
+  <maintainer email="yuyuqq@gmail.como">yuyuqq</maintainer>
   <license>Apache-2.0</license>
 
 
@@ -19,10 +19,41 @@
   
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
+  <depend>action_msgs</depend>
   <depend> builtin_interfaces</depend>
   <buildtool_depend>rosidl_default_generators</buildtool_depend>
   <exec_depend>rosidl_default_runtime</exec_depend>
   <member_of_group>rosidl_interface_packages</member_of_group>
+
+  <!-- TF / messages / visualization -->
+  <exec_depend>tf2</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>tf2_geometry_msgs</exec_depend>
+  <exec_depend>visualization_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+
+  <!-- URDF parsing (exports CMake target urdf::urdf) -->
+  <depend>urdf</depend>
+
+  <!-- YAML support for thruster tables -->
+  <depend>yaml-cpp</depend>
+
+  <!-- OpenCV and SDL2 used by demo nodes -->
+  <exec_depend>OpenCV</exec_depend>
+  <exec_depend>SDL2</exec_depend>
+
+  <!-- Eigen is found via CMake's Eigen3 package; declare the helper module if available -->
+  <!-- Some distros export this as eigen3_cmake_module. Safe to add as a build dependency. -->
+  <build_depend>eigen3_cmake_module</build_depend>
+  <exec_depend>eigen3_cmake_module</exec_depend>
+
+  <!-- Testing -->
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <test_depend>ament_cmake_gtest</test_depend>
+  <!-- Tests also use YAML and URDF at runtime -->
+  <test_depend>yaml-cpp</test_depend>
+  <test_depend>urdf</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>
