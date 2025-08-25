@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<root main_tree_to_execute="ControlModeTestTree">
+  
+  <!-- Control Mode Test Behavior Tree -->
+  <BehaviorTree ID="ControlModeTestTree">
+    <Sequence name="control_mode_test_root">
+      
+      <!-- Start with CMG control -->
+      <LogMessage name="log_cmg_start" message="Starting with CMG control mode" level="INFO"/>
+      
+      <!-- Switch to thruster control -->
+      <SetControlMode name="switch_to_thruster" thruster_mode="true"/>
+      
+      <!-- Wait a bit -->
+      <WaitForStabilization name="wait_after_thruster_switch" timeout="5.0"/>
+      
+      <!-- Switch back to CMG control -->
+      <SetControlMode name="switch_to_cmg" thruster_mode="false"/>
+      
+      <!-- Wait a bit -->
+      <WaitForStabilization name="wait_after_cmg_switch" timeout="5.0"/>
+      
+      <!-- Log completion -->
+      <LogMessage name="log_completion" message="Control mode switching test completed" level="INFO"/>
+      
+    </Sequence>
+  </BehaviorTree>
+  
+</root>

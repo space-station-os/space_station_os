@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>space_station_lifecycle_manager</name>
+  <version>0.0.1</version>
+  <description>Lifecycle manager for bringing up Space Station OS nodes.</description>
+  <maintainer email="todo@example.com">TODO Maintainer</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_components</depend>
+  <depend>lifecycle_msgs</depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+    <rclcpp_components plugin="space_station_lifecycle_manager::LifecycleManager"/>
+  </export>
+</package>

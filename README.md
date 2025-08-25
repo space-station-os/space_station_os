@@ -1,101 +1,37 @@
-# **Space Station OS – Setup & Demo Guide**
+# Space Station Behavior Tree Core
 
+This package provides the core behavior tree engine for the space station system.
 
+## Package Structure
 
-https://github.com/user-attachments/assets/5b82c516-075d-44ac-b440-fb73bedc1e91
-
-
-
-[![ROS 2 Humble CI](https://github.com/space-station-os/space_station_os/actions/workflows/ros2_humble_ci.yml/badge.svg)](https://github.com/space-station-os/space_station_os/actions/workflows/ros2_humble_ci.yml)
-
----
-
-##  Quick Start with Docker (with GUI support)
-
-If you prefer not to build everything locally, use our **prebuilt Docker image** to get up and running instantly — including GUI support for the astronaut simulation.
-
-### 1. Pull the image
-
-```bash
-docker pull ghcr.io/space-station-os/space_station_os:latest
+```
+space_station_bt/
+├── include/space_station_bt/
+│   └── behavior_tree_engine.hpp    # Core behavior tree engine
+├── src/
+│   └── behavior_tree_engine.cpp    # Engine implementation
+└── CMakeLists.txt
 ```
 
-> Docker must be installed and running. No need to install ROS 2 or dependencies manually.
+## Components
 
----
+### Behavior Tree Engine
+- **BehaviorTreeEngine**: Core engine for loading and executing behavior trees
+- Plugin management and tree execution
+- Status tracking and error handling
 
-### 2. Allow GUI access
+## Usage
 
-Before running the container, allow local Docker containers to access your X server:
+The engine is used by the behavior tree navigator to execute behavior trees:
 
-```bash
-xhost +local:root
+```cpp
+#include "space_station_bt/behavior_tree_engine.hpp"
+
+space_station_bt::BehaviorTreeEngine engine(plugin_libraries);
+auto status = engine.run(tree);
 ```
 
----
+## Dependencies
 
-### 3. Run the container with GUI support
-
-```bash
-docker run -it --rm \
-  --env="DISPLAY=$DISPLAY" \
-  --env="QT_X11_NO_MITSHM=1" \
-  --env="LIBGL_ALWAYS_SOFTWARE=1" \
-  --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
-  --network=host \
-  ghcr.io/space-station-os/space_station_os:latest
-```
-
----
-
-##  Local Installation (Build from Source)
-
-Use this method if you want to modify the source code or don't want to use Docker.
-
-### Prerequisites
-
-* **OS:** Ubuntu 22.04
-* **ROS 2:** Humble (Desktop)
-  → [ROS 2 Installation Guide](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html)
-
-### 1. Create a ROS 2 workspace
-
-```bash
-mkdir -p ~/ssos_ws/src
-cd ~/ssos_ws/src
-```
-
-### 2. Clone the super-repository with submodules
-
-```bash
-git clone https://github.com/space-station-os/space_station_os.git
-cd space_station_os
-```
-
-### 3. Build the workspace
-
-Go back to the workspace root and build everything:
-
-```bash
-cd ~/ssos_ws
-colcon build --symlink-install
-sudo rosdep init
-rosdep update 
-rosdep install --from-paths src --ignore-src -r -y
-source install/setup.bash
-```
-
-> Always source the workspace before running ROS 2 commands:
->
-> ```bash
-> source ~/ssos_ws/install/setup.bash
-> ```
-
----
-# TO RUN THE DEMOS
-
-([Check out our wiki](https://github.com/space-station-os/space_station_os/wiki))
-##  Contributing
-
-See the project backlog:
-[Space Station OS – Project Board](https://github.com/orgs/space-station-os/projects/2/views/1)
+- `behaviortree_cpp_v3`: Core behavior tree library
+- `rclcpp`: ROS2 C++ client library

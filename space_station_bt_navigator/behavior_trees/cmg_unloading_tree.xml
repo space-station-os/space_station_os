@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<root main_tree_to_execute="CMGUnloadingTree">
+  
+  <!-- CMG Unloading Behavior Tree -->
+  <BehaviorTree ID="CMGUnloadingTree">
+    <Sequence name="cmg_unloading_root">
+      
+      <!-- Check CMG Thresholds -->
+      <CheckCmgThreshold name="check_cmg_threshold" 
+                        threshold_x="100.0" 
+                        threshold_y="100.0" 
+                        threshold_z="100.0"/>
+      
+      <!-- Execute CMG unloading -->
+      <UnloadCMG name="unload_cmg" timeout="60.0"/>
+      
+      <!-- Check if unloading is complete -->
+      <CheckCmgUnloadingStatus name="check_unloading_complete" expected_status="unloaded"/>
+      
+    </Sequence>
+  </BehaviorTree>
+  
+</root>
