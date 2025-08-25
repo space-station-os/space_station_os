@@ -51,7 +51,7 @@ class ThermalNodeItem(QGraphicsEllipseItem):
     Handles hover events to trigger callbacks for displaying node details.
     """
 
-    SIZE_SCALE = 0.05
+    SIZE_SCALE = 0.04
     DEFAULT_FONT_SIZE = 7
     MIN_TEMP = 275.0
     TEMP_RANGE = 50.0
