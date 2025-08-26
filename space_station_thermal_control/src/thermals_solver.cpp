@@ -16,7 +16,7 @@ ThermalSolverNode::ThermalSolverNode()
   cooling_client_ = this->create_client<space_station_thermal_control::srv::NodeHeatFlow>(
     "/internal_loop_cooling");
 
-  this->declare_parameter("enable_failure", true);
+  this->declare_parameter("enable_failure", false);
   this->declare_parameter("enable_cooling", true);
   this->declare_parameter("cooling_trigger_threshold", 57.0);  // Celsius
   this->declare_parameter("max_temp_threshold", 147.0);        // Celsius
@@ -65,7 +65,9 @@ ThermalSolverNode::ThermalSolverNode()
   parseYAMLConfig(config_path);
 
   timer_ = this->create_wall_timer(std::chrono::duration<double>(thermal_update_dt_), std::bind(&ThermalSolverNode::updateSimulation, this));
+
 }
+
 
 ThermalSolverNode::~ThermalSolverNode() {}
 
@@ -79,7 +81,7 @@ void ThermalSolverNode::parseYAMLConfig(const std::string &filepath)
     ThermalNode node;
     node.heat_capacity = entry["heat_capacity"].as<double>();
     node.internal_power = entry["internal_power"].as<double>();
-    node.temperature = 20.0 + std::rand() % 10;  // Celsius
+    node.temperature = REFERENCE_TEMP_CELCIUS + std::rand() % 10;  // Celsius
     std::string name = entry["node_name"].as<std::string>();
     std::string parent_link = entry["parent_link"].as<std::string>();
     double conductance = entry["conductance"].as<double>();
@@ -125,7 +127,7 @@ void ThermalSolverNode::coolingCallback()
   if (!cooling_active_ && enable_cooling_ && avg_temperature_ > cooling_trigger_threshold_) {
     if (cooling_client_->wait_for_service(1s)) {
       auto req = std::make_shared<space_station_thermal_control::srv::NodeHeatFlow::Request>();
-      req->heat_flow = avg_temperature_ - 20.0;
+      req->heat_flow = avg_temperature_ - REFERENCE_TEMP_CELCIUS;
 
       cooling_client_->async_send_request(req,
         [this](rclcpp::Client<space_station_thermal_control::srv::NodeHeatFlow>::SharedFuture future) {

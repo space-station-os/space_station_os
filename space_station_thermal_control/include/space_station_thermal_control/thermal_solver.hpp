@@ -70,7 +70,7 @@ private:
   bool enable_failure_ = false;
   bool enable_cooling_ = true;
   bool cooling_active_ = false;
-
+  double  REFERENCE_TEMP_CELCIUS = 20.0;
   double cooling_rate_ = 0.05;
   double cooling_trigger_threshold_ = 330.0;
   double max_temp_threshold_ = 420.0;
