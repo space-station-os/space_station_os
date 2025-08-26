@@ -51,9 +51,9 @@ class ThermalNodeItem(QGraphicsEllipseItem):
     Handles hover events to trigger callbacks for displaying node details.
     """
 
-    SIZE_SCALE = 0.05
+    SIZE_SCALE = 0.04
     DEFAULT_FONT_SIZE = 7
-    MIN_TEMP = 275.0
+    MIN_TEMP = 27.0
     TEMP_RANGE = 50.0
 
     def __init__(self, name, temperature, heat_capacity, internal_power, x=0, y=0, hover_callback=None):
@@ -410,8 +410,8 @@ class ThermalVisualizationGUI(QWidget):
         legend_layout = QVBoxLayout()
         legend_text = (
             "<b>Node Colors:</b><br>"
-            "• Blue = Cold (275K)<br>"
-            "• Red = Hot (325K)<br><br>"
+            "• Blue = Cold <br>"
+            "• Red = Hot <br><br>"
             "<b>Node Size:</b><br>"
             "• Larger = Higher heat capacity<br><br>"
             "<b>Arrow Width:</b><br>"
@@ -522,7 +522,7 @@ class ThermalVisualizationGUI(QWidget):
         rect = self.scene.sceneRect()
         area = max(1.0, rect.width() * rect.height())
         k = max(40.0, math.sqrt(area / max(1, N)))
-        repulsion = 5.0
+        repulsion = 15.0
         attraction_scale = 3
         max_disp = 30.0
 
@@ -631,7 +631,7 @@ class ThermalVisualizationGUI(QWidget):
         if self.node.tank_status:
             tank = self.node.tank_status
             self.ammonia_temp_label.setText(f"{tank['temperature']:.1f}°C")
-            self.ammonia_pressure_label.setText(f"{tank['pressure']:.0f} Pa")
+            self.ammonia_pressure_label.setText(f"{tank['pressure']:.0f} KPa")
             self.ammonia_heater_label.setText("ON" if tank['heater_on'] else "OFF")
         if self.node.loop_status:
             loop = self.node.loop_status
@@ -643,7 +643,7 @@ class ThermalVisualizationGUI(QWidget):
         self.details_group.setTitle("Node Details")
         self._set_fields(self.node_fields, [
             node_item.name,
-            f"{node_item.temperature:.1f} K",
+            f"{node_item.temperature:.1f} °C",
             f"{node_item.heat_capacity:.1f} J/K",
             f"{node_item.internal_power:.1f} W"
         ])

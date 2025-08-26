@@ -27,7 +27,6 @@ ExternalLoopA::ExternalLoopA()
 
   RCLCPP_INFO(this->get_logger(), "[INIT] External Loop A Node Ready.");
 
-  // First attempt to fill
   try_ammonia_refill();
 }
 
@@ -72,16 +71,16 @@ void ExternalLoopA::interface_heat_exchanger(const space_station_thermal_control
 
   double loop_temp = msg->loop_a.temperature;
   if (loop_temp < 45.0) {
-    RCLCPP_INFO(this->get_logger(), "[SKIP] Loop A temperature %.2f°C below threshold (45°C).", loop_temp);
+    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 15000,
+      "[SKIP] Loop A temperature %.2f°C below threshold (45°C).", loop_temp);
     return;
   }
 
-  // Simulate heat exchange
-  const double received_heat = 1200.0;
-  const double Cp_ammonia = 4.7;
-  const double mass = 5.0;
+  const double received_heat = 1200.0;  // in kJ
+  const double Cp_ammonia = 4.7;        // J/g°C
+  const double mass = 5000.0;           // 5.0 kg -> 5000 g
 
-  double deltaT = received_heat / (mass * Cp_ammonia);
+  double deltaT = received_heat * 1000.0 / (mass * Cp_ammonia);  // convert kJ to J
   double ammonia_temp_after = ammonia_temp_ + deltaT;
   double loop_temp_after = loop_temp - deltaT;
 
@@ -99,9 +98,9 @@ void ExternalLoopA::interface_heat_exchanger(const space_station_thermal_control
     "[EX LOOP] Q=%.2f kJ | Loop: %.2f->%.2f°C | Ammonia: %.2f->%.2f°C",
     received_heat, loop_temp, loop_temp_after, ammonia_temp_, ammonia_temp_after);
 
-  // Mark ammonia as used, refill will be attempted by retry_timer
   ammonia_temp_ = ammonia_temp_after;
   ammonia_filled_ = false;
+
   if (radiator_client_->wait_for_service(std::chrono::milliseconds(500))) {
     auto req = std::make_shared<space_station_thermal_control::srv::VentHeat::Request>();
     req->excess_heat = received_heat;
@@ -118,7 +117,6 @@ void ExternalLoopA::interface_heat_exchanger(const space_station_thermal_control
   } else {
     RCLCPP_WARN(this->get_logger(), "[RADIATOR] Service unavailable for heat venting.");
   }
-
 }
 
 }  // namespace space_station_thermal_control

@@ -1,5 +1,6 @@
 #include "space_station_thermal_control/coolant.hpp"
 
+
 using std::placeholders::_1;
 using std::placeholders::_2;
 
@@ -23,7 +24,6 @@ CoolantManager::CoolantManager()
 {
   water_client_ = this->create_client<space_station_eclss::srv::RequestProductWater>("/wrs/product_water_request");
 
-
   ammonia_server_ = this->create_service<space_station_thermal_control::srv::CoolantFlow>(
     "/tcs/request_ammonia", std::bind(&CoolantManager::handle_ammonia, this, _1, _2));
 
@@ -42,6 +42,8 @@ CoolantManager::CoolantManager()
 
   heatflow_server_ = this->create_service<space_station_thermal_control::srv::NodeHeatFlow>(
     "/internal_loop_cooling", std::bind(&CoolantManager::handle_heatflow, this, _1, _2));
+
+  heater_signal_pub_ = this->create_publisher<std_msgs::msg::Bool>("/tcs/heater_state", 10);
 
   control_timer_ = this->create_wall_timer(
     std::chrono::seconds(5), std::bind(&CoolantManager::control_cycle, this));
@@ -64,14 +66,13 @@ void CoolantManager::request_water()
   }
 
   auto req = std::make_shared<space_station_eclss::srv::RequestProductWater::Request>();
-  req->amount = 100.0;  // request in liters
+  req->amount = 100.0;
 
   water_future_ = water_client_->async_send_request(req);
   water_request_pending_ = true;
 
   RCLCPP_INFO(this->get_logger(), "[FILL] Requested %.2f L potable water from WRS...", req->amount);
 }
-
 
 void CoolantManager::apply_heat_reduction(
   const space_station_thermal_control::msg::ExternalLoopStatus::SharedPtr msg)
@@ -120,8 +121,7 @@ void CoolantManager::handle_thermal_state_request(
   }
 
   const double Cp = 4.186;
-  double delta_T = current_temperature_ - initial_temperature_;
-  delta_T = std::max(0.0, delta_T);
+  double delta_T = std::max(0.0, current_temperature_ - initial_temperature_);
   double Q = loop_mass_kg_ * Cp * delta_T;
 
   response->loop_capacity = loop_mass_kg_;
@@ -133,10 +133,9 @@ void CoolantManager::handle_heatflow(
   const std::shared_ptr<space_station_thermal_control::srv::NodeHeatFlow::Request> request,
   std::shared_ptr<space_station_thermal_control::srv::NodeHeatFlow::Response> response)
 {
-  double avg_temp = request->heat_flow;  
+  double avg_temp = request->heat_flow;
   const double Cp = 4.186;
-  double deltaT = avg_temp - initial_temperature_;
-  deltaT = std::max(0.0, deltaT);
+  double deltaT = std::max(0.0, avg_temp - initial_temperature_);
 
   double Q = loop_mass_kg_ * 1000.0 * Cp * deltaT;
   double boosted_heat = Q * 1.2;
@@ -170,10 +169,9 @@ void CoolantManager::publish_loop_temperatures()
   RCLCPP_INFO_THROTTLE(
     this->get_logger(),
     *this->get_clock(),
-    5000,  
+    5000,
     "[TEMP] A: %.2f°C | B: %.2f°C | Avg: %.2f°C",
     loop_a_temp, loop_b_temp, current_temperature_);
-
 }
 
 void CoolantManager::control_cycle()
@@ -184,7 +182,7 @@ void CoolantManager::control_cycle()
     request_water();
   }
 
-    if (water_request_pending_) {
+  if (water_request_pending_) {
     auto future_status = water_future_.wait_for(std::chrono::seconds(0));
     if (future_status == std::future_status::ready) {
       auto resp = water_future_.get();
@@ -208,12 +206,17 @@ void CoolantManager::control_cycle()
     }
   }
 
-
   if (ammonia_temp_ < -10.0 && !heater_on_) {
     heater_on_ = true;
+    std_msgs::msg::Bool msg;
+    msg.data = true;
+    heater_signal_pub_->publish(msg);
     RCLCPP_INFO(this->get_logger(), "[HEATER] Turning ON (%.2f°C)", ammonia_temp_);
   } else if (ammonia_temp_ > -5.0 && heater_on_) {
     heater_on_ = false;
+    std_msgs::msg::Bool msg;
+    msg.data = false;
+    heater_signal_pub_->publish(msg);
     RCLCPP_INFO(this->get_logger(), "[HEATER] Turning OFF (%.2f°C)", ammonia_temp_);
   }
 
@@ -222,7 +225,8 @@ void CoolantManager::control_cycle()
     RCLCPP_DEBUG(this->get_logger(), "[HEATER] Ammonia: %.2f°C", ammonia_temp_);
   }
 
-  ammonia_pressure_ = 101325.0 + (ammonia_temp_ + 20.0) * 1500.0;
+  ammonia_pressure_ = (101325.0 + (ammonia_temp_ + 20.0) * 1500.0) / 1000.0;  // [kPa]
+
 
   space_station_thermal_control::msg::TankStatus tank_status;
   tank_status.tank_capacity = tank_capacity_;
@@ -236,7 +240,7 @@ void CoolantManager::control_cycle()
   status_pub_->publish(tank_status);
 }
 
-}  // namespace space_station_thermal_control
+}  
 
 int main(int argc, char **argv)
 {

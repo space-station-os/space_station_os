@@ -14,6 +14,7 @@
 #include "space_station_thermal_control/msg/tank_status.hpp"
 #include "space_station_thermal_control/msg/internal_loop_status.hpp"
 #include "space_station_thermal_control/msg/external_loop_status.hpp"
+#include "std_msgs/msg/bool.hpp"
 
 namespace space_station_thermal_control
 {
@@ -60,6 +61,7 @@ private:
   rclcpp::Publisher<space_station_thermal_control::msg::InternalLoopStatus>::SharedPtr loop_temp_pub_;
   rclcpp::Subscription<space_station_thermal_control::msg::ExternalLoopStatus>::SharedPtr loop_temp_sub_;
   rclcpp::Publisher<space_station_thermal_control::msg::TankStatus>::SharedPtr status_pub_;
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr heater_signal_pub_;
 
   rclcpp::TimerBase::SharedPtr control_timer_;
   rclcpp::TimerBase::SharedPtr publish_timer_;

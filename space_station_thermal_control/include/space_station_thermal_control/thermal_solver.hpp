@@ -12,7 +12,7 @@
 
 #include "std_msgs/msg/string.hpp"
 #include "diagnostic_msgs/msg/diagnostic_status.hpp"
-
+#include "diagnostic_msgs/msg/key_value.hpp"
 #include "space_station_thermal_control/msg/thermal_node_data_array.hpp"
 #include "space_station_thermal_control/msg/thermal_node_data.hpp"
 #include "space_station_thermal_control/msg/thermal_link_flows_array.hpp"
@@ -51,7 +51,7 @@ private:
   void updateSimulation();
   double compute_dTdt(const std::string &name, const std::unordered_map<std::string, double> &temps);
   void coolingCallback();
-
+  void publishThermalNetworkDiag(const std::vector<space_station_thermal_control::msg::ThermalNodeData> &nodes);
   // ROS publishers and clients
   rclcpp::Publisher<space_station_thermal_control::msg::ThermalNodeDataArray>::SharedPtr node_pub_;
   rclcpp::Publisher<space_station_thermal_control::msg::ThermalLinkFlowsArray>::SharedPtr link_pub_;
