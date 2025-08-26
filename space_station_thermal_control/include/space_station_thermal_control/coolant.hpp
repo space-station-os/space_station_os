@@ -32,7 +32,7 @@ namespace space_station_thermal_control
 class CoolantManager : public rclcpp::Node
 {
 public:
-  explicit CoolantManager(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
+  explicit CoolantManager();
 
 private:
   // ---- Callbacks / operations ----
@@ -40,7 +40,7 @@ private:
     const std::shared_ptr<std_srvs::srv::Trigger::Request>,
     std::shared_ptr<std_srvs::srv::Trigger::Response> response);
 
-  void request_water(double amount_l);
+
   void request_water();  // uses default param volume
 
   void apply_heat_reduction(
@@ -73,7 +73,7 @@ private:
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr heat_available_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr grey_water_pub_;
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticStatus>::SharedPtr diag_pub_;
-
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr heater_signal_pub_;
   rclcpp::Client<space_station_eclss::srv::RequestProductWater>::SharedPtr water_client_;
 
   rclcpp::Service<space_station_thermal_control::srv::CoolantFlow>::SharedPtr ammonia_server_;
@@ -81,10 +81,6 @@ private:
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr fill_loops_server_;
   rclcpp::Service<space_station_thermal_control::srv::NodeHeatFlow>::SharedPtr heatflow_server_;
 
-  rclcpp::Publisher<space_station_thermal_control::msg::InternalLoopStatus>::SharedPtr loop_temp_pub_;
-  rclcpp::Subscription<space_station_thermal_control::msg::ExternalLoopStatus>::SharedPtr loop_temp_sub_;
-  rclcpp::Publisher<space_station_thermal_control::msg::TankStatus>::SharedPtr status_pub_;
-  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr heater_signal_pub_;
 
   rclcpp::TimerBase::SharedPtr control_timer_;
   rclcpp::TimerBase::SharedPtr publish_timer_;
