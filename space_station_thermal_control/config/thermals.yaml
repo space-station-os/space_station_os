@@ -1,31 +1,33 @@
-thermal_solver_node:
+thermal_network:
   ros__parameters:
     thermal_config_file: "config/thermal_nodes.yaml"   # Path to YAML describing thermal nodes & links
     sink_link: "base_link"                             # Reference sink link (heat sinks towards here)
-    thermal_config_file: "config/thermal_nodes.yaml"
     enable_failure: True 
-    sink_link: "base_link"
-    cooling_trigger_threshold: 320.0
-    max_temp_threshold: 330.0
-    cooling_rate: 0.05
-    thermal_update_dt: 0.3
 
-    cooling_trigger_threshold: 400.0                   # [°C] Above this average temperature, cooling is triggered
-    max_temp_threshold: 500.0                          # [°C] Absolute safety cap; publish error if exceeded
-    cooling_rate: 0.05                                 # Fractional rate of heat removed during cooling
-    thermal_update_dt: 0.5                             # [s] Simulation timestep for RK4/Euler integration
+   # --- Temperature thresholds (Celsius) ---
+    cooling_trigger_threshold: 30.0        # °C — coolant starts before overheat
+    max_temp_threshold: 60.0               # °C — triggers diagnostics
 
-    init_temp_low: 295.0                               # [K] Minimum initial node temperature (~22°C)
-    init_temp_high: 310.0                              # [K] Maximum initial node temperature (~37°C)
+    # --- Cooling and update parameters ---
+    cooling_rate: 0.05                     # Fraction of heat removed per cycle
+    thermal_update_dt: 0.5                 # [s] simulation step
 
-    capacity_low: 500.0                                # [J/K] Lower bound for node heat capacity
-    capacity_high: 1500.0                              # [J/K] Upper bound for node heat capacity
+    # --- Initial node temperature range (Celsius) ---
+    init_temp_low: 22.0                    # °C
+    init_temp_high: 37.0                   # °C
 
-    power_low: 30.0                                    # [W] Lower bound for node internal power generation
-    power_high: 60.0                                   # [W] Upper bound for node internal power generation
+    # --- Heat capacity range (Joules per °C) ---
+    capacity_low: 500.0                    # J/°C
+    capacity_high: 5000.0                  # J/°C
 
-    conductance_low: 0.05                              # [W/K] Lower bound for thermal conductance between nodes
-    conductance_high: 2.0                              # [W/K] Upper bound for thermal conductance between nodes
+    # --- Internal power generation range (Watts = J/s) ---
+    power_low: 30.0                         # W
+    power_high: 60.0                      # W
+
+    # --- Thermal conductance range (Watts per °C) ---
+    conductance_low: 0.05                  # W/°C
+    conductance_high: 2.0                  # W/°C
+
 
 
 coolant_manager:
@@ -66,3 +68,4 @@ coolant_manager:
     enable_failures: false                             # Enable or disable fault injection
     p_drop_water_req: 0.0                              # Probability of dropping water request [0–1]
     p_drop_ammonia_grant: 0.0                          # Probability of denying ammonia grant [0–1]
+

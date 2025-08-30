@@ -16,6 +16,8 @@
 #include "space_station_thermal_control/srv/internal_loop.hpp"
 #include "space_station_thermal_control/srv/node_heat_flow.hpp"
 
+#include "std_msgs/msg/bool.hpp"
+
 #include <chrono>
 #include <future>
 #include <random>
@@ -68,7 +70,7 @@ private:
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr heat_available_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr grey_water_pub_;
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticStatus>::SharedPtr diag_pub_;
-
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr heater_signal_pub_;
   rclcpp::Client<space_station_eclss::srv::RequestProductWater>::SharedPtr water_client_;
 
   rclcpp::Service<space_station_thermal_control::srv::CoolantFlow>::SharedPtr ammonia_server_;
@@ -96,7 +98,9 @@ private:
   bool water_request_pending_;
   bool publish_timer_started_ {false};
 
-  std::shared_future<space_station_eclss::srv::RequestProductWater::Response::SharedPtr> water_future_;
+  //std::shared_future<space_station_eclss::srv::RequestProductWater::Response::SharedPtr> water_future_;
+  rclcpp::Client<space_station_eclss::srv::RequestProductWater>::SharedFuture water_future_;
+
 
   // ---- Parameters (runtime) ----
   double cp_j_per_kg_c_;             // [J/(kg·°C)]

@@ -1,8 +1,6 @@
 #include "space_station_thermal_control/thermal_solver.hpp"
-#include <ament_index_cpp/get_package_share_directory.hpp>
-#include <yaml-cpp/yaml.h>
-#include <cmath>
-#include <cstdlib>
+
+using namespace std::chrono_literals;
 
 ThermalSolverNode::ThermalSolverNode()
 : Node("thermal_solver_node")
@@ -18,11 +16,10 @@ ThermalSolverNode::ThermalSolverNode()
   cooling_client_ = this->create_client<space_station_thermal_control::srv::NodeHeatFlow>(
     "/internal_loop_cooling");
 
-  // Declare and retrieve parameters
   this->declare_parameter("enable_failure", false);
   this->declare_parameter("enable_cooling", true);
-  this->declare_parameter("cooling_trigger_threshold", 330.0);
-  this->declare_parameter("max_temp_threshold", 420.0);
+  this->declare_parameter("cooling_trigger_threshold", 57.0);  // Celsius
+  this->declare_parameter("max_temp_threshold", 147.0);        // Celsius
   this->declare_parameter("cooling_rate", 0.05);
   this->declare_parameter("thermal_update_dt", 0.3);
   this->declare_parameter<std::string>("thermal_config_file", "config/thermal_nodes.yaml");
@@ -33,6 +30,7 @@ ThermalSolverNode::ThermalSolverNode()
   max_temp_threshold_ = this->get_parameter("max_temp_threshold").as_double();
   cooling_rate_ = this->get_parameter("cooling_rate").as_double();
   thermal_update_dt_ = this->get_parameter("thermal_update_dt").as_double();
+  cooling_active_ = false;
 
   param_callback_ = this->add_on_set_parameters_callback(
     [this](const std::vector<rclcpp::Parameter> &params) {
@@ -67,7 +65,9 @@ ThermalSolverNode::ThermalSolverNode()
   parseYAMLConfig(config_path);
 
   timer_ = this->create_wall_timer(std::chrono::duration<double>(thermal_update_dt_), std::bind(&ThermalSolverNode::updateSimulation, this));
+
 }
+
 
 ThermalSolverNode::~ThermalSolverNode() {}
 
@@ -81,7 +81,7 @@ void ThermalSolverNode::parseYAMLConfig(const std::string &filepath)
     ThermalNode node;
     node.heat_capacity = entry["heat_capacity"].as<double>();
     node.internal_power = entry["internal_power"].as<double>();
-    node.temperature = 293.15 + std::rand() % 10;  
+    node.temperature = REFERENCE_TEMP_CELCIUS + std::rand() % 10;  // Celsius
     std::string name = entry["node_name"].as<std::string>();
     std::string parent_link = entry["parent_link"].as<std::string>();
     double conductance = entry["conductance"].as<double>();
@@ -92,7 +92,7 @@ void ThermalSolverNode::parseYAMLConfig(const std::string &filepath)
     ThermalLink link;
     link.from = name;
     link.to = parent_link;
-    link.joint_name = name;  
+    link.joint_name = name;
     link.conductance = conductance;
 
     thermal_links_.push_back(link);
@@ -102,21 +102,32 @@ void ThermalSolverNode::parseYAMLConfig(const std::string &filepath)
               thermal_nodes_.size(), thermal_links_.size());
 }
 
-void ThermalSolverNode::coolingCallback()
+double ThermalSolverNode::compute_dTdt(
+  const std::string &name,
+  const std::unordered_map<std::string, double> &temps)
 {
-  if (enable_failure_ && avg_temperature_ > max_temp_threshold_) {
-    diagnostic_msgs::msg::DiagnosticStatus diag;
-    diag.name = "THERMAL_SOLVER_OVERHEAT";
-    diag.level = diagnostic_msgs::msg::DiagnosticStatus::ERROR;
-    diag.message = "Thermal system overheating";
-    diag_pub_->publish(diag);
-    RCLCPP_ERROR(this->get_logger(), "Thermal system overheating, triggering diagnostics.");
+  const auto &node = thermal_nodes_.at(name);
+  double q_total = node.internal_power;
+
+  for (const auto &link : thermal_links_) {
+    if (link.from == name && temps.count(link.to)) {
+      q_total += link.conductance * (temps.at(link.to) - temps.at(name));
+    } else if (link.to == name && temps.count(link.from)) {
+      q_total += link.conductance * (temps.at(link.from) - temps.at(name));
+    }
   }
 
+  return q_total / node.heat_capacity;
+}
+
+
+void ThermalSolverNode::coolingCallback()
+{
+  
   if (!cooling_active_ && enable_cooling_ && avg_temperature_ > cooling_trigger_threshold_) {
     if (cooling_client_->wait_for_service(1s)) {
       auto req = std::make_shared<space_station_thermal_control::srv::NodeHeatFlow::Request>();
-      req->heat_flow = avg_temperature_ - 273.15;
+      req->heat_flow = avg_temperature_ - REFERENCE_TEMP_CELCIUS;
 
       cooling_client_->async_send_request(req,
         [this](rclcpp::Client<space_station_thermal_control::srv::NodeHeatFlow>::SharedFuture future) {
@@ -133,28 +144,10 @@ void ThermalSolverNode::coolingCallback()
     }
   }
 }
-
-double ThermalSolverNode::compute_dTdt(const std::string &name,
-                                       const std::unordered_map<std::string, double> &temps)
-{
-  const auto &node = thermal_nodes_[name];
-  double q_total = node.internal_power;
-
-  for (const auto &link : thermal_links_) {
-    if (link.from == name && temps.count(link.to))
-      q_total += link.conductance * (temps.at(link.to) - temps.at(name));
-    else if (link.to == name && temps.count(link.from))
-      q_total += link.conductance * (temps.at(link.from) - temps.at(name));
-  }
-
-  return q_total / node.heat_capacity;
-}
-
+  
 void ThermalSolverNode::updateSimulation()
 {
-  if (thermal_nodes_.empty())
-    return;
-
+  if (thermal_nodes_.empty()) return;
   double total_temp = 0.0;
   double total_power = 0.0;
   for (const auto &[name, node] : thermal_nodes_) {
@@ -166,7 +159,7 @@ void ThermalSolverNode::updateSimulation()
   avg_internal_power_ = total_power / thermal_nodes_.size();
 
   RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
-                       "Avg temperature = %.2f K", avg_temperature_);
+                       "Avg temperature = %.2f degC", avg_temperature_);
 
   coolingCallback();
 
@@ -198,29 +191,61 @@ void ThermalSolverNode::updateSimulation()
   for (const auto &[name, node] : thermal_nodes_)
     k4[name] = thermal_update_dt_ * compute_dTdt(name, T_k4);
 
-  for (auto &[name, node] : thermal_nodes_)
+  double hottest_temp = -std::numeric_limits<double>::infinity();
+  std::string hottest_name = "n/a";
+
+  for (auto &[name, node] : thermal_nodes_) {
     node.temperature += (k1[name] + 2 * k2[name] + 2 * k3[name] + k4[name]) / 6.0;
-
-  if (cooling_active_) {
-    bool all_cooled = true;
-    for (auto &[name, node] : thermal_nodes_) {
-      double target_temp = initial_temperatures_[name];
-      double diff = node.temperature - target_temp;
-      if (std::abs(diff) < 0.5) {
-        node.temperature = target_temp;
-      } else {
-        node.temperature -= std::copysign(cooling_rate_ * thermal_update_dt_, diff);
-        all_cooled = false;
-      }
-    }
-
-    if (all_cooled) {
-      RCLCPP_INFO(this->get_logger(), "All nodes restored to initial temperatures.");
-      cooling_active_ = false;
+    if (node.temperature > hottest_temp) {
+      hottest_temp = node.temperature;
+      hottest_name = name;
     }
   }
 
-  // Publish node data
+
+  if (cooling_active_) {
+    for (auto &[name, node] : thermal_nodes_) {
+      double target_temp = initial_temperatures_[name];
+      double diff = node.temperature - target_temp;
+      if (std::abs(diff) > 0.5) {
+        node.temperature -= std::copysign(cooling_rate_ * thermal_update_dt_, diff);
+      } else {
+        node.temperature = target_temp;
+      }
+
+      if (enable_failure_ && node.temperature > max_temp_threshold_) {
+        diagnostic_msgs::msg::DiagnosticStatus diag;
+        diag.name = "THERMAL_NODE_OVERHEAT";
+        diag.level = diagnostic_msgs::msg::DiagnosticStatus::ERROR;
+        diag.message = "Overheating after cooling";
+        diag.hardware_id = name;
+
+        diagnostic_msgs::msg::KeyValue kv;
+        kv.key = "temperature_C";
+        kv.value = std::to_string(node.temperature);
+        diag.values.push_back(kv);
+
+        diag_pub_->publish(diag);
+      }
+    }
+
+    
+    bool all_below = true;
+    for (const auto &[name, node] : thermal_nodes_) {
+      if (node.temperature > initial_temperatures_[name] + 0.5) {
+        all_below = false;
+        break;
+      }
+    }
+
+    if (all_below) {
+      cooling_active_ = false;
+      RCLCPP_INFO(this->get_logger(), "Cooling complete, system stabilized.");
+    }
+  }
+
+
+
   space_station_thermal_control::msg::ThermalNodeDataArray node_msg;
   for (const auto &[name, node] : thermal_nodes_) {
     space_station_thermal_control::msg::ThermalNodeData data;
@@ -231,8 +256,8 @@ void ThermalSolverNode::updateSimulation()
     node_msg.nodes.push_back(data);
   }
   node_pub_->publish(node_msg);
+  publishThermalNetworkDiag(node_msg.nodes);
 
-  // Publish link data
   space_station_thermal_control::msg::ThermalLinkFlowsArray link_msg;
   for (const auto &link : thermal_links_) {
     space_station_thermal_control::msg::ThermalLinkFlows l;
@@ -241,12 +266,56 @@ void ThermalSolverNode::updateSimulation()
     l.conductance = link.conductance;
 
     double T_a = thermal_nodes_.count(link.joint_name) ? thermal_nodes_.at(link.joint_name).temperature : 0.0;
-    double T_b = 293.15;  // Reference temp
+    double T_b = 20.0;  // Reference temp in Celsius
 
     l.heat_flow = link.conductance * (T_a - T_b);
     link_msg.links.push_back(l);
   }
   link_pub_->publish(link_msg);
+}
+
+void ThermalSolverNode::publishThermalNetworkDiag(
+    const std::vector<space_station_thermal_control::msg::ThermalNodeData> &nodes)
+{
+  using diagnostic_msgs::msg::DiagnosticStatus;
+  using diagnostic_msgs::msg::KeyValue;
+
+  DiagnosticStatus st;
+  st.name = "ThermalNetwork";
+
+  std::string hottest_name = "n/a";
+  double hottest_temp = -std::numeric_limits<double>::infinity();
+
+  for (const auto &n : nodes) {
+    if (n.temperature > hottest_temp) {
+      hottest_temp = n.temperature;
+      hottest_name = n.name;
+    }
+  }
+
+  if (std::isfinite(hottest_temp) && hottest_temp > max_temp_threshold_) {
+    st.level = DiagnosticStatus::WARN;
+    st.message = "Node temperature exceeds max_temp_threshold";
+  } else {
+    st.level = DiagnosticStatus::OK;
+    st.message = "All node temperatures within threshold";
+  }
+
+  KeyValue kv1, kv2;
+  kv1.key = "hottest_node";
+  kv1.value = hottest_name;
+
+  kv2.key = "node_temperature_C";
+  {
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(2) << hottest_temp;
+    kv2.value = oss.str();
+  }
+
+  st.hardware_id = hottest_name;
+  st.values = {kv1, kv2};
+
+  diag_pub_->publish(st);
 }
 
 int main(int argc, char **argv)
