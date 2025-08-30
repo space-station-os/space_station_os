@@ -10,20 +10,16 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+
 find_package(std_srvs REQUIRED)
 find_package(space_station_eclss REQUIRED)
-find_package(Bullet REQUIRED)
-find_package(urdf REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(rclcpp_action REQUIRED)
+find_package(yaml-cpp REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-include_directories(
-  ${BULLET_INCLUDE_DIRS}
-  ${urdf_INCLUDE_DIRS}
-)
 
 
 set(msg_files
@@ -56,7 +52,7 @@ ament_target_dependencies(coolant rosidl_default_generators rclcpp  std_srvs spa
 rosidl_target_interfaces(coolant ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 add_executable(external_loop src/external_loop.cpp)
-ament_target_dependencies(external_loop rosidl_default_generators rclcpp sensor_msgs space_station_eclss)
+ament_target_dependencies(external_loop rosidl_default_generators rclcpp sensor_msgs space_station_eclss diagnostic_msgs)
 rosidl_target_interfaces(external_loop ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 add_executable(radiator src/radiators.cpp)
@@ -65,10 +61,14 @@ rosidl_target_interfaces(radiator ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 
 add_executable(thermal_nodes src/thermals_solver.cpp)
-ament_target_dependencies(thermal_nodes rosidl_default_generators rclcpp sensor_msgs space_station_eclss diagnostic_msgs rclcpp_action)
+
+ament_target_dependencies(thermal_nodes rosidl_default_generators rclcpp ament_index_cpp sensor_msgs space_station_eclss diagnostic_msgs yaml-cpp )
+
+ament_target_dependencies(thermal_nodes rosidl_default_generators rclcpp sensor_msgs space_station_eclss diagnostic_msgs yaml-cpp )
+
 rosidl_target_interfaces(thermal_nodes ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(thermal_nodes
-  ${urdf_LIBRARIES}
+  yaml-cpp
 )
 
 add_executable(demand src/on_demand_publisher.cpp)
@@ -107,7 +107,10 @@ install(DIRECTORY config/
    DESTINATION share/${PROJECT_NAME}/config
  )
 
-
+install(PROGRAMS
+ scripts/thermal_visualization.py
+ DESTINATION lib/${PROJECT_NAME}
+)
 
 
 
