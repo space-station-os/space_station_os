@@ -3,11 +3,12 @@ thermal_solver_node:
     thermal_config_file: "config/thermal_nodes.yaml"   # Path to YAML describing thermal nodes & links
     sink_link: "base_link"                             # Reference sink link (heat sinks towards here)
     thermal_config_file: "config/thermal_nodes.yaml"
+    enable_failure: True 
     sink_link: "base_link"
-    cooling_trigger_threshold: 400.0
-    max_temp_threshold: 500.0
+    cooling_trigger_threshold: 320.0
+    max_temp_threshold: 330.0
     cooling_rate: 0.05
-    thermal_update_dt: 0.5
+    thermal_update_dt: 0.3
 
     cooling_trigger_threshold: 400.0                   # [°C] Above this average temperature, cooling is triggered
     max_temp_threshold: 500.0                          # [°C] Absolute safety cap; publish error if exceeded
