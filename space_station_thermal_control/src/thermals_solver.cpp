@@ -158,8 +158,8 @@ void ThermalSolverNode::updateSimulation()
   avg_temperature_ = total_temp / thermal_nodes_.size();
   avg_internal_power_ = total_power / thermal_nodes_.size();
 
-  RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 10000,
-                       "Avg temperature = %.2f K", avg_temperature_);
+  RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+                       "Avg temperature = %.2f degC", avg_temperature_);
 
   coolingCallback();
 
