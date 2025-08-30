@@ -24,7 +24,7 @@ ThermalSolverNode::ThermalSolverNode()
   this->declare_parameter("cooling_trigger_threshold", 330.0);
   this->declare_parameter("max_temp_threshold", 420.0);
   this->declare_parameter("cooling_rate", 0.05);
-  this->declare_parameter("thermal_update_dt", 0.5);
+  this->declare_parameter("thermal_update_dt", 0.3);
   this->declare_parameter<std::string>("thermal_config_file", "config/thermal_nodes.yaml");
 
   enable_failure_ = this->get_parameter("enable_failure").as_bool();
@@ -165,7 +165,7 @@ void ThermalSolverNode::updateSimulation()
   avg_temperature_ = total_temp / thermal_nodes_.size();
   avg_internal_power_ = total_power / thermal_nodes_.size();
 
-  RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 10000,
+  RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
                        "Avg temperature = %.2f K", avg_temperature_);
 
   coolingCallback();
