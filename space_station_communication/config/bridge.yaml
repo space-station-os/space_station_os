@@ -16,7 +16,7 @@
   communication_type: "TM"
 
 - ros_service_name: "/ogs/request_o2"
-  ros_type_name: "space_station_eclss/srv/RequestO2"
+  ros_type_name: "space_station_eclss/srv/O2Request"
   packet_apid: 78
   communication_type: "TC"
 
