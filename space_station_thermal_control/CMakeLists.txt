@@ -61,7 +61,7 @@ rosidl_target_interfaces(radiator ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 
 add_executable(thermal_nodes src/thermals_solver.cpp)
-ament_target_dependencies(thermal_nodes rosidl_default_generators rclcpp sensor_msgs space_station_eclss diagnostic_msgs yaml-cpp )
+ament_target_dependencies(thermal_nodes rosidl_default_generators ament_index_cpp rclcpp sensor_msgs space_station_eclss diagnostic_msgs yaml-cpp )
 rosidl_target_interfaces(thermal_nodes ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(thermal_nodes
   yaml-cpp
