@@ -1,3 +1,5 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+src/space_station_os/space_station_communication/space_station_communication/__pycache__
+src/space_station_os/space_station_communication/space_station_communication/ground/__pycache__

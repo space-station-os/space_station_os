@@ -257,6 +257,16 @@ class ThermalVisualizationNode(Node):
         self.loop_status = None
         self.node_data_received = False
         self.link_data_received = False
+        self.declare_parameter("min_temp",25.0)
+        self.declare_parameter("max_temp",40.0)
+        self.declare_parameter("cold_temp_color","blue")
+        self.declare_parameter("hot_temp_color","red")
+        
+        min_temp = self.get_parameter("min_temp").get_parameter_value().double_value
+        max_temp = self.get_parameter("max_temp").get_parameter_value().double_value
+        cold_color = self.get_parameter("cold_temp_color").get_parameter_value().string_value
+        hot_color = self.get_parameter("hot_temp_color").get_parameter_value().string_value
+        
 
     def node_callback(self, msg):
         """Callback for thermal node data."""

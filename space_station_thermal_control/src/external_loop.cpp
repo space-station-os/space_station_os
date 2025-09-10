@@ -75,7 +75,7 @@ void ExternalLoopA::try_ammonia_refill()
   }
 
   auto req = std::make_shared<space_station_thermal_control::srv::CoolantFlow::Request>();
-  req->requested_volume = request_volume_kg_;  // using "kg" as mass proxy
+  req->requested_volume = request_volume_kg_;  
 
   awaiting_ammonia_response_ = true;
 
