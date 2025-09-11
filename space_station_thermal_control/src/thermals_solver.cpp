@@ -13,8 +13,8 @@ ThermalSolverNode::ThermalSolverNode()
     "/thermal/links/flux", 10);
   diag_pub_ = this->create_publisher<diagnostic_msgs::msg::DiagnosticStatus>(
     "/thermals/diagnostics", 10);
-  cooling_client_ = this->create_client<space_station_thermal_control::srv::NodeHeatFlow>(
-    "/internal_loop_cooling");
+  cooling_client_ = rclcpp_action::create_client<space_station_thermal_control::action::Coolant>(
+      this,"coolant_heat_transfer");
 
   this->declare_parameter("enable_failure", false);
   this->declare_parameter("enable_cooling", true);
@@ -123,28 +123,56 @@ double ThermalSolverNode::compute_dTdt(
 
 void ThermalSolverNode::coolingCallback()
 {
-  
-  if (!cooling_active_ && enable_cooling_ && avg_temperature_ > cooling_trigger_threshold_) {
-    if (cooling_client_->wait_for_service(1s)) {
-      auto req = std::make_shared<space_station_thermal_control::srv::NodeHeatFlow::Request>();
-      req->heat_flow = avg_temperature_ - REFERENCE_TEMP_CELCIUS;
+  using namespace space_station_thermal_control::action;
 
-      cooling_client_->async_send_request(req,
-        [this](rclcpp::Client<space_station_thermal_control::srv::NodeHeatFlow>::SharedFuture future) {
-          auto result = future.get();
-          if (result->success) {
-            RCLCPP_WARN(this->get_logger(), "Cooling triggered: %s", result->message.c_str());
-            this->cooling_active_ = true;
-          } else {
-            RCLCPP_ERROR(this->get_logger(), "Cooling service call failed: %s", result->message.c_str());
-          }
-        });
-    } else {
-      RCLCPP_WARN(this->get_logger(), "Cooling service unavailable.");
+  if (!cooling_active_ && enable_cooling_ && avg_temperature_ > cooling_trigger_threshold_) {
+    if (!cooling_client_->wait_for_action_server(1s)) {
+      RCLCPP_WARN(this->get_logger(), "[COOLING] Cooling action server unavailable.");
+      return;
     }
+
+    Coolant::Goal goal_msg;
+    goal_msg.input_temperature_c = avg_temperature_;
+    goal_msg.component_id = "thermal_nodes";  // Set your unique ID here
+
+    RCLCPP_INFO(this->get_logger(), "[COOLING] Sending goal: avg_temperature = %.2f °C", avg_temperature_);
+
+    auto send_goal_options = rclcpp_action::Client<Coolant>::SendGoalOptions();
+
+    send_goal_options.feedback_callback =
+      [this](GoalHandleCoolant::SharedPtr,
+             const std::shared_ptr<const Coolant::Feedback> feedback) {
+        RCLCPP_INFO(this->get_logger(),
+          "[COOLING][Feedback] Internal=%.2f°C | Ammonia=%.2f°C | Vented=%.2f kJ",
+          feedback->internal_temp_c, feedback->ammonia_temp_c, feedback->vented_heat_kj);
+      };
+
+    send_goal_options.result_callback =
+      [this](const GoalHandleCoolant::WrappedResult &result) {
+        switch (result.code) {
+          case rclcpp_action::ResultCode::SUCCEEDED:
+            RCLCPP_INFO(this->get_logger(), "[COOLING]  Completed: %s", result.result->message.c_str());
+            break;
+          case rclcpp_action::ResultCode::ABORTED:
+            RCLCPP_ERROR(this->get_logger(), "[COOLING]  Aborted: %s", result.result->message.c_str());
+            break;
+          case rclcpp_action::ResultCode::CANCELED:
+            RCLCPP_WARN(this->get_logger(), "[COOLING]  Canceled.");
+            break;
+          default:
+            RCLCPP_ERROR(this->get_logger(), "[COOLING]  Unknown result code.");
+            break;
+        }
+        cooling_active_ = false;  
+      };
+
+    // Send goal asynchronously
+    cooling_client_->async_send_goal(goal_msg, send_goal_options);
+
+    cooling_active_ = true;
   }
 }
-  
+
 void ThermalSolverNode::updateSimulation()
 {
   if (thermal_nodes_.empty()) return;
