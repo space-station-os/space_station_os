@@ -17,7 +17,7 @@
 #include "space_station_thermal_control/msg/thermal_node_data.hpp"
 #include "space_station_thermal_control/msg/thermal_link_flows_array.hpp"
 #include "space_station_thermal_control/msg/thermal_link_flows.hpp"
-#include "space_station_thermal_control/srv/node_heat_flow.hpp"
+
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <space_station_thermal_control/action/coolant.hpp>
 
