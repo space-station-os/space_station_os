@@ -41,8 +41,7 @@ private:
 
   rclcpp::Client<space_station_eclss::srv::RequestProductWater>::SharedPtr product_water_client_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr grey_water_client_;
-  rclcpp::Service<space_station_thermal_control::srv::VentHeat>::SharedPtr venting_server_;
-
+  rclcpp::Client<space_station_thermal_control::srv::VentHeat>::SharedPtr radiator_client_;
   rclcpp::TimerBase::SharedPtr timer_;
 
   // Internal Methods

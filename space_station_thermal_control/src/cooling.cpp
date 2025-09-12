@@ -36,9 +36,9 @@ CoolantActionServer::CoolantActionServer(const rclcpp::NodeOptions &options)
   grey_water_client_ = this->create_client<std_srvs::srv::Trigger>(
       "/grey_water");
 
-  venting_server_ = this->create_service<space_station_thermal_control::srv::VentHeat>(
-      "/tcs/radiator_a/vent_heat",
-      std::bind(&CoolantActionServer::handleVenting, this, std::placeholders::_1, std::placeholders::_2));
+  radiator_client_ = this->create_client<space_station_thermal_control::srv::VentHeat>(
+    "/tcs/radiator_a/vent_heat");
+
 
   action_server_ = rclcpp_action::create_server<Coolant>(
       this,
@@ -135,6 +135,28 @@ void CoolantActionServer::execute(const std::shared_ptr<GoalHandle> goal_handle)
   RCLCPP_INFO(this->get_logger(),
               "[ACTION] Cooling complete: final node temp = %.2f C, total vented = %.2f kJ",
               node_temp, vented_total);
+
+  if (vented_total > 0.0) {
+      auto req = std::make_shared<space_station_thermal_control::srv::VentHeat::Request>();
+      req->excess_heat = vented_total;
+
+      if (radiator_client_->wait_for_service(2s)) {
+        auto future = radiator_client_->async_send_request(req);
+        if (future.wait_for(2s) == std::future_status::ready) {
+          auto resp = future.get();
+          if (resp->success) {
+            RCLCPP_INFO(this->get_logger(), "[RADIATOR] %s", resp->message.c_str());
+          } else {
+            RCLCPP_WARN(this->get_logger(), "[RADIATOR] Failed: %s", resp->message.c_str());
+          }
+        } else {
+          RCLCPP_ERROR(this->get_logger(), "[RADIATOR] VentHeat service timed out");
+        }
+      } else {
+        RCLCPP_ERROR(this->get_logger(), "[RADIATOR] VentHeat service not available");
+      }
+    }
+
 }
 
 
@@ -173,22 +195,6 @@ void CoolantActionServer::recycleWater()
   }
 }
 
-void CoolantActionServer::handleVenting(
-    const std::shared_ptr<space_station_thermal_control::srv::VentHeat::Request> req,
-    std::shared_ptr<space_station_thermal_control::srv::VentHeat::Response> res)
-{
-  if (lasted_vented_heat_ >= req->excess_heat)
-  {
-    lasted_vented_heat_ -= req->excess_heat;
-    res->success = true;
-    res->message = "Venting successful";
-  }
-  else
-  {
-    res->success = false;
-    res->message = "Insufficient ventable heat";
-  }
-}
 
 void CoolantActionServer::publishDiagnostics(bool status, const std::string &msg)
 {
