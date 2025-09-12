@@ -5,7 +5,7 @@ using namespace std::chrono_literals;
 namespace space_station_thermal_control
 {
 CoolantActionServer::CoolantActionServer(const rclcpp::NodeOptions &options)
-: Node("coolant_heat_transfer_action_server", options), goal_counter_(0), lasted_vented_heat_(0.0)
+: Node("coolant_server", options), goal_counter_(0), lasted_vented_heat_(0.0)
 {
   this->declare_parameter("mass_kg", 200.0);
   this->declare_parameter("specific_heat_j_per_kg_c", 4186.0);
@@ -41,25 +41,20 @@ CoolantActionServer::CoolantActionServer(const rclcpp::NodeOptions &options)
       std::bind(&CoolantActionServer::handleVenting, this, std::placeholders::_1, std::placeholders::_2));
 
   action_server_ = rclcpp_action::create_server<Coolant>(
-      shared_from_this(),
+      this,
       "coolant_heat_transfer",
       std::bind(&CoolantActionServer::handleGoal, this, std::placeholders::_1, std::placeholders::_2),
       std::bind(&CoolantActionServer::handleCancel, this, std::placeholders::_1),
       std::bind(&CoolantActionServer::handleAccepted, this, std::placeholders::_1));
 
-  current_temp_c_ = 25.0;
-  timer_ = this->create_wall_timer(5s, std::bind(&CoolantActionServer::simulateHeatRise, this));
+  coolant_temp_c_ = 25.0;
+  // timer_ = this->create_wall_timer(5s, std::bind(&CoolantActionServer::simulateHeatRise, this));
 
   RCLCPP_INFO(this->get_logger(),
               "Coolant action server ready. Mass: %.1f kg, Specific Heat: %.1f J/kgC, Efficiency: %.2f, Vent Threshold: %.1f kJ",
               mass_kg_, cp_water_, transfer_efficiency_, vent_threshold_kj_);
 }
 
-void CoolantActionServer::simulateHeatRise()
-{
-  current_temp_c_ += 1.0;
-  RCLCPP_INFO(this->get_logger(), "[SIM] Current internal temperature: %.2f C", current_temp_c_);
-}
 
 rclcpp_action::GoalResponse CoolantActionServer::handleGoal(
     const rclcpp_action::GoalUUID &uuid,
@@ -79,67 +74,74 @@ rclcpp_action::CancelResponse CoolantActionServer::handleCancel(
 
 void CoolantActionServer::handleAccepted(const std::shared_ptr<GoalHandle> goal_handle)
 {
-  std::thread{std::bind(&CoolantActionServer::execute, this, goal_handle)}.detach();
+  std::thread{[this, goal_handle]() {
+    this->execute(goal_handle);
+  }}.detach(); 
 }
+
 
 void CoolantActionServer::execute(const std::shared_ptr<GoalHandle> goal_handle)
 {
   const auto goal = goal_handle->get_goal();
   auto result = std::make_shared<Coolant::Result>();
 
-  double delta_T = current_temp_c_ - goal->input_temperature_c;
-  if (delta_T <= 0.0)
-  {
-    RCLCPP_WARN(this->get_logger(), "[ACTION] No cooling needed. Current: %.2f C, Goal: %.2f C",
-                current_temp_c_, goal->input_temperature_c);
-    result->success = true;
-    result->message = "No cooling needed";
-    goal_handle->succeed(result);
-    return;
-  }
-
-  double Q_joules = mass_kg_ * cp_water_ * delta_T;
-  double Q_kj = Q_joules / 1000.0;
-
   RCLCPP_INFO(this->get_logger(),
-              "[ACTION] Cooling %s from %.2fC to %.2fC (%.2f kJ heat removed)",
-              goal->component_id.c_str(), current_temp_c_, goal->input_temperature_c, Q_kj);
+              "[ACTION] Cooling %s from %.2f C towards coolant %.2f C",
+              goal->component_id.c_str(), goal->input_temperature_c, coolant_temp_c_);
 
-  current_temp_c_ = goal->input_temperature_c;
-  publishInternalLoop();
+  double target_temp = coolant_temp_c_;
+  double node_temp   = goal->input_temperature_c;
 
-  double ammonia_heat = Q_kj * transfer_efficiency_;
-  publishExternalLoop(ammonia_heat);
 
-  if (ammonia_heat >= vent_threshold_kj_)
-  {
-    std::this_thread::sleep_for(500ms);
-    RCLCPP_WARN(this->get_logger(),
-                "[ACTION] Venting triggered (%.2f kJ exceeds %.2f kJ)",
-                ammonia_heat, vent_threshold_kj_);
-    lasted_vented_heat_ = ammonia_heat;
+  double vented_total = 0.0;
+
+  while (rclcpp::ok() && node_temp > target_temp + 0.5) {
+    // Simulate cooling step
+    double delta_T = std::min(2.5, node_temp - target_temp);
+    double Q_joules = mass_kg_ * cp_water_ * delta_T;
+    double Q_kj = Q_joules / 1000.0;
+
+    node_temp -= delta_T;
+
+    // Heat transferred to ammonia
+    double ammonia_heat = Q_kj * transfer_efficiency_;
+    double ammonia_temp = 5.0 + (ammonia_heat / 1000.0); // dummy model
+
+    // Vent if needed
+    if (ammonia_heat >= vent_threshold_kj_) {
+      vented_total += ammonia_heat;
+      RCLCPP_WARN(this->get_logger(),
+                  "[ACTION] Venting triggered (%.2f kJ exceeds %.2f kJ)",
+                  ammonia_heat, vent_threshold_kj_);
+    }
+
+    // Publish feedback
+    auto feedback = std::make_shared<Coolant::Feedback>();
+    feedback->internal_temp_c = node_temp;
+    feedback->ammonia_temp_c  = ammonia_temp;
+    feedback->vented_heat_kj  = vented_total;
+    goal_handle->publish_feedback(feedback);
+
+    // Sleep for loop rate
+    rclcpp::sleep_for(100ms);
+
   }
 
-  if (++goal_counter_ >= 10)
-  {
-    recycleWater();
-    goal_counter_ = 0;
-  }
-
-  if (diagnostics_enabled_)
-  {
-    publishDiagnostics(true, "Cooling operation successful");
-  }
-
+  // Final result
   result->success = true;
   result->message = "Cooling completed successfully";
   goal_handle->succeed(result);
+
+  RCLCPP_INFO(this->get_logger(),
+              "[ACTION] Cooling complete: final node temp = %.2f C, total vented = %.2f kJ",
+              node_temp, vented_total);
 }
+
 
 void CoolantActionServer::publishInternalLoop()
 {
   sensor_msgs::msg::Temperature msg;
-  msg.temperature = current_temp_c_;
+  msg.temperature = coolant_temp_c_;
   msg.variance = 0.1;
   internal_loop_pub_->publish(msg);
 }

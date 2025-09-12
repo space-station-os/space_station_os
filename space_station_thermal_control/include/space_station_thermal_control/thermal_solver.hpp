@@ -83,6 +83,7 @@ private:
   // Simulation metrics
   double avg_temperature_ = 0.0;
   double avg_internal_power_ = 0.0;
+  double feedback_latest_temp_ = 0.0;
 
   std::string config_path_;
   std::default_random_engine rng_;

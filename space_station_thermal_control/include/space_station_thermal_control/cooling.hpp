@@ -30,7 +30,7 @@ private:
   double vent_threshold_kj_;
   bool diagnostics_enabled_;
   int goal_counter_ = 0;
-  double current_temp_c_ = 25.0;
+  double coolant_temp_c_ = 25.0;
   double lasted_vented_heat_ = 0.0;
 
   // ROS interfaces

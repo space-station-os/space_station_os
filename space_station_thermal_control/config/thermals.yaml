@@ -5,7 +5,7 @@ thermal_network:
     enable_failure: True 
 
    # --- Temperature thresholds (Celsius) ---
-    cooling_trigger_threshold: 70.0        # °C — coolant starts before overheat
+    cooling_trigger_threshold: 30.0        # °C — coolant starts before overheat
     max_temp_threshold: 60.0               # °C — triggers diagnostics
 
     # --- Cooling and update parameters ---
