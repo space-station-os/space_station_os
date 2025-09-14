@@ -34,11 +34,13 @@ OrbitDynamicsNode::OrbitDynamicsNode(const rclcpp::NodeOptions &options)
     this->declare_parameter<bool>("initial.compute_acc_on_start", true);
 
     // Read parameters
-    dynamics_dt_ = this->get_parameter("timing.dynamics_dt").as_double();
-    publish_dt_  = this->get_parameter("timing.publish_dt").as_double();
-    mu_          = this->get_parameter("dynamics.mu").as_double();
-    mass_        = this->get_parameter("dynamics.total_mass").as_double();
-    use_rk4_     = this->get_parameter("dynamics.use_rk4").as_bool();
+    dynamics_dt_       = this->get_parameter("timing.dynamics_dt").as_double();
+    publish_dt_        = this->get_parameter("timing.publish_dt").as_double();
+    mu_                = this->get_parameter("dynamics.mu").as_double();
+    mass_              = this->get_parameter("dynamics.total_mass").as_double();
+    use_rk4_           = this->get_parameter("dynamics.use_rk4").as_bool();
+    consider_j2_       = this->get_parameter("dynamics.consider_j2").as_bool();
+    consider_air_drag_ = this->get_parameter("dynamics.consider_air_drag").as_bool();
 
     topic_thruster_ = this->get_parameter("topics.bias_thruster_cmd").as_string();
     topic_quat_     = this->get_parameter("topics.attitude_quat").as_string();
@@ -160,6 +162,64 @@ void OrbitDynamicsNode::on_forward_time(const std_msgs::msg::Float64::SharedPtr 
     
 }
 
+Eigen::Vector3d OrbitDynamicsNode::calc_leo_acc_j2_term(const Eigen::Vector3d& position) {
+    const double& x = position[0];
+    const double& y = position[1];
+    const double& z = position[2];
+
+    double z2 = z * z;
+    double r2 = x * x + y * y + z2;
+    double r_norm = std::sqrt(r2);
+    double r5 = r2 * r2 * r_norm;
+
+    double factor = 1.5 * OrbitLib::J2 * OrbitLib::G_ME * OrbitLib::EARTH_RADIUS * OrbitLib::EARTH_RADIUS / r5;
+    double term = 5.0 * z2 / r2;
+
+    Eigen::Vector3d acc_J2 = {
+        x * (1 - term),
+        y * (1 - term),
+        z * (3 - term * 5)
+    };
+    return acc_J2 * factor;
+}
+
+Eigen::Vector3d OrbitDynamicsNode::calc_leo_acc_air_drag_term(const Eigen::Vector3d& position, const Eigen::Vector3d& velocity) {
+    double r_norm = position.norm();
+    Eigen::Vector3d v_atm = {
+        -OrbitLib::EARTH_OMEGA * position[1],
+        OrbitLib::EARTH_OMEGA * position[0],
+        0.0
+    };
+    Eigen::Vector3d v_rel = velocity - v_atm;
+    double alt = r_norm - OrbitLib::EARTH_RADIUS;
+    double rho = OrbitLib::atmospheric_density(alt); // [m]
+    return v_rel * (-0.5 * this->cd_ * this->area_ / this->mass_ * rho * v_rel.norm());
+}
+
+
+// Internal function: Calulating acceleration [m/s^2]
+//   - r: ECI position [m]
+//   - v: ECI velocity [m/s]
+Eigen::Vector3d OrbitDynamicsNode::calc_leo_acceleration(const Eigen::Vector3d& r, const Eigen::Vector3d& v) {
+
+    Eigen::Vector3d acc = Eigen::Vector3d::Zero();
+    // Gravity effect
+    acc += (-mu_ / std::pow(r.norm(), 3)) * r;
+
+    // J2 effect
+    if (this->consider_j2_){
+        acc += calc_leo_acc_j2_term(r);
+    }
+
+    // Air drag effect
+    if (this->consider_air_drag_){
+        acc += calc_leo_acc_air_drag_term(r, v);
+    }
+
+    return acc;
+}
+
+
 // ----- Dynamics core -----
 void OrbitDynamicsNode::step_dynamics_once() {
     const double dt = dynamics_dt_;
@@ -168,29 +228,29 @@ void OrbitDynamicsNode::step_dynamics_once() {
 
     if (use_rk4_) {
         // State: [r, v]; r' = v; v' = a(r, F)
-        const auto ar = [&](const Eigen::Vector3d &r){ return (-mu_ / std::pow(r.norm(), 3)) * r; };
+
 
         // k1
         Eigen::Vector3d k1_r = v_eci_;
-        Eigen::Vector3d k1_v = ar(r_eci_) + F_eci / mass_;
+        Eigen::Vector3d k1_v = this->calc_leo_acceleration(r_eci_, v_eci_) + F_eci / mass_;
 
         // k2
         Eigen::Vector3d r2 = r_eci_ + 0.5*dt*k1_r;
         Eigen::Vector3d v2 = v_eci_ + 0.5*dt*k1_v;
         Eigen::Vector3d k2_r = v2;
-        Eigen::Vector3d k2_v = ar(r2) + F_eci / mass_;
+        Eigen::Vector3d k2_v = this->calc_leo_acceleration(r2, v2) + F_eci / mass_;
 
         // k3
         Eigen::Vector3d r3 = r_eci_ + 0.5*dt*k2_r;
         Eigen::Vector3d v3 = v_eci_ + 0.5*dt*k2_v;
         Eigen::Vector3d k3_r = v3;
-        Eigen::Vector3d k3_v = ar(r3) + F_eci / mass_;
+        Eigen::Vector3d k3_v = this->calc_leo_acceleration(r3, v3) + F_eci / mass_;
 
         // k4
         Eigen::Vector3d r4 = r_eci_ + dt*k3_r;
         Eigen::Vector3d v4 = v_eci_ + dt*k3_v;
         Eigen::Vector3d k4_r = v4;
-        Eigen::Vector3d k4_v = ar(r4) + F_eci / mass_;
+        Eigen::Vector3d k4_v = this->calc_leo_acceleration(r4, v4) + F_eci / mass_;
 
         r_eci_ += (dt/6.0)*(k1_r + 2.0*k2_r + 2.0*k3_r + k4_r);
         v_eci_ += (dt/6.0)*(k1_v + 2.0*k2_v + 2.0*k3_v + k4_v);

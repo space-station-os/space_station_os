@@ -37,11 +37,32 @@ namespace Math {
 namespace OrbitLib {
     // Earth GM [m^3/s^2]
     constexpr double MU_EARTH = 3.986004418e14;
+    // The Earth radius [m]
+    constexpr double EARTH_RADIUS = 6378.14 * 1e3;
+    // Earth rotation angular velocity [rad/s]
+    const double EARTH_OMEGA = 7.2921150e-5;
+    // [m^3 s^-2]
+    constexpr double G_ME = 3.986004418e14;
 
     // WGS‑84 (kept for potential ECI→ECEF→LLA use)
     inline constexpr double WGS84_A = 6378137.0;
     inline constexpr double WGS84_F = 1.0 / 298.257223563;
     inline constexpr double WGS84_E2 = WGS84_F * (2.0 - WGS84_F);
+
+    // J2
+    inline constexpr double J2 = 1.08263e-3;
+
+    // Very simple atmospheric density function
+    double atmospheric_density(double altitude) {
+        // altitude: altitude [m]
+        // return: atmosphic density [kg/m^3]
+        if (altitude < 150e3) return 4e-9;
+        if (altitude < 200e3) return 1e-9;
+        if (altitude < 300e3) return 1e-10;
+        if (altitude < 400e3) return 1e-11;
+        if (altitude < 500e3) return 1e-12;
+        return 1e-13;
+    }
 
     // Convert mean motion (rad/s) to semi‑major axis [m]
     inline double mean_motion_to_a(double n) { // n: rad/s
@@ -145,7 +166,14 @@ private:
     double publish_dt_{0.5};
     double mu_{OrbitLib::MU_EARTH};
     double mass_{420000.0};
+    // sruface area [m^2]
+    double area_{10.0};
+    double cd_{3.5};
     bool   use_rk4_{false};
+
+    bool consider_j2_{false};
+    bool consider_air_drag_{false};
+    double j2_coeff_{OrbitLib::J2};
 
     std::string topic_thruster_, topic_quat_, topic_t_fwd_;
     std::string topic_pos_, topic_vel_, topic_acc_, topic_pose_, topic_path_;
@@ -192,6 +220,10 @@ private:
         const Eigen::Vector3d a_t = F_eci / mass_;
         return a_g + a_t;
     }
+
+    Eigen::Vector3d calc_leo_acc_j2_term(const Eigen::Vector3d& position);
+    Eigen::Vector3d calc_leo_acc_air_drag_term(const Eigen::Vector3d& position, const Eigen::Vector3d& velocity);
+    Eigen::Vector3d calc_leo_acceleration(const Eigen::Vector3d& position, const Eigen::Vector3d& velocity) ;
 
     inline Eigen::Vector3d current_thruster_force_eci() const {
         Eigen::Vector3d F_body;
