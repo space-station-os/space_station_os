@@ -26,27 +26,17 @@ from space_station_thermal_control.msg import (
 class ZoomableGraphicsView(QGraphicsView):
     """Graphics view with scroll-to-zoom and pan support."""
 
-    MIN_SCALE = 0.2
-    MAX_SCALE = 5.0
-
-    def __init__(self, *args, min_scale=MIN_SCALE, max_scale=MAX_SCALE, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._zoom = 1.0
-        self._min_scale = min_scale
-        self._max_scale = max_scale
         self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.AnchorViewCenter)
         self.setDragMode(QGraphicsView.ScrollHandDrag)
 
     def wheelEvent(self, event):
         """Zoom in/out with mouse wheel."""
-        zoom_in_factor = 1.25
-        zoom_out_factor = 1.0 / zoom_in_factor
-        factor = zoom_in_factor if event.angleDelta().y() > 0 else zoom_out_factor
-        new_zoom = self._zoom * factor
-        if new_zoom < self._min_scale or new_zoom > self._max_scale:
-            return
-        self._zoom = new_zoom
+        factor = 1.2 if event.angleDelta().y() > 0 else 1 / 1.2
+        self._zoom *= factor
         self.scale(factor, factor)
 
     def reset_zoom(self):
@@ -61,10 +51,10 @@ class ThermalNodeItem(QGraphicsEllipseItem):
     Handles hover events to trigger callbacks for displaying node details.
     """
 
-    MIN_SIZE = 20
-    MAX_SIZE = 60
-    SIZE_SCALE = 40
+    SIZE_SCALE = 0.04
     DEFAULT_FONT_SIZE = 7
+    MIN_TEMP = 0.0
+    TEMP_RANGE = 40.0
 
     def __init__(self, name, temperature, heat_capacity, internal_power, x=0, y=0, hover_callback=None):
         super().__init__()
@@ -97,7 +87,7 @@ class ThermalNodeItem(QGraphicsEllipseItem):
 
     def _compute_size(self, heat_capacity):
         """Compute node size based on heat capacity."""
-        return max(self.MIN_SIZE, min(self.MAX_SIZE, heat_capacity / 1000.0 * self.SIZE_SCALE))
+        return heat_capacity * self.SIZE_SCALE
 
     def _tooltip_text(self):
         """Return tooltip summary for node."""
@@ -110,7 +100,7 @@ class ThermalNodeItem(QGraphicsEllipseItem):
 
     def _apply_color(self):
         """Set node color based on temperature."""
-        temp_ratio = max(0.0, min(1.0, (self.temperature - 275.0) / 50.0))
+        temp_ratio = max(0.0, min(1.0, (self.temperature - self.MIN_TEMP) / self.TEMP_RANGE))
         red = int(255 * temp_ratio)
         blue = int(255 * (1.0 - temp_ratio))
         color = QColor(red, 0, blue)
@@ -159,10 +149,8 @@ class ThermalLinkItem(QGraphicsLineItem):
     Graphics item representing a thermal link.
 
     Handles hover events to trigger callbacks for displaying link details.
+    Animated dashed line, width by conductance, dash offset by heat flow.
     """
-
-    MIN_WIDTH = 1
-    MAX_WIDTH = 8
 
     def __init__(self, from_node_item, to_node_item, conductance, heat_flow, hover_callback=None):
         super().__init__()
@@ -170,19 +158,37 @@ class ThermalLinkItem(QGraphicsLineItem):
         self.to_node_item = to_node_item
         self.conductance = conductance
         self.heat_flow = heat_flow
+        self._is_hovered = False
         self.hover_callback = hover_callback
         self.setAcceptHoverEvents(True)
         self.setZValue(1)
+        self.dash_offset = 0.0
+        self._animation_timer = QTimer()
+        self._animation_timer.timeout.connect(self._animate_dash)
+        self._animation_timer.start(30)
         self._apply_pen()
         self.update_line()
         self.setAcceptedMouseButtons(Qt.NoButton)
 
     def _apply_pen(self):
-        """Set pen width and color based on heat flow."""
-        width = max(self.MIN_WIDTH, min(self.MAX_WIDTH, abs(self.heat_flow)))
-        pen = QPen(Qt.white, width)
+        """Set pen width by conductance, fixed dash/gap size in pixels, white."""
+        width = self.conductance * 7.5
+        pen = QPen(Qt.yellow if self._is_hovered else Qt.white, width)
         pen.setCapStyle(Qt.RoundCap)
+        pen.setCosmetic(True)
+        pen.setDashPattern([2, 2])  
+        pen.setDashOffset(self.dash_offset)
         self.setPen(pen)
+
+    def _animate_dash(self):
+        """Animate dash offset so that dashed area per unit time ∝ heat flow."""
+        if self.conductance > 0:
+            speed = (self.heat_flow / self.conductance) * 0.01
+        else:
+            speed = 0
+        self.dash_offset += speed
+        self._apply_pen()
+        self.update()
 
     def update_data(self, conductance, heat_flow):
         """Update link data and appearance."""
@@ -199,6 +205,7 @@ class ThermalLinkItem(QGraphicsLineItem):
 
     def hoverEnterEvent(self, event):
         """Handle hover enter event for link."""
+        self._is_hovered = True
         if callable(self.hover_callback):
             self.hover_callback(self, 'link')
         pen = self.pen()
@@ -208,6 +215,7 @@ class ThermalLinkItem(QGraphicsLineItem):
 
     def hoverMoveEvent(self, event):
         """Handle hover move event for link."""
+        self._is_hovered = True
         if callable(self.hover_callback):
             self.hover_callback(self, 'link')
         pen = self.pen()
@@ -217,6 +225,7 @@ class ThermalLinkItem(QGraphicsLineItem):
 
     def hoverLeaveEvent(self, event):
         """Handle hover leave event for link."""
+        self._is_hovered = False
         if callable(self.hover_callback):
             self.hover_callback(None, None)
         self._apply_pen()
@@ -268,7 +277,7 @@ class ThermalVisualizationNode(Node):
                 'internal_power': node.internal_power
             }
         self.node_data_received = True
-        self.get_logger().info(f"Received thermal data for {len(self.thermal_nodes)} nodes")
+        self.get_logger().info(f"Received thermal data for {len(self.thermal_nodes)} nodes",once=True)
 
     def link_callback(self, msg):
         """Callback for thermal link data."""
@@ -281,7 +290,7 @@ class ThermalVisualizationNode(Node):
                 'heat_flow': link.heat_flow
             })
         self.link_data_received = True
-        self.get_logger().info(f"Received thermal data for {len(self.thermal_links)} links")
+        self.get_logger().info(f"Received thermal data for {len(self.thermal_links)} links",once=True)
 
     def tank_callback(self, msg):
         """Callback for tank status."""
@@ -306,8 +315,8 @@ class ThermalVisualizationGUI(QWidget):
     Handles layout, updates, and details panel logic.
     """
 
-    NODE_PLACEHOLDER = {'temperature': 300.0, 'heat_capacity': 1000.0, 'internal_power': 0.0}
-    GRID_SPACING = 80
+    # NODE_PLACEHOLDER = {'temperature': 300.0, 'heat_capacity': 1000.0, 'internal_power': 0.0}
+    NODE_PLACEHOLDER = {'temperature': 27.0, 'heat_capacity': 1000.0, 'internal_power': 0.0}
     FORCE_LAYOUT_ITER = 200
     VIEW_MARGIN = 40
 
@@ -315,7 +324,7 @@ class ThermalVisualizationGUI(QWidget):
         super().__init__()
         self.node = node
         self.setWindowTitle("Space Station Thermal Visualization")
-        self.setFixedSize(1400, 900)
+        self.resize(1400, 900)
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_display)
         self.timer.start(1000)
@@ -375,7 +384,7 @@ class ThermalVisualizationGUI(QWidget):
         tanks_layout.addRow("Loop B Temp:", self.loop_b_temp_label)
         tanks_group.setLayout(tanks_layout)
         info_layout.addWidget(tanks_group)
-
+        self.hovered_item = None
         details_group = QGroupBox("")
         self.details_group = details_group
         details_layout = QFormLayout()
@@ -386,17 +395,14 @@ class ThermalVisualizationGUI(QWidget):
             "Internal Power:": (QLabel("Internal Power:"), QLabel(""))
         }
         for label_widget, value_widget in self.node_fields.values():
-            label_widget.hide()
-            value_widget.hide()
             details_layout.addRow(label_widget, value_widget)
         self.link_fields = {
-            "Link:": (QLabel("Link:"), QLabel("")),
+            "Parent:": (QLabel("Parent:"), QLabel("")),
+            "Child:": (QLabel("Child:"), QLabel("")),
             "Conductance:": (QLabel("Conductance:"), QLabel("")),
             "Heat Flow:": (QLabel("Heat Flow:"), QLabel(""))
         }
         for label_widget, value_widget in self.link_fields.values():
-            label_widget.hide()
-            value_widget.hide()
             details_layout.addRow(label_widget, value_widget)
         details_group.setLayout(details_layout)
         info_layout.addWidget(details_group)
@@ -405,8 +411,8 @@ class ThermalVisualizationGUI(QWidget):
         legend_layout = QVBoxLayout()
         legend_text = (
             "<b>Node Colors:</b><br>"
-            "• Blue = Cold (275K)<br>"
-            "• Red = Hot (325K)<br><br>"
+            "• Blue = Cold <br>"
+            "• Red = Hot <br><br>"
             "<b>Node Size:</b><br>"
             "• Larger = Higher heat capacity<br><br>"
             "<b>Arrow Width:</b><br>"
@@ -435,6 +441,14 @@ class ThermalVisualizationGUI(QWidget):
                 self.update_links()
             for link in self.link_items.values():
                 link.update_line()
+        
+        if self.hovered_item is not None and self.hovered_type is not None:
+            if self.hovered_type == 'node':
+                self.update_node_details(self.hovered_item)
+            elif self.hovered_type == 'link':
+                self.update_link_details(self.hovered_item)
+        else:
+            self.clear_details()
 
     def update_graph(self):
         """Create/update node items and compute layout."""
@@ -475,25 +489,9 @@ class ThermalVisualizationGUI(QWidget):
 
         # Compute layout only once (or when topology changes)
         if not self.layout_computed and len(self.node_items) > 0:
-            if len(self.node.thermal_links) > 0:
-                self._apply_force_directed_layout(iterations=self.FORCE_LAYOUT_ITER)
-            else:
-                self._compact_grid_layout()
+            self._apply_force_directed_layout(iterations=self.FORCE_LAYOUT_ITER)
             self._fit_view_to_items(margin=self.VIEW_MARGIN)
             self.layout_computed = True
-
-    def _compact_grid_layout(self):
-        """Simple compact grid layout used when there are no links yet."""
-        names = list(self.node_items.keys())
-        N = len(names)
-        cols = int(math.ceil(math.sqrt(N)))
-        spacing = self.GRID_SPACING
-        for i, name in enumerate(names):
-            r = i // cols
-            c = i % cols
-            x = (c - cols / 2) * spacing
-            y = (r - cols / 2) * spacing
-            self.node_items[name].setPos(x, y)
 
     def _apply_force_directed_layout(self, iterations=60):
         """
@@ -525,7 +523,7 @@ class ThermalVisualizationGUI(QWidget):
         rect = self.scene.sceneRect()
         area = max(1.0, rect.width() * rect.height())
         k = max(40.0, math.sqrt(area / max(1, N)))
-        repulsion = 5.0
+        repulsion = 15.0
         attraction_scale = 3
         max_disp = 30.0
 
@@ -564,6 +562,8 @@ class ThermalVisualizationGUI(QWidget):
                 uy = dy / dist
                 disp[ia][0] -= ux * force
                 disp[ia][1] -= uy * force
+                disp[ib][0] += ux * force
+                disp[ib][1] += uy * force
             # Apply
             for i in range(N):
                 dx, dy = disp[i]
@@ -605,8 +605,8 @@ class ThermalVisualizationGUI(QWidget):
         """Create/update link graphics for every reported link."""
         current_keys = set()
         for l in self.node.thermal_links:
-            a = l['node_a']
-            b = l['node_b']
+            a = l['node_b']
+            b = l['node_a']
             key = f"{a}__{b}"
             current_keys.add(key)
             if a not in self.node_items or b not in self.node_items:
@@ -632,33 +632,20 @@ class ThermalVisualizationGUI(QWidget):
         if self.node.tank_status:
             tank = self.node.tank_status
             self.ammonia_temp_label.setText(f"{tank['temperature']:.1f}°C")
-            self.ammonia_pressure_label.setText(f"{tank['pressure']:.0f} Pa")
+            self.ammonia_pressure_label.setText(f"{tank['pressure']:.0f} kPa")
             self.ammonia_heater_label.setText("ON" if tank['heater_on'] else "OFF")
         if self.node.loop_status:
             loop = self.node.loop_status
             self.loop_a_temp_label.setText(f"{loop['loop_a_temp']:.1f}°C")
             self.loop_b_temp_label.setText(f"{loop['loop_b_temp']:.1f}°C")
 
-    def _on_item_hover(self, item, item_type):
-        """
-        Callback for hover events from node/link items.
-
-        Shows details for the hovered item, or clears details if not hovering.
-        """
-        if item is None:
-            self.clear_details()
-        elif item_type == 'node':
-            self.update_node_details(item)
-        elif item_type == 'link':
-            self.update_link_details(item)
-
     def update_node_details(self, node_item):
         """Show node details, hide link details."""
         self.details_group.setTitle("Node Details")
         self._set_fields(self.node_fields, [
             node_item.name,
-            f"{node_item.temperature:.1f} K",
-            f"{node_item.heat_capacity:.1f} J/K",
+            f"{node_item.temperature:.1f} °C",
+            f"{node_item.heat_capacity:.1f} J/°C",
             f"{node_item.internal_power:.1f} W"
         ])
         self._set_fields(self.link_fields, None)
@@ -666,19 +653,38 @@ class ThermalVisualizationGUI(QWidget):
     def update_link_details(self, link_item):
         """Show link details, hide node details."""
         self.details_group.setTitle("Link Details")
-        a, b = link_item.from_node_item.name, link_item.to_node_item.name
+        a = link_item.from_node_item.name
+        b = link_item.to_node_item.name
+        # Show both directions as parent/child for clarity
         self._set_fields(self.link_fields, [
-            f"{a} ↔ {b}",
-            f"{link_item.conductance:.3f} W/K",
+            a,
+            b,
+            f"{link_item.conductance:.3f} W/°C",
             f"{link_item.heat_flow:.2f} W"
         ])
         self._set_fields(self.node_fields, None)
 
     def clear_details(self):
-        """Hide all details panel fields and clear title."""
-        self.details_group.setTitle("")
+        """Show default info when nothing is selected."""
+        self.details_group.setTitle("Hover over something for info")
         self._set_fields(self.node_fields, None)
         self._set_fields(self.link_fields, None)
+
+
+    def _on_item_hover(self, item, item_type):
+        """
+        Callback for hover events from node/link items.
+
+        Shows details for the hovered item, or clears details if not hovering.
+        """
+        self.hovered_item = item
+        self.hovered_type = item_type
+        if item is None:
+            self.clear_details()
+        elif item_type == 'node':
+            self.update_node_details(item)
+        elif item_type == 'link':
+            self.update_link_details(item)
 
     def _set_fields(self, field_dict, values):
         """
