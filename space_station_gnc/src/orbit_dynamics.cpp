@@ -9,12 +9,6 @@ OrbitDynamicsNode::OrbitDynamicsNode(const rclcpp::NodeOptions &options)
     // Timing
     this->declare_parameter<double>("timing.dynamics_dt", 0.25);   // [s]
     this->declare_parameter<double>("timing.publish_dt",  0.5);    // [s]
-
-    // Dynamics
-    this->declare_parameter<double>("dynamics.mu", OrbitLib::MU_EARTH);
-    this->declare_parameter<double>("dynamics.total_mass", 420000.0); // ~ISS
-    this->declare_parameter<bool>("dynamics.use_rk4", false);
-
     // Topics
     this->declare_parameter<std::string>("topics.bias_thruster_cmd", "gnc/bias_thruster_cmd");
     this->declare_parameter<std::string>("topics.attitude_quat",     "gnc/attitude_body_to_eci");
@@ -33,6 +27,12 @@ OrbitDynamicsNode::OrbitDynamicsNode(const rclcpp::NodeOptions &options)
     this->declare_parameter<std::string>("initial.tle_line2", "");
     this->declare_parameter<bool>("initial.compute_acc_on_start", true);
 
+    // Dynamics
+    this->declare_parameter<double>("dynamics.mu", OrbitLib::MU_EARTH);
+    this->declare_parameter<double>("dynamics.total_mass", 420000.0); // ~ISS
+    this->declare_parameter<bool>("dynamics.use_rk4", false);
+    this->declare_parameter<bool>("dynamics.consider_j2", true);
+    this->declare_parameter<bool>("dynamics.consider_air_drag", false);
     // Read parameters
     dynamics_dt_       = this->get_parameter("timing.dynamics_dt").as_double();
     publish_dt_        = this->get_parameter("timing.publish_dt").as_double();

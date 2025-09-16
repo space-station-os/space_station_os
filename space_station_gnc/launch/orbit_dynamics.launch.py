@@ -8,7 +8,7 @@ def generate_launch_description():
     orbital_config_file = os.path.join(
         get_package_share_directory('space_station_gnc'),
         'config',
-        'params.yaml'
+        'orbit_dynamics.yaml'
     )
     return LaunchDescription([
         
