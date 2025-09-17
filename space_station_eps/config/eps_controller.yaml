@@ -1,0 +1,6 @@
+/eps_power_controller:
+  ros__parameter:
+    charge_threshold: 165.0
+    discharge_threshold: 140.0 
+
+
