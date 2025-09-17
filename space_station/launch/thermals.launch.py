@@ -11,24 +11,14 @@ def generate_launch_description():
         'thermals.yaml'
     )
     return LaunchDescription([
+    
+        Node(
+            package='space_station_thermal_control',
+            executable='cooling_server',
+            name='cooling_server',
+            emulate_tty=True,
+            output='screen'),
         
-
-        Node(
-            package='space_station_thermal_control',
-            executable='coolant',
-            name='internal_coolant',
-            output='screen',
-            
-            emulate_tty=True
-        ),
-
-        Node(
-            package='space_station_thermal_control',
-            executable='external_loop',
-            name='external_loop',
-            output='screen',
-            emulate_tty=True
-        ),
         Node(
             package='space_station_thermal_control',
             executable='radiator',
@@ -45,5 +35,11 @@ def generate_launch_description():
             emulate_tty=True
         ),
         
-        
+        # Node(
+        #     package='space_station_thermal_control',
+        #     executable='thermal_visualization.py',
+        #     name='thermal_visualization',
+        #     output='screen',
+        #     emulate_tty=True
+        # )
     ])

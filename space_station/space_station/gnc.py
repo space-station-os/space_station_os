@@ -1,11 +1,13 @@
-from PyQt5.QtWidgets import (
+# space_station/gnc.py
+
+from PyQt6.QtWidgets import (
     QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QGroupBox,
     QSizePolicy
 )
-from PyQt5.QtGui import QFont
-from PyQt5.QtCore import Qt, QTimer
+from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, QTimer
 
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import numpy as np
 import matplotlib.image as mpimg
@@ -43,7 +45,7 @@ class GncWidget(QWidget):
         self.canvas3d = FigureCanvas(Figure(figsize=(6, 6)))
         self.ax3d = self.canvas3d.figure.add_subplot(111, projection='3d')
         self.canvas3d.figure.subplots_adjust(left=0.02, right=0.98, bottom=0.02, top=0.98)
-        self.canvas3d.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.canvas3d.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         # Base 3D styling (we re-apply after each clear)
         self.ax3d.set_facecolor('black')
@@ -54,11 +56,11 @@ class GncWidget(QWidget):
         for axis in (self.ax3d.xaxis, self.ax3d.yaxis, self.ax3d.zaxis):
             axis.line.set_color((0, 0, 0, 0))
 
-        # Right panel: labels, buttons, then 2D plot
+        # Right panel
         right_panel = QVBoxLayout()
 
         title = QLabel("Guidance, Navigation & Control (GNC)")
-        title.setFont(QFont("Arial", 14, QFont.Bold))
+        title.setFont(QFont("Arial", 14, QFont.Weight.Bold))
         title.setStyleSheet("color: white;")
         right_panel.addWidget(title)
         right_panel.addSpacing(10)
@@ -67,8 +69,8 @@ class GncWidget(QWidget):
         orbit_box.setStyleSheet("color: white;")
         orbit_layout = QVBoxLayout()
         self.altitude_label = QLabel("Altitude: --- km")
-        self.inclination_label = QLabel("Inclination: ---°")  # placeholder
-        self.velocity_label = QLabel("Velocity: --- km/s")    # placeholder
+        self.inclination_label = QLabel("Inclination: ---°")
+        self.velocity_label = QLabel("Velocity: --- km/s")
         for lbl in [self.altitude_label, self.inclination_label, self.velocity_label]:
             lbl.setStyleSheet("color: lightgray;")
             orbit_layout.addWidget(lbl)
@@ -98,7 +100,7 @@ class GncWidget(QWidget):
         control_box.setLayout(control_layout)
         right_panel.addWidget(control_box)
 
-        # 2D plot sits BELOW buttons
+        # 2D plot
         self.canvas2d = FigureCanvas(Figure(figsize=(4, 2)))
         self.ax2d = self.canvas2d.figure.add_subplot(111)
         self.canvas2d.figure.subplots_adjust(left=0.12, right=0.98, bottom=0.18, top=0.92)
@@ -117,7 +119,6 @@ class GncWidget(QWidget):
 
     # ---------- Data/ROS ----------
     def _load_2d_bg_image(self):
-        # Load ./assets/earth2d.png relative to this file
         base_dir = os.path.dirname(os.path.abspath(__file__))
         img_path = os.path.join(base_dir, "assets", "earth2d.png")
         try:
@@ -136,11 +137,9 @@ class GncWidget(QWidget):
         self.timer.start(500)  # ms
 
     def _init_ros_subscribers(self):
-        # Use /gnc/pos_eci for position trace; keep others for labels
         self.node.create_subscription(Vector3, '/gnc/pos_eci', self._eci_cb, 10)
         self.node.create_subscription(Quaternion, '/gnc/attitude_LVLH', self._att_cb, 10)
         self.node.create_subscription(Vector3, '/gnc/angvel_body', self._w_cb, 10)
-        # self.node.create_subscription(PoseStamped, 'gnc/pose_all', self._pose_cb, 10)
 
     # ---------- Callbacks ----------
     def _eci_cb(self, msg: Vector3):
@@ -155,17 +154,14 @@ class GncWidget(QWidget):
         self.eci_y.append(y)
         self.eci_z.append(z)
 
-        # Cap history
         max_pts = 2000
         if len(self.eci_x) > max_pts:
             self.eci_x = self.eci_x[-max_pts:]
             self.eci_y = self.eci_y[-max_pts:]
             self.eci_z = self.eci_z[-max_pts:]
 
-        # Quick derived label (altitude ~ |r| - R_earth)
         r = (x**2 + y**2 + z**2) ** 0.5
         self.altitude_label.setText(f"Altitude: {r/1000.0 - 6371:.2f} km")
-        # Velocity label left as placeholder unless you publish /gnc/vel_eci
         self.velocity_label.setText("Velocity: --- km/s")
 
     def _att_cb(self, q: Quaternion):
@@ -185,10 +181,9 @@ class GncWidget(QWidget):
         ax.set_facecolor('black')
         ax.grid(False)
         try:
-            ax.set_axis_off()        # preferred
+            ax.set_axis_off()
         except Exception:
-            ax._axis3don = False     # fallback
-        # Make panes/lines transparent across versions
+            ax._axis3don = False
         for a in (ax.xaxis, ax.yaxis, ax.zaxis):
             try:
                 a.pane.fill = False
@@ -199,12 +194,6 @@ class GncWidget(QWidget):
                 a.line.set_color((0, 0, 0, 0))
             except Exception:
                 pass
-        for setter in (getattr(ax, "w_xaxis", None), getattr(ax, "w_yaxis", None), getattr(ax, "w_zaxis", None)):
-            if setter is not None:
-                try:
-                    setter.set_pane_color((0, 0, 0, 0))
-                except Exception:
-                    pass
 
     def _set_equal_3d_limits(self, max_extent):
         self.ax3d.set_xlim([-max_extent, max_extent])
@@ -213,7 +202,6 @@ class GncWidget(QWidget):
 
     # ---------- Plotting ----------
     def _update_plots(self):
-        # --- 3D: draw Earth sphere first ---
         self.ax3d.cla()
 
         R = self._earth_radius
@@ -228,7 +216,6 @@ class GncWidget(QWidget):
             alpha=0.35, color='#0b5fff', edgecolor='none', shade=True
         )
 
-        # Orbit trace (yellow), if any points exist
         if self.eci_x:
             x = np.asarray(self.eci_x); y = np.asarray(self.eci_y); z = np.asarray(self.eci_z)
             self.ax3d.plot(x, y, z, linewidth=2.0, color='yellow')
@@ -237,9 +224,8 @@ class GncWidget(QWidget):
             max_extent = R * 1.1
 
         self._set_equal_3d_limits(max_extent)
-        self._style_ax3d()  # IMPORTANT: call after cla() and limits
+        self._style_ax3d()
 
-        # --- 2D: background Earth + radius line ---
         self.ax2d.cla()
         if self._img_ok and self._earth2d is not None:
             y_min, y_max = (R*0.95, R*1.1)

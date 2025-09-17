@@ -1,11 +1,11 @@
 # space_station/system_status.py
 
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton,
-    QTableWidget, QTableWidgetItem, QHeaderView, QTextEdit, QDialog
+    QTableWidget, QTableWidgetItem, QTextEdit, QDialog
 )
-from PyQt5.QtGui import QFont, QColor
-from PyQt5.QtCore import Qt, QTimer
+from PyQt6.QtGui import QFont, QColor
+from PyQt6.QtCore import QTimer
 from diagnostic_msgs.msg import DiagnosticStatus
 from rcl_interfaces.msg import Log
 
@@ -49,7 +49,7 @@ class SystemStatusWidget(QWidget):
         layout = QVBoxLayout()
 
         title = QLabel("System Diagnostics & Status")
-        title.setFont(QFont("Arial", 14, QFont.Bold))
+        title.setFont(QFont("Arial", 14, QFont.Weight.Bold))
         title.setStyleSheet("color: white;")
         layout.addWidget(title)
         layout.addSpacing(10)
@@ -59,8 +59,8 @@ class SystemStatusWidget(QWidget):
         self.table.setHorizontalHeaderLabels(["Subsystem", "Status"])
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.verticalHeader().setVisible(False)
-        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.table.setSelectionMode(QTableWidget.NoSelection)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
         self.table.setStyleSheet("""
             QTableWidget {
                 background-color: #2a2a2a;
@@ -79,8 +79,10 @@ class SystemStatusWidget(QWidget):
             ("WRS", "OK"),
             ("Thermal Solver", "OK"),
             ("Coolant Manager", "OK"),
+            ("Thermal System", "OK"),
+            ("EPS", "OK"),
             ("GNC", "OK"),
-            ("Comms Bridge", "OK")
+            ("Comms Bridge", "OK"),
         ]
         self.diagnostic_aliases = {
             "WRS": "WRS",
@@ -94,6 +96,14 @@ class SystemStatusWidget(QWidget):
             "ProductWaterTank": "WRS",
             "CoolantManager": "Coolant Manager",
             "ThermalSolver": "Thermal Solver",
+            "ThermalNetwork": "Thermal System",
+            "Thermal": "Thermal System",
+            "EPS": "EPS",
+            "EpsPowerController": "EPS",
+            "BCDU": "EPS",
+            "BatteryManager": "EPS",
+            "MBSU": "EPS",
+            "DDCU": "EPS",
             "GNC": "GNC",
             "Comms Bridge": "Comms Bridge",
             "CommsBridge": "Comms Bridge",
@@ -123,25 +133,16 @@ class SystemStatusWidget(QWidget):
         self.setLayout(layout)
 
     def init_ros_interfaces(self):
-        self.node.create_subscription(DiagnosticStatus, '/ars/diagnostics', self.ars_callback, 10)
-        self.node.create_subscription(DiagnosticStatus, '/ogs/diagnostics', self.ogs_callback, 10)
-        self.node.create_subscription(DiagnosticStatus, '/wrs/diagnostics', self.wrs_callback, 10)
+        self.node.create_subscription(DiagnosticStatus, '/ars/diagnostics', self.handle_diagnostic, 10)
+        self.node.create_subscription(DiagnosticStatus, '/ogs/diagnostics', self.handle_diagnostic, 10)
+        self.node.create_subscription(DiagnosticStatus, '/wrs/diagnostics', self.handle_diagnostic, 10)
+        self.node.create_subscription(DiagnosticStatus, '/thermals/diagnostics', self.handle_diagnostic, 10)
+        self.node.create_subscription(DiagnosticStatus, '/eps/diagnostics', self.handle_diagnostic, 10)
         self.node.create_subscription(Log, '/rosout', self.rosout_callback, 50)
 
-    def ars_callback(self, msg: DiagnosticStatus):
-        self.handle_diagnostic(msg)
-
-    def ogs_callback(self, msg: DiagnosticStatus):
-        self.handle_diagnostic(msg)
-
-    def wrs_callback(self, msg: DiagnosticStatus):
-        self.handle_diagnostic(msg)
-
     def handle_diagnostic(self, msg: DiagnosticStatus):
-        # self.node.get_logger().info(f"[SYSTEM STATUS] Received diagnostic for {msg.name}: {msg.message}")
         alias = self.diagnostic_aliases.get(msg.name, None)
         if alias is None or alias.upper() not in self.subsystem_map:
-            # self.node.get_logger().warn(f"[SYSTEM STATUS] Unknown subsystem: {msg.name}")
             return
         subsystem_name = alias.upper()
 
