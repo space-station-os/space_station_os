@@ -1,0 +1,5 @@
+/**:
+  ros__parameters:
+    num_channels: 12
+    battery_config: "config/battery_id.yaml"
+    
