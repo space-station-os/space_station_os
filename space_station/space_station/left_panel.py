@@ -1,8 +1,10 @@
-from PyQt5.QtWidgets import (
+# space_station/left_panel.py
+
+from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QTextEdit, QLabel
 )
-from PyQt5.QtGui import QFont
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, pyqtSignal
 
 
 class LeftPanel(QWidget):
@@ -25,7 +27,7 @@ class LeftPanel(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
 
         header = QLabel("SSOS-NOVA")
-        header.setFont(QFont("Arial", 12, QFont.Bold))
+        header.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         header.setStyleSheet("color: white;")
         layout.addWidget(header)
 
@@ -72,7 +74,7 @@ class LeftPanel(QWidget):
         q = self.ai_input.text().strip()
         if not q:
             return
-        # Show astronaut line in cyan and emit to agent
+     
         safe = self._escape(q)
         html = (
             "<div style='margin:6px 0;'>"
@@ -93,7 +95,6 @@ class LeftPanel(QWidget):
              .replace("\n", "<br>")
         )
 
-    # -------- No-ops preserved for compatibility --------
     def update_co2(self, value): pass
     def update_o2(self, percent): pass
     def update_temp(self, temp): pass

@@ -2,19 +2,19 @@
 
 import os
 import sys
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QTabWidget, QLabel, QApplication
+    QTabWidget, QLabel, QApplication, QFormLayout
 )
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtWebSockets import QWebSocket
-from PyQt5.QtWidgets import QFormLayout
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QPixmap
+from PyQt6.QtWebSockets import QWebSocket
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from space_station.video_player import VideoPlayer
 from space_station.theme import load_dark_theme, load_light_theme
+from space_station.eps import EPSWidget
 
 # Subsystem tabs
 from space_station.eclss import EclssWidget
@@ -23,13 +23,13 @@ from space_station.gnc import GncWidget
 from space_station.comms import CommsWidget
 from space_station.system_status import SystemStatusWidget
 
-# Left panel with AI Assist (must include ask_ai signal and append_ai_response method)
+# Left panel with AI Assist
 from space_station.left_panel import LeftPanel
 
-# AI agent that reads ROS 2 topics via shared GUI node and calls local LLM
+# AI agent
 from space_station.agent import SsosAIAgent
 
-# --- Resources API (Py 3.9+ files/as_file) ---
+# --- Resources API ---
 try:
     from importlib.resources import files, as_file
     _USE_NEW_RESOURCES_API = True
@@ -48,22 +48,21 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Space Station Operations Dashboard")
         self.resize(1200, 800)
 
-        # ---- ROS init (owned by MainWindow; no global spin, no threads) ----
+        # ---- ROS init ----
         self._ros_ctx = rclpy.context.Context()
         rclpy.init(args=None, context=self._ros_ctx)
 
-   
         self.node: Node = rclpy.create_node('space_station_gui_node', context=self._ros_ctx)
         self.executor = SingleThreadedExecutor(context=self._ros_ctx)
         self.executor.add_node(self.node)
 
-        # Pump ROS callbacks from GUI thread
+        # Pump ROS callbacks
         self._ros_timer = QTimer(self)
-        self._ros_timer.setInterval(20)  # ~50 Hz; adjust if needed
+        self._ros_timer.setInterval(20)
         self._ros_timer.timeout.connect(self._spin_ros_once)
         self._ros_timer.start()
 
-        # ---- UI init ----
+        # ---- UI ----
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
 
@@ -71,7 +70,7 @@ class MainWindow(QMainWindow):
         self._build_ui()
         load_dark_theme(QApplication.instance())
 
-        # --- AI Agent wiring (after UI exists) ---
+        # --- AI Agent wiring ---
         self.ai_agent = SsosAIAgent(
             self.node,
             base_url=os.environ.get("SSOS_LLM_BASE_URL", "https://integrate.api.nvidia.com/v1"),
@@ -82,17 +81,14 @@ class MainWindow(QMainWindow):
         self.left_panel.ask_ai.connect(self.ai_agent.ask)
         self.ai_agent.ai_reply.connect(self.left_panel.append_ai_response)
 
-        # Optional: play splash video before showing the window
         self._play_startup_video()
 
     # ---------------- ROS pump ----------------
     def _spin_ros_once(self):
         if self._ros_ctx.ok():
             try:
-                # Non-blocking; processes any ready callbacks once
                 self.executor.spin_once(timeout_sec=0.0)
             except Exception:
-                # Avoid crashing GUI on transient cleanup races
                 pass
 
     # ---------------- UI ----------------
@@ -117,11 +113,11 @@ class MainWindow(QMainWindow):
             pixmap = QPixmap()
 
         if not pixmap.isNull():
-            pixmap = pixmap.scaledToHeight(50, Qt.SmoothTransformation)
+            pixmap = pixmap.scaledToHeight(50, Qt.TransformationMode.SmoothTransformation)
             logo_label.setPixmap(pixmap)
-            logo_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+            logo_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
 
-        # Theme toggle (no emoji)
+        # Theme toggle
         self.toggle_button = QPushButton("Light Mode")
         self.toggle_button.clicked.connect(self._toggle_theme)
 
@@ -129,13 +125,14 @@ class MainWindow(QMainWindow):
         header.addStretch()
         header.addWidget(self.toggle_button)
 
-        # Tabs (pass ROS node to tabs that need it)
+        # Tabs
         self.tabs = QTabWidget()
         self.tabs.addTab(EclssWidget(self.node), "ECLSS")
         self.tabs.addTab(ThermalWidget(self.node), "THERMAL")
         self.tabs.addTab(GncWidget(self.node), "GNC")
         self.tabs.addTab(CommsWidget(self.node), "COMMS")
         self.tabs.addTab(SystemStatusWidget(self.node), "SYSTEM STATUS")
+        self.tabs.addTab(EPSWidget(), "EPS")
 
         # Split with LeftPanel
         split_layout = QHBoxLayout()
@@ -157,7 +154,6 @@ class MainWindow(QMainWindow):
         self.diagnose_button = QPushButton("Run Diagnose")
 
         self.shutdown_button.clicked.connect(self._play_shutdown_video)
-        # self.diagnose_button.clicked.connect(self._run_diagnostics)
 
         footer.addWidget(self.crew_label)
         footer.addWidget(self.day_label)
@@ -183,9 +179,7 @@ class MainWindow(QMainWindow):
     # ---------------- Videos ----------------
     def _play_startup_video(self):
         def after_video():
-            # nothing special; window will already be showing
             pass
-
         try:
             if _USE_NEW_RESOURCES_API:
                 video_resource = files("space_station.assets") / "Ssos_begin.mp4"
@@ -203,7 +197,6 @@ class MainWindow(QMainWindow):
         def after_video():
             self._shutdown_ros()
             QApplication.quit()
-
         try:
             if _USE_NEW_RESOURCES_API:
                 video_resource = files("space_station.assets") / "exit_vid.mp4"
@@ -238,7 +231,6 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
-    # Ensure ROS shuts down when window is closed
     def closeEvent(self, event):
         self._shutdown_ros()
         super().closeEvent(event)
@@ -248,7 +240,8 @@ def main():
     app = QApplication(sys.argv)
     w = MainWindow()
     w.show()
-    sys.exit(app.exec_())
-    
+    sys.exit(app.exec())
+
+
 if __name__ == "__main__":
     main()
