@@ -4,6 +4,7 @@ from PyQt5.QtGui import QPalette, QColor
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication
 
+
 def load_dark_theme(app: QApplication):
     palette = QPalette()
 
@@ -23,6 +24,7 @@ def load_dark_theme(app: QApplication):
 
     app.setStyle("Fusion")
     app.setPalette(palette)
+
 
 def load_light_theme(app: QApplication):
     palette = QPalette()

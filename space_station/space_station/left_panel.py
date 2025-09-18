@@ -1,10 +1,10 @@
 # space_station/left_panel.py
 
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QTextEdit, QLabel
 )
-from PyQt6.QtGui import QFont
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QFont
+from PyQt5.QtCore import Qt, pyqtSignal
 
 
 class LeftPanel(QWidget):
@@ -27,7 +27,7 @@ class LeftPanel(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
 
         header = QLabel("SSOS-NOVA")
-        header.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        header.setFont(QFont("Arial", 12, QFont.Bold))
         header.setStyleSheet("color: white;")
         layout.addWidget(header)
 
@@ -69,12 +69,11 @@ class LeftPanel(QWidget):
         )
         self.ai_output.append(html)
 
-    # ---- Helpers ----
     def _emit_question(self):
         q = self.ai_input.text().strip()
         if not q:
             return
-     
+
         safe = self._escape(q)
         html = (
             "<div style='margin:6px 0;'>"
@@ -83,6 +82,7 @@ class LeftPanel(QWidget):
             "</div>"
         )
         self.ai_output.append(html)
+        self.ai_output.moveCursor(self.ai_output.textCursor().End)  # auto-scroll
         self.ask_ai.emit(q)
         self.ai_input.clear()
 
@@ -95,8 +95,18 @@ class LeftPanel(QWidget):
              .replace("\n", "<br>")
         )
 
-    def update_co2(self, value): pass
-    def update_o2(self, percent): pass
-    def update_temp(self, temp): pass
-    def update_failure(self, msg, is_critical=False): pass
-    def update_goal_summary(self, summary): pass
+   
+    def update_co2(self, value): 
+        pass
+
+    def update_o2(self, percent): 
+        pass
+
+    def update_temp(self, temp): 
+        pass
+
+    def update_failure(self, msg, is_critical=False): 
+        pass
+
+    def update_goal_summary(self, summary): 
+        pass
