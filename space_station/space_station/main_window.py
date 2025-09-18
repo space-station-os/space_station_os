@@ -2,19 +2,17 @@
 
 import os
 import sys
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QTabWidget, QLabel, QApplication, QFormLayout
 )
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtWebSockets import QWebSocket
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QPixmap
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from space_station.video_player import VideoPlayer
 from space_station.theme import load_dark_theme, load_light_theme
-from space_station.eps import EPSWidget
 
 # Subsystem tabs
 from space_station.eclss import EclssWidget
@@ -22,14 +20,15 @@ from space_station.thermal import ThermalWidget
 from space_station.gnc import GncWidget
 from space_station.comms import CommsWidget
 from space_station.system_status import SystemStatusWidget
+from space_station.eps import EPSWidget   # <-- correct import
 
-# Left panel with AI Assist
+# Left panel with AI Assist (must include ask_ai signal and append_ai_response method)
 from space_station.left_panel import LeftPanel
 
-# AI agent
+# AI agent that reads ROS 2 topics via shared GUI node and calls local LLM
 from space_station.agent import SsosAIAgent
 
-# --- Resources API ---
+# --- Resources API (Py 3.9+ files/as_file) ---
 try:
     from importlib.resources import files, as_file
     _USE_NEW_RESOURCES_API = True
@@ -62,7 +61,7 @@ class MainWindow(QMainWindow):
         self._ros_timer.timeout.connect(self._spin_ros_once)
         self._ros_timer.start()
 
-        # ---- UI ----
+        # ---- UI init ----
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
 
@@ -81,6 +80,7 @@ class MainWindow(QMainWindow):
         self.left_panel.ask_ai.connect(self.ai_agent.ask)
         self.ai_agent.ai_reply.connect(self.left_panel.append_ai_response)
 
+        # Startup splash
         self._play_startup_video()
 
     # ---------------- ROS pump ----------------
@@ -97,8 +97,6 @@ class MainWindow(QMainWindow):
 
         # Header
         header = QHBoxLayout()
-
-        # Logo
         logo_label = QLabel()
         pixmap = QPixmap()
         try:
@@ -113,11 +111,10 @@ class MainWindow(QMainWindow):
             pixmap = QPixmap()
 
         if not pixmap.isNull():
-            pixmap = pixmap.scaledToHeight(50, Qt.TransformationMode.SmoothTransformation)
+            pixmap = pixmap.scaledToHeight(50, Qt.SmoothTransformation)
             logo_label.setPixmap(pixmap)
-            logo_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+            logo_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
 
-        # Theme toggle
         self.toggle_button = QPushButton("Light Mode")
         self.toggle_button.clicked.connect(self._toggle_theme)
 
@@ -127,18 +124,18 @@ class MainWindow(QMainWindow):
 
         # Tabs
         self.tabs = QTabWidget()
+        self.tabs.addTab(GncWidget(self.node), "GNC")
         self.tabs.addTab(EclssWidget(self.node), "ECLSS")
         self.tabs.addTab(ThermalWidget(self.node), "THERMAL")
-        self.tabs.addTab(GncWidget(self.node), "GNC")
+        self.tabs.addTab(EPSWidget(self.node), "EPS")  
         self.tabs.addTab(CommsWidget(self.node), "COMMS")
         self.tabs.addTab(SystemStatusWidget(self.node), "SYSTEM STATUS")
-        self.tabs.addTab(EPSWidget(), "EPS")
+      
 
         # Split with LeftPanel
         split_layout = QHBoxLayout()
         self.left_panel = LeftPanel()
         self.left_panel.setFixedWidth(250)
-
         split_layout.addWidget(self.left_panel)
         split_layout.addWidget(self.tabs)
         split_layout.setStretch(0, 0)
@@ -152,7 +149,6 @@ class MainWindow(QMainWindow):
         self.day_label.setStyleSheet("color: white;")
         self.shutdown_button = QPushButton("Shutdown GUI")
         self.diagnose_button = QPushButton("Run Diagnose")
-
         self.shutdown_button.clicked.connect(self._play_shutdown_video)
 
         footer.addWidget(self.crew_label)
@@ -184,12 +180,10 @@ class MainWindow(QMainWindow):
             if _USE_NEW_RESOURCES_API:
                 video_resource = files("space_station.assets") / "Ssos_begin.mp4"
                 with as_file(video_resource) as path:
-                    player = VideoPlayer(str(path), on_finished_callback=after_video)
-                    player.play()
+                    VideoPlayer(str(path), on_finished_callback=after_video).play()
             else:
                 with pkg_resources.path("space_station.assets", "Ssos_begin.mp4") as path:
-                    player = VideoPlayer(str(path), on_finished_callback=after_video)
-                    player.play()
+                    VideoPlayer(str(path), on_finished_callback=after_video).play()
         except Exception:
             pass
 
@@ -201,12 +195,10 @@ class MainWindow(QMainWindow):
             if _USE_NEW_RESOURCES_API:
                 video_resource = files("space_station.assets") / "exit_vid.mp4"
                 with as_file(video_resource) as path:
-                    player = VideoPlayer(str(path), on_finished_callback=after_video)
-                    player.play()
+                    VideoPlayer(str(path), on_finished_callback=after_video).play()
             else:
                 with pkg_resources.path("space_station.assets", "exit_vid.mp4") as path:
-                    player = VideoPlayer(str(path), on_finished_callback=after_video)
-                    player.play()
+                    VideoPlayer(str(path), on_finished_callback=after_video).play()
         except Exception:
             self._shutdown_ros()
             QApplication.quit()
@@ -240,7 +232,7 @@ def main():
     app = QApplication(sys.argv)
     w = MainWindow()
     w.show()
-    sys.exit(app.exec())
+    sys.exit(app.exec_())
 
 
 if __name__ == "__main__":

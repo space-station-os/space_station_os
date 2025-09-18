@@ -1,13 +1,13 @@
 # space_station/gnc.py
 
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QGroupBox,
     QSizePolicy
 )
-from PyQt6.QtGui import QFont
-from PyQt6.QtCore import Qt, QTimer
+from PyQt5.QtGui import QFont
+from PyQt5.QtCore import Qt, QTimer
 
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import numpy as np
 import matplotlib.image as mpimg
@@ -45,7 +45,7 @@ class GncWidget(QWidget):
         self.canvas3d = FigureCanvas(Figure(figsize=(6, 6)))
         self.ax3d = self.canvas3d.figure.add_subplot(111, projection='3d')
         self.canvas3d.figure.subplots_adjust(left=0.02, right=0.98, bottom=0.02, top=0.98)
-        self.canvas3d.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.canvas3d.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         # Base 3D styling (we re-apply after each clear)
         self.ax3d.set_facecolor('black')
@@ -60,7 +60,7 @@ class GncWidget(QWidget):
         right_panel = QVBoxLayout()
 
         title = QLabel("Guidance, Navigation & Control (GNC)")
-        title.setFont(QFont("Arial", 14, QFont.Weight.Bold))
+        title.setFont(QFont("Arial", 14, QFont.Bold))
         title.setStyleSheet("color: white;")
         right_panel.addWidget(title)
         right_panel.addSpacing(10)

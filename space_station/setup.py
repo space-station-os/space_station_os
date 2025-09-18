@@ -20,7 +20,7 @@ setup(
     maintainer='siddarth',
     maintainer_email='siddarth.dayasagar@gmail.com',
     description='GUI and simulation framework for SSOS',
-    license='TODO: License declaration',
+    license='MIT',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [

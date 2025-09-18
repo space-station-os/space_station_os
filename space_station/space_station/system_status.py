@@ -1,11 +1,11 @@
 # space_station/system_status.py
 
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton,
     QTableWidget, QTableWidgetItem, QTextEdit, QDialog
 )
-from PyQt6.QtGui import QFont, QColor
-from PyQt6.QtCore import QTimer
+from PyQt5.QtGui import QFont, QColor
+from PyQt5.QtCore import QTimer
 from diagnostic_msgs.msg import DiagnosticStatus
 from rcl_interfaces.msg import Log
 
@@ -49,7 +49,7 @@ class SystemStatusWidget(QWidget):
         layout = QVBoxLayout()
 
         title = QLabel("System Diagnostics & Status")
-        title.setFont(QFont("Arial", 14, QFont.Weight.Bold))
+        title.setFont(QFont("Arial", 14, QFont.Bold))
         title.setStyleSheet("color: white;")
         layout.addWidget(title)
         layout.addSpacing(10)
@@ -59,8 +59,8 @@ class SystemStatusWidget(QWidget):
         self.table.setHorizontalHeaderLabels(["Subsystem", "Status"])
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.verticalHeader().setVisible(False)
-        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setSelectionMode(QTableWidget.NoSelection)
         self.table.setStyleSheet("""
             QTableWidget {
                 background-color: #2a2a2a;
@@ -72,7 +72,13 @@ class SystemStatusWidget(QWidget):
                 color: white;
             }
         """)
-
+        self.LOG_LEVEL_MAP = {
+            10: "DEBUG",
+            20: "INFO",
+            30: "WARN",
+            40: "ERROR",
+            50: "FATAL",
+        }
         subsystems = [
             ("ARS", "OK"),
             ("OGS", "OK"),
@@ -178,7 +184,7 @@ class SystemStatusWidget(QWidget):
 
     def rosout_callback(self, msg: Log):
         log_entry = {
-            "level": msg.level,
+            "level": self.LOG_LEVEL_MAP.get(msg.level, str(msg.level)),
             "name": msg.name,
             "msg": msg.msg
         }
