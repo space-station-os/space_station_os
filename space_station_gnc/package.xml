@@ -45,7 +45,12 @@
   <!-- Eigen is found via CMake's Eigen3 package; declare the helper module if available -->
   <!-- Some distros export this as eigen3_cmake_module. Safe to add as a build dependency. -->
   <build_depend>eigen3_cmake_module</build_depend>
+  <build_export_depend>eigen3_cmake_module</build_export_depend>
   <exec_depend>eigen3_cmake_module</exec_depend>
+
+  <build_depend>eigen3</build_depend>
+  <build_export_depend>eigen3</build_export_depend>
+  <exec_depend>eigen3</exec_depend>
 
   <!-- Testing -->
   <test_depend>ament_lint_auto</test_depend>

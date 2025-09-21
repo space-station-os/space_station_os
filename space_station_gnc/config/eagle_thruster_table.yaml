@@ -1,0 +1,50 @@
+# Thruster table with explicit force/torque directions.
+# Conventions:
+#   - Body axes: +X forward (or starboard), +Y left, +Z up  
+#   - Force  = [Fx, Fy, Fz]
+#   - Torque = [Tx, Ty, Tz] = [Roll, Pitch, Yaw]
+#
+
+tables:
+  sixdof_phys:
+    # ---- X nozzles ----
+    thruster_xp1:
+      force:  [ +9.0,  0.0,  0.0 ]
+      torque: [  0.0,  0.0, +1.0 ]   # +Yaw
+    thruster_xp2:
+      force:  [ +9.0,  0.0,  0.0 ]
+      torque: [  0.0,  0.0, -1.0 ]   # -Yaw
+    thruster_xn1:
+      force:  [ -9.0,  0.0,  0.0 ]
+      torque: [  0.0,  0.0, -1.0 ]   # -Yaw
+    thruster_xn2:
+      force:  [ -9.0,  0.0,  0.0 ]
+      torque: [  0.0,  0.0, +1.0 ]   # +Yaw
+
+    # ---- Y nozzles  ----
+    thruster_yp1:
+      force:  [  0.0, +9.0,  0.0 ]
+      torque: [  0.0, +1.0,  0.0 ]   # +Pitch
+    thruster_yp2:
+      force:  [  0.0, +9.0,  0.0 ]
+      torque: [  0.0, -1.0,  0.0 ]   # -Pitch
+    thruster_yn1:
+      force:  [  0.0, -9.0,  0.0 ]
+      torque: [  0.0, -1.0,  0.0 ]   # -Pitch
+    thruster_yn2:
+      force:  [  0.0, -9.0,  0.0 ]
+      torque: [  0.0, +1.0,  0.0 ]   # +Pitch
+
+    # ---- Z nozzles  ----
+    thruster_zp1:
+      force:  [  0.0,  0.0, +9.0 ]
+      torque: [ +1.0,  0.0,  0.0 ]   # +Roll
+    thruster_zp2:
+      force:  [  0.0,  0.0, +9.0 ]
+      torque: [ -1.0,  0.0,  0.0 ]   # -Roll
+    thruster_zn1:
+      force:  [  0.0,  0.0, -9.0 ]
+      torque: [ -1.0,  0.0,  0.0 ]   # -Roll
+    thruster_zn2:
+      force:  [  0.0,  0.0, -9.0 ]
+      torque: [ +1.0,  0.0,  0.0 ]   # +Roll

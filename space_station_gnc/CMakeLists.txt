@@ -109,6 +109,8 @@ ament_export_include_directories(
   $<INSTALL_INTERFACE:include>
 )
 
+ament_export_dependencies(Eigen3)
+
 target_link_libraries(control_torque ${cpp_typesupport_target})
 target_link_libraries(physics_motion ${cpp_typesupport_target})
 target_link_libraries(orbit_dynamics ${cpp_typesupport_target})
