@@ -210,11 +210,11 @@ private:
 
   
     if (illum <= 1e-6) {
-      RCLCPP_INFO(this->get_logger(),
+      RCLCPP_DEBUG(this->get_logger(),
         "[ECLIPSE] P_arr=%.1f kW, V_ssu=%.1f V, I_ssu=%.1f A, T=%.1f C, beta=%.1f°, orbit=%d",
         p_array_kw, v_ssu_v, i_ssu_a, panel_temp_c_, beta_deg, orbit_count_);
     } else {
-      RCLCPP_INFO(this->get_logger(),
+      RCLCPP_DEBUG(this->get_logger(),
         "[SUN]     P_arr=%.1f kW (derate=%.2f) -> SSU: V=%.1f V, I=%.1f A, P=%.0f W, T=%.1f C, beta=%.1f°, orbit=%d",
         p_array_kw, beta_derate, v_ssu_v, i_ssu_a, p_ssu_w, panel_temp_c_, beta_deg, orbit_count_);
     }

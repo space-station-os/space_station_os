@@ -1,26 +1,34 @@
+# eclss_widget.py
+
 from PyQt5.QtWidgets import (
-    QWidget, QLabel, QVBoxLayout, QPushButton, QGroupBox, QGridLayout, QProgressBar, QHBoxLayout
+    QWidget, QLabel, QVBoxLayout, QGroupBox, QGridLayout, QProgressBar,
+    QComboBox, QHBoxLayout
 )
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt, QTimer, QMetaObject, Q_ARG
+import pyqtgraph as pg
+import random
+
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from std_msgs.msg import Float64
 from space_station_eclss.action import AirRevitalisation, WaterRecovery
 from space_station_eclss.srv import O2Request, RequestProductWater
-import random
-
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
-# Constants
+
+# ---------------- Constants ---------------- #
 MAX_O2_STORAGE = 60000.0  # grams
 MAX_WATER_STORAGE = 2000.0  # liters
 MAX_CO2_STORAGE = 7000.0  # mmHg
+
 STATE_QOS = QoSProfile(
     history=HistoryPolicy.KEEP_LAST,
     depth=1,
-    reliability=ReliabilityPolicy.BEST_EFFORT,   
-    durability=DurabilityPolicy.TRANSIENT_LOCAL 
+    reliability=ReliabilityPolicy.BEST_EFFORT,
+    durability=DurabilityPolicy.TRANSIENT_LOCAL
 )
+
+
 class EclssWidget(QWidget):
     def __init__(self, node: Node, parent=None):
         super().__init__(parent)
@@ -29,96 +37,107 @@ class EclssWidget(QWidget):
         self.init_ros_interfaces()
 
         # Simulation state
+        self.sim_minutes = 0   # 1 sec real = 1 minute simulated
         self.co2_level = 400.0
         self.urine_volume = 0.0
-        self.tick = 0
-        self.day = 1
         self.crew_size = 4
         self.total_days = 180
-        self.exercise_event = 3
 
-        # Disable manual buttons
-        self.ars_button.setEnabled(False)
-        self.ogs_button.setEnabled(False)
-        self.wrs_button.setEnabled(False)
+        # Graph data (independent timelines)
+        self.co2_x, self.co2_data = [], []
+        self.o2_x, self.o2_data = [], []
+        self.h2o_x, self.h2o_data = [], []
 
+        # Timers
         self.timer = QTimer()
         self.timer.timeout.connect(self.simulate_event)
-        self.timer.start(2000)
+        self.timer.start(1000)   # 1 Hz (1 sec = 1 min sim)
 
+        self.health_timer = QTimer()
+        self.health_timer.timeout.connect(self.update_mock_health)
+        self.health_timer.start(3000)
+
+    # ---------------- UI ---------------- #
     def init_ui(self):
-        layout = QVBoxLayout()
-        title = QLabel("Environmental Control & Life Support System (ECLSS)")
-        title.setFont(QFont("Arial", 14, QFont.Bold))
-        title.setStyleSheet("color: white;")
-        layout.addWidget(title)
+        layout = QGridLayout()
+        layout.setSpacing(10)
 
-        grid = QGridLayout()
+        # Quadrant 1: Tanks (horizontal)
+        tanks_group = QGroupBox("Storage Tanks")
+        tanks_layout = QHBoxLayout()
 
-        # ARS Group
-        ars_group = QGroupBox("Air Revitalization (ARS)")
-        ars_group.setStyleSheet("color: white;")
-        ars_layout = QVBoxLayout()
-        self.co2_status = QLabel("CO₂: --- mmHg")
-        self.co2_status.setStyleSheet("color: lightgray;")
-        self.ars_button = QPushButton("Vent CO₂")
-        self.ars_button.setStyleSheet("background-color: #444; color: white;")
-        self.ars_button.clicked.connect(self.send_ars_goal)
-        self.co2_bar = QProgressBar()
-        self.co2_bar.setOrientation(Qt.Vertical)
-        self.co2_bar.setRange(0, 100)
-        self.co2_bar.setFixedWidth(40)
-        self.co2_bar.setStyleSheet("QProgressBar::chunk { background-color: #2ecc71; }")
-        ars_layout.addWidget(self.co2_status)
-        ars_layout.addWidget(self.ars_button)
-        ars_layout.addWidget(self.co2_bar, alignment=Qt.AlignHCenter)
-        ars_group.setLayout(ars_layout)
-        grid.addWidget(ars_group, 0, 0)
+        self.co2_bar = self._create_horizontal_tank("CO₂", "#19da69")
+        self.o2_bar = self._create_horizontal_tank("O₂", "#55c3df")
+        self.water_bar = self._create_horizontal_tank("H₂O", "#ae3bd1")
 
-        # OGS Group
-        ogs_group = QGroupBox("Oxygen Generation (OGS)")
-        ogs_group.setStyleSheet("color: white;")
-        ogs_layout = QVBoxLayout()
-        self.o2_status = QLabel("O₂ Reserve: --- %")
-        self.o2_status.setStyleSheet("color: lightgray;")
-        self.ogs_button = QPushButton("Request O₂")
-        self.ogs_button.setStyleSheet("background-color: #444; color: white;")
-        self.ogs_button.clicked.connect(self.send_ogs_service)
-        self.o2_bar = QProgressBar()
-        self.o2_bar.setOrientation(Qt.Vertical)
-        self.o2_bar.setRange(0, 100)
-        self.o2_bar.setFixedWidth(40)
-        self.o2_bar.setStyleSheet("QProgressBar::chunk { background-color: #3498db; }")
-        ogs_layout.addWidget(self.o2_status)
-        ogs_layout.addWidget(self.ogs_button)
-        ogs_layout.addWidget(self.o2_bar, alignment=Qt.AlignHCenter)
-        ogs_group.setLayout(ogs_layout)
-        grid.addWidget(ogs_group, 0, 1)
+        tanks_layout.addWidget(self.co2_bar["box"])
+        tanks_layout.addWidget(self.o2_bar["box"])
+        tanks_layout.addWidget(self.water_bar["box"])
+        tanks_group.setLayout(tanks_layout)
+        layout.addWidget(tanks_group, 0, 0)
 
-        # WRS Group
-        wrs_group = QGroupBox("Water Recovery (WRS)")
-        wrs_group.setStyleSheet("color: white;")
-        wrs_layout = QVBoxLayout()
-        self.water_status = QLabel("Water Tank: --- % Full")
-        self.water_status.setStyleSheet("color: lightgray;")
-        self.wrs_button = QPushButton("Start Recycling")
-        self.wrs_button.setStyleSheet("background-color: #444; color: white;")
-        self.wrs_button.clicked.connect(self.send_wrs_goal)
-        self.water_bar = QProgressBar()
-        self.water_bar.setOrientation(Qt.Vertical)
-        self.water_bar.setRange(0, 100)
-        self.water_bar.setFixedWidth(40)
-        self.water_bar.setStyleSheet("QProgressBar::chunk { background-color: #9b59b6; }")
-        wrs_layout.addWidget(self.water_status)
-        wrs_layout.addWidget(self.wrs_button)
-        wrs_layout.addWidget(self.water_bar, alignment=Qt.AlignHCenter)
-        wrs_group.setLayout(wrs_layout)
-        grid.addWidget(wrs_group, 0, 2)
+        # Quadrant 2: Production Graphs
+        prod_group = QGroupBox("Production (CO₂, O₂, H₂O)")
+        prod_layout = QVBoxLayout()
+        self.prod_plot = pg.PlotWidget(title="Production Over Time")
+        self.prod_plot.addLegend()
+        self.prod_plot.showGrid(x=True, y=True)
+        self.co2_curve = self.prod_plot.plot(pen='g', name="CO₂")
+        self.o2_curve = self.prod_plot.plot(pen='b', name="O₂")
+        self.h2o_curve = self.prod_plot.plot(pen='m', name="H₂O")
+        prod_layout.addWidget(self.prod_plot)
+        prod_group.setLayout(prod_layout)
+        layout.addWidget(prod_group, 0, 1)
 
-        layout.addLayout(grid)
-        layout.addStretch()
+        # Quadrant 3: Consumption Graphs (placeholder for now)
+        cons_group = QGroupBox("Consumption vs Reserves")
+        cons_layout = QVBoxLayout()
+        self.cons_plot = pg.PlotWidget(title="Consumption Over Time")
+        self.cons_plot.addLegend()
+        self.cons_plot.showGrid(x=True, y=True)
+        self.co2_cons_curve = self.cons_plot.plot(pen='r', name="CO₂ Consumed")
+        self.o2_cons_curve = self.cons_plot.plot(pen='c', name="O₂ Consumed")
+        self.h2o_cons_curve = self.cons_plot.plot(pen='y', name="H₂O Consumed")
+        cons_layout.addWidget(self.cons_plot)
+        cons_group.setLayout(cons_layout)
+        layout.addWidget(cons_group, 1, 0)
+
+        # Quadrant 4: Crew Health Monitor
+        health_group = QGroupBox("Crew Health Monitor")
+        health_layout = QVBoxLayout()
+
+        self.crew_dropdown = QComboBox()
+        self.crew_dropdown.addItems([f"Astronaut {i+1}" for i in range(4)])
+        health_layout.addWidget(self.crew_dropdown)
+
+        self.hr_label = QLabel("Heart Rate: --- bpm")
+        self.spo2_label = QLabel("SpO₂: --- %")
+        self.bp_label = QLabel("Blood Pressure: ---/--- mmHg")
+        self.temp_label = QLabel("Temp: --- °C")
+
+        for lbl in [self.hr_label, self.spo2_label, self.bp_label, self.temp_label]:
+            lbl.setStyleSheet("color: lightgray;")
+            health_layout.addWidget(lbl)
+
+        health_group.setLayout(health_layout)
+        layout.addWidget(health_group, 1, 1)
+
         self.setLayout(layout)
 
+    def _create_horizontal_tank(self, name, color):
+        box = QGroupBox(name)
+        vbox = QVBoxLayout()
+        label = QLabel(f"{name}: ---")
+        bar = QProgressBar()
+        bar.setOrientation(Qt.Horizontal)
+        bar.setRange(0, 100)
+        bar.setStyleSheet(f"QProgressBar::chunk {{ background-color: {color}; }}")
+        vbox.addWidget(label)
+        vbox.addWidget(bar)
+        box.setLayout(vbox)
+        return {"box": box, "label": label, "bar": bar}
+
+    # ---------------- ROS Interfaces ---------------- #
     def init_ros_interfaces(self):
         self.ars_client = ActionClient(self.node, AirRevitalisation, '/air_revitalisation')
         self.wrs_client = ActionClient(self.node, WaterRecovery, '/water_recovery_systems')
@@ -129,105 +148,113 @@ class EclssWidget(QWidget):
         self.node.create_subscription(Float64, '/o2_storage', self.update_o2_status, 10)
         self.node.create_subscription(Float64, '/wrs/product_water_reserve', self.update_water_status, 10)
 
+    # ---------------- Simulation ---------------- #
     def simulate_event(self):
-        if self.day > self.total_days:
-            self.timer.stop()
-            self.node.get_logger().info("[Sim] Mission Complete")
-            return
+        # advance simulation
+        self.sim_minutes += 1
 
-        self.tick += 1
-        self.node.get_logger().info(f"[Sim] Day {self.day} - Event {self.tick}")
-        self.node.get_logger().info("======================================")
-        high_metabolism = random.random() < 0.25
+        # --- Send INITIAL goals at startup ---
+        if self.sim_minutes == 1:
+            self.node.get_logger().info("[Sim] Sending initial ARS/WRS/OGS/Water goals...")
 
-        # CO2 generation
-        base_co2 = 100.0 if not high_metabolism else 160.0
-        exercise_boost = 80.0 if self.tick == self.exercise_event else 0.0
-        co2_generated = (base_co2 + exercise_boost) * self.crew_size
-        self.co2_level += co2_generated
-
-        if self.co2_level >= 2000.0:
             self.send_ars_goal(self.co2_level)
-            self.co2_level = 400.0
 
-        # Water
-        daily_liters = (5.0 if not high_metabolism else 15.0) * 3.78541
-        water_per_event = daily_liters / 7.0
-        if self.water_client.service_is_ready():
-            req = RequestProductWater.Request()
-            req.amount = water_per_event
-            self.water_client.call_async(req)
+            total_waste = self.urine_volume + (1.5 * self.crew_size)
+            self.send_wrs_goal(total_waste)
+            self.urine_volume = 0.0
 
-        self.urine_volume += water_per_event * (0.9 if high_metabolism else 0.85)
+            if self.o2_client.service_is_ready():
+                req = O2Request.Request()
+                req.o2_req = 800.0 * self.crew_size
+                self.o2_client.call_async(req)
 
-        # WRS
-        hygiene = (1.59 if not high_metabolism else 2.0) * self.crew_size
-        excess = (0.2 if not high_metabolism else 0.5) * self.crew_size
-        total_waste = self.urine_volume + hygiene + excess
-        self.send_wrs_goal(total_waste)
-        self.urine_volume = 0.0
+            if self.water_client.service_is_ready():
+                req = RequestProductWater.Request()
+                req.amount = 10.0 * self.crew_size
+                self.water_client.call_async(req)
 
-        # O2
-        if self.o2_client.service_is_ready():
-            req = O2Request.Request()
-            req.o2_req = (800.0 if not high_metabolism else 1000.0) * self.crew_size
-            self.o2_client.call_async(req)
+        # --- Then every 30 simulated minutes ---
+        elif self.sim_minutes % 30 == 0:
+            self.node.get_logger().info("[Sim] Sending scheduled ARS/WRS/OGS/Water goals...")
 
-        # Day end
-        if self.tick >= 7:
-            self.day += 1
-            self.tick = 0
-            self.node.get_logger().info(f"[Sim] Completed Day {self.day - 1}")
-        self.node.get_logger().info("+======================================+")
+            self.send_ars_goal(self.co2_level)
 
+            total_waste = self.urine_volume + (1.5 * self.crew_size)
+            self.send_wrs_goal(total_waste)
+            self.urine_volume = 0.0
+
+            if self.o2_client.service_is_ready():
+                req = O2Request.Request()
+                req.o2_req = 800.0 * self.crew_size
+                self.o2_client.call_async(req)
+
+            if self.water_client.service_is_ready():
+                req = RequestProductWater.Request()
+                req.amount = 10.0 * self.crew_size
+                self.water_client.call_async(req)
+
+    # ---------------- Health ---------------- #
+    def update_mock_health(self):
+        hr = random.randint(60, 100)
+        spo2 = random.randint(94, 99)
+        bp_sys = random.randint(110, 130)
+        bp_dia = random.randint(70, 85)
+        temp = round(random.uniform(36.5, 37.5), 1)
+
+        QMetaObject.invokeMethod(self.hr_label, "setText", Qt.QueuedConnection,
+            Q_ARG(str, f"Heart Rate: {hr} bpm"))
+        QMetaObject.invokeMethod(self.spo2_label, "setText", Qt.QueuedConnection,
+            Q_ARG(str, f"SpO₂: {spo2} %"))
+        QMetaObject.invokeMethod(self.bp_label, "setText", Qt.QueuedConnection,
+            Q_ARG(str, f"Blood Pressure: {bp_sys}/{bp_dia} mmHg"))
+        QMetaObject.invokeMethod(self.temp_label, "setText", Qt.QueuedConnection,
+            Q_ARG(str, f"Temp: {temp} °C"))
+
+    # ---------------- Status Updates ---------------- #
     def update_co2_status(self, msg):
-        # self.node.get_logger().info(f"[GUI][CO2] Received: {msg.data} mmHg")
         percent = round((msg.data / MAX_CO2_STORAGE) * 100.0, 1)
-        QMetaObject.invokeMethod(self.co2_status, "setText", Qt.QueuedConnection,
-            Q_ARG(str, f"CO₂: {round(msg.data, 2)} mmHg"))
-        QMetaObject.invokeMethod(self.co2_bar, "setValue", Qt.QueuedConnection,
-            Q_ARG(int, int(percent)))
+        self.co2_bar["label"].setText(f"CO₂: {round(msg.data, 2)} mmHg")
+        self.co2_bar["bar"].setValue(int(percent))
+
+        self.co2_x.append(self.sim_minutes)
+        self.co2_data.append(msg.data)
+        self.co2_curve.setData(self.co2_x, self.co2_data)
 
     def update_o2_status(self, msg):
-        # self.node.get_logger().info(f"[GUI][O2] Received: {msg.data} g")
         percent = round((msg.data / MAX_O2_STORAGE) * 100.0, 1)
-        QMetaObject.invokeMethod(self.o2_status, "setText", Qt.QueuedConnection,
-            Q_ARG(str, f"O₂ Reserve: {percent} %"))
-        QMetaObject.invokeMethod(self.o2_bar, "setValue", Qt.QueuedConnection,
-            Q_ARG(int, int(percent)))
+        self.o2_bar["label"].setText(f"O₂: {round(msg.data, 2)} g")
+        self.o2_bar["bar"].setValue(int(percent))
+
+        self.o2_x.append(self.sim_minutes)
+        self.o2_data.append(msg.data)
+        self.o2_curve.setData(self.o2_x, self.o2_data)
 
     def update_water_status(self, msg):
-        # self.node.get_logger().info(f"[GUI][Water] Received: {msg.data} L")
         percent = round((msg.data / MAX_WATER_STORAGE) * 100.0, 1)
-        QMetaObject.invokeMethod(self.water_status, "setText", Qt.QueuedConnection,
-            Q_ARG(str, f"Water Tank: {percent} % Full"))
-        QMetaObject.invokeMethod(self.water_bar, "setValue", Qt.QueuedConnection,
-            Q_ARG(int, int(percent)))
+        self.water_bar["label"].setText(f"H₂O: {round(msg.data, 2)} L")
+        self.water_bar["bar"].setValue(int(percent))
 
-    def send_ars_goal(self, co2_mass=1800.0):
+        self.h2o_x.append(self.sim_minutes)
+        self.h2o_data.append(msg.data)
+        self.h2o_curve.setData(self.h2o_x, self.h2o_data)
+
+    # ---------------- Action/Service Senders ---------------- #
+    def send_ars_goal(self, co2_mass=2800.0):
         if not self.ars_client.wait_for_server(timeout_sec=2.0):
-            self.co2_status.setText("ARS Unavailable")
+            self.co2_bar["label"].setText("ARS Unavailable")
             return
         goal = AirRevitalisation.Goal()
         goal.initial_co2_mass = co2_mass
         goal.initial_moisture_content = 0.8 * 2.5 * self.crew_size
-        goal.initial_contaminants = 5.0
+        goal.initial_contaminants = 25.0
         self.node.get_logger().info("Sending ARS goal...")
         self.ars_client.send_goal_async(goal)
 
-    def send_wrs_goal(self, urine_volume=8.0):
+    def send_wrs_goal(self, urine_volume=28.0):
         if not self.wrs_client.wait_for_server(timeout_sec=2.0):
-            self.water_status.setText("WRS Unavailable")
+            self.water_bar["label"].setText("WRS Unavailable")
             return
         goal = WaterRecovery.Goal()
         goal.urine_volume = urine_volume
         self.node.get_logger().info("Sending WRS goal...")
         self.wrs_client.send_goal_async(goal)
-
-    def send_ogs_service(self):
-        if not self.o2_client.wait_for_service(timeout_sec=2.0):
-            self.o2_status.setText("OGS Service Not Found")
-            return
-        req = O2Request.Request()
-        req.o2_req = 10.0
-        self.o2_client.call_async(req)
