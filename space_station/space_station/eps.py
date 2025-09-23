@@ -16,6 +16,7 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float64, String
 from sensor_msgs.msg import BatteryState
+from space_station_eps.msg import BCDUStatus   
 
 
 class EPSWidget(QWidget):
@@ -130,7 +131,7 @@ class EPSWidget(QWidget):
                                           lambda msg, idx=i: self._battery_cb(idx, msg), 10)
 
         # BCDU
-        self.node.create_subscription(String, "/bcdu/status", self._bcdu_cb, 10)
+        self.node.create_subscription(BCDUStatus, "/bcdu/status", self._bcdu_cb, 10)
 
         # MBSU
         for i in range(12):
