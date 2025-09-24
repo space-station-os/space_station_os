@@ -15,7 +15,8 @@ find_package(actionlib_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(rclcpp_action REQUIRED)
-
+find_package(behaviortree_cpp_v3 REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -46,9 +47,29 @@ install(PROGRAMS
 include_directories(include)
 
 
-add_executable(ars src/ars_systems/ars_systems.cpp )
-ament_target_dependencies(ars std_srvs rosidl_default_generators rclcpp sensor_msgs rclcpp_action diagnostic_msgs)
-rosidl_target_interfaces(ars ${PROJECT_NAME} "rosidl_typesupport_cpp")
+add_library(ars_systems
+  src/ars_systems/ars_systems.cpp
+)
+
+ament_target_dependencies(ars_systems
+  rclcpp
+  rclcpp_action
+  std_msgs
+  diagnostic_msgs
+  behaviortree_cpp_v3
+  ament_index_cpp
+  std_srvs
+  sensor_msgs
+)
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(ars_systems ${cpp_typesupport_target})
+
+# ------------------------------------------------------------------
+# executable
+# ------------------------------------------------------------------
+add_executable(ars src/ars_systems/ars_main_node.cpp)
+target_link_libraries(ars ars_systems)
+ament_target_dependencies(ars rclcpp)
 
 add_executable(ogs src/ors_systems/src/ogs_systems.cpp)
 ament_target_dependencies(ogs std_srvs rosidl_default_generators rclcpp rclcpp_action diagnostic_msgs)
@@ -77,16 +98,18 @@ install(DIRECTORY assets/
   DESTINATION share/${PROJECT_NAME}/assets
 )
 
+install(DIRECTORY behaviortrees/
+  DESTINATION share/${PROJECT_NAME}/behaviortrees
+)
+
 if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # comment the line when a copyright and license is added to all source files
-  set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # comment the line when this package is in a git repo and when
-  # a copyright and license is added to all source files
-  set(ament_cmake_cpplint_FOUND TRUE)
-  ament_lint_auto_find_test_dependencies()
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(ars_test test/test_ars_action_server.cpp)
+  target_include_directories(ars_test PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+  )
+  target_link_libraries(ars_test ars_systems)
 endif()
 
 ament_package()
