@@ -1,16 +1,15 @@
 <root main_tree_to_execute="ARS">
-<BehaviorTree ID="ARS">
-  <Sequence name="ARS_Main">
-    <Fallback>
-      <Desiccant1/>
-      <Desiccant2/>
-    </Fallback>
-    <Fallback>
-      <Adsorbent1/>
-      <Adsorbent2/>
-    </Fallback>
-    <!-- Vents CO₂ for OGS -->
-    <VentOrStoreCO2 CO2_out="{co2_from_ars}"/>
-  </Sequence>
-</BehaviorTree>
+  <BehaviorTree ID="ARS">
+    <Sequence name="ARS_Main">
+      <Fallback>
+        <Desiccant1/>
+        <Desiccant2/>
+      </Fallback>
+      <Fallback>
+        <Adsorbent1/>
+        <Adsorbent2/>
+      </Fallback>
+      <VentOrStoreCO2/>
+    </Sequence>
+  </BehaviorTree>
 </root>
