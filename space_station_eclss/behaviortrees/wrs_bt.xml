@@ -1,0 +1,12 @@
+<root main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <Sequence name="WRS_Process">
+      <CollectGreyWater/>
+      <RecycleGreyWater/>
+      <UPAStage/>
+      <FilterStage/>
+      <IonizationStage/>
+      <TankStage/>
+    </Sequence>
+  </BehaviorTree>
+</root>

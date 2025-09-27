@@ -162,6 +162,8 @@ void ARSActionServer::execute(const std::shared_ptr<GoalHandleARS> goal_handle)
   RCLCPP_INFO(this->get_logger(), "Loading BT from: %s", bt_xml_file.c_str());
 
   auto tree = factory.createTreeFromFile(bt_xml_file);
+
+  
   for (int t = 0; t < sim_time_; ++t) {
     if (!rclcpp::ok() || goal_handle->is_canceling()) {
       goal_handle->canceled(result);
@@ -200,6 +202,7 @@ void ARSActionServer::execute(const std::shared_ptr<GoalHandleARS> goal_handle)
   result->summary_message = "ARS process completed with fallback BT sequence";
 
   goal_handle->succeed(result);
+  
 }
 
 // ------------------- SUPPORT METHODS -------------------
@@ -209,6 +212,14 @@ rclcpp_action::GoalResponse ARSActionServer::handle_goal(
   std::shared_ptr<const AirRevitalisation::Goal> goal)
 {
   RCLCPP_INFO(this->get_logger(), "Received goal request with CO₂: %.2f", goal->initial_co2_mass);
+
+  
+  if (total_co2_storage_ > max_co2_storage_) {
+    RCLCPP_WARN(this->get_logger(), "Rejecting goal: CO₂ storage already above max threshold (%.2f > %.2f)",
+                total_co2_storage_, max_co2_storage_);
+    return rclcpp_action::GoalResponse::REJECT;
+  }
+
   return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
 

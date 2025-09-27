@@ -1,6 +1,9 @@
 #include "space_station_eclss/ogs_system.hpp"
 
-OGSSystem::OGSSystem() : Node("ogs_system")
+namespace space_station_eclss {
+
+OGSSystem::OGSSystem(const rclcpp::NodeOptions & options)
+: Node("ogs_system", options)
 {
   this->declare_parameter("enable_failure", false);
   enable_failure_ = this->get_parameter("enable_failure").as_bool();
@@ -78,128 +81,82 @@ rclcpp_action::CancelResponse OGSSystem::handle_cancel(
   return rclcpp_action::CancelResponse::REJECT;
 }
 
-void OGSSystem::execute_goal(
-  const std::shared_ptr<rclcpp_action::ServerGoalHandle<space_station_eclss::action::OxygenGeneration>> goal_handle)
+void OGSSystem::execute_goal(const std::shared_ptr<GoalHandleOGS> goal_handle)
 {
   auto goal = goal_handle->get_goal();
-  auto result = std::make_shared<space_station_eclss::action::OxygenGeneration::Result>();
-  auto feedback = std::make_shared<space_station_eclss::action::OxygenGeneration::Feedback>();
+  auto result = std::make_shared<OxygenGeneration::Result>();
+  auto feedback = std::make_shared<OxygenGeneration::Feedback>();
 
-  RCLCPP_INFO(this->get_logger(), "Starting deionization: input water = %.2f L, iodine = %.2f ppm",
-              goal->input_water_mass, goal->iodine_concentration);
+  BT::BehaviorTreeFactory factory;
 
-  // === Step 1: Request Product Water ===
-  auto water_req = std::make_shared<space_station_eclss::srv::RequestProductWater::Request>();
-  water_req->amount = goal->input_water_mass;
+  // Register BT nodes inline
+  factory.registerSimpleAction("RequestProductWater", [&](BT::TreeNode &) {
+    request_product_water(goal->input_water_mass);
+    return BT::NodeStatus::SUCCESS;
+  });
 
-  water_client_->async_send_request(water_req,
-    [this, goal_handle, goal, result, feedback](rclcpp::Client<space_station_eclss::srv::RequestProductWater>::SharedFuture water_future)
-    {
-      auto water_resp = water_future.get();
-      if (!water_resp->success) {
-        publish_failure_diagnostics("Deionization", water_resp->message);
-        result->success = false;
-        result->summary_message = "Water request failed: " + water_resp->message;
-        goal_handle->abort(result);
-        return;
-      }
+  factory.registerSimpleAction("Electrolysis", [&](BT::TreeNode &) {
+  double water = goal->input_water_mass;  // grams of H2O
+  double o2_generated = 0.89 * water;     // g O2
+  double h2_generated = 0.11 * water;     // g H2
 
-      double water_granted = water_resp->water_granted;
-      double o2_generated = o2_efficiency_ * water_granted;
-      double h2_generated = (1.0 - o2_efficiency_) * water_granted;
-      latest_o2_ += o2_generated;
+  latest_o2_ += o2_generated;
 
-      // O2 overflow check
-      if (enable_failure_ && latest_o2_ > max_o2_capacity_) {
-        std::string msg = "O2 storage overflow: " + std::to_string(latest_o2_) + " g";
-        RCLCPP_FATAL(this->get_logger(), "%s", msg.c_str());
-        publish_failure_diagnostics("O2Storage", msg);
-        result->success = false;
-        result->summary_message = msg;
-        goal_handle->abort(result);
-        return;
-      }
+    if (enable_failure_ && latest_o2_ > max_o2_capacity_) {
+      publish_failure_diagnostics("O2Storage", "Overflow during Electrolysis");
+      return BT::NodeStatus::FAILURE;
+    }
 
-      latest_o2_ += o2_generated;
+    feedback->o2_generated = o2_generated;
+    feedback->h2_generated = h2_generated;
+    goal_handle->publish_feedback(feedback);
+    return BT::NodeStatus::SUCCESS;
+  });
 
-      if (o2_generated <= 0.0) {
-        publish_failure_diagnostics("Electrolysis", "Zero oxygen generated");
-        result->success = false;
-        result->summary_message = "Electrolysis failed: No O₂ generated.";
-        goal_handle->abort(result);
-        return;
-      }
+  factory.registerSimpleAction("SabatierReactor", [&](BT::TreeNode &) {
+    double h2_generated = feedback->h2_generated;   // use stored feedback value
 
-      RCLCPP_INFO(this->get_logger(), "Electrolysis output: O2 = %.2f g, H2 = %.2f g", o2_generated, h2_generated);
+    double co2_req = (44.0/8.0) * h2_generated;     // ~5.5 g CO₂ per g H₂
+    request_co2(co2_req);
 
-      std_msgs::msg::Float64 o2_msg;
-      o2_msg.data = latest_o2_;
-      o2_pub_->publish(o2_msg);
+    double ch4_generated = 2.0 * h2_generated;      // g CH₄ vented
+    double grey_water = 4.5 * h2_generated;         // g H₂O recycled
 
-      // === Step 2: Request CO₂ ===
-      auto co2_req = std::make_shared<space_station_eclss::srv::Co2Request::Request>();
-      co2_req->co2_req = h2_generated * 1000.0;  // grams
+    total_ch4_vented_ += ch4_generated;
 
-      co2_client_->async_send_request(co2_req,
-        [this, goal_handle, result, feedback, o2_generated, h2_generated, water_granted](rclcpp::Client<space_station_eclss::srv::Co2Request>::SharedFuture co2_future)
-        {
-          auto co2_resp = co2_future.get();
-          if (!co2_resp->success) {
-            publish_failure_diagnostics("Sabatier Reactor", co2_resp->message);
-            result->success = false;
-            result->summary_message = "CO₂ request failed: " + co2_resp->message;
-            goal_handle->abort(result);
-            return;
-          }
+    std_msgs::msg::Float64 ch4_msg;
+    ch4_msg.data = ch4_generated;
+    ch4_pub_->publish(ch4_msg);
 
-          double co2_granted = co2_resp->co2_resp;
-          double ch4 = sabatier_efficiency_ * co2_granted;
+    return BT::NodeStatus::SUCCESS;
+  });
 
-          double gray_water = 0.8 * water_granted;
+  factory.registerSimpleAction("SendGreyWater", [&](BT::TreeNode &) {
+    send_gray_water(0.9 * goal->input_water_mass);
+    return BT::NodeStatus::SUCCESS;
+  });
 
-          RCLCPP_INFO(this->get_logger(), "Sabatier output: CH4 = %.2f g, Grey water = %.2f L", ch4, gray_water);
-          total_ch4_vented_ += ch4;
+  // Load XML
+  bt_xml_file_ = ament_index_cpp::get_package_share_directory("space_station_eclss") + "/behaviortrees/ogs_bt.xml";
+  auto tree = factory.createTreeFromFile(bt_xml_file_);
 
-          std_msgs::msg::Float64 ch4_msg;
-          ch4_msg.data = total_ch4_vented_;
-          ch4_pub_->publish(ch4_msg);
+  RCLCPP_INFO(this->get_logger(), "Executing OGS BT from: %s", bt_xml_file_.c_str());
 
-          // === Step 3: Send grey water ===
-          auto gw_req = std::make_shared<space_station_eclss::srv::GreyWater::Request>();
-          gw_req->gray_water_liters = gray_water;
+  BT::NodeStatus status = tree.tickRoot();
+  if (status == BT::NodeStatus::FAILURE) {
+    result->success = false;
+    result->summary_message = "OGS BT failed.";
+    goal_handle->abort(result);
+    return;
+  }
 
-          gray_water_client_->async_send_request(gw_req,
-            [this, goal_handle, result, feedback, o2_generated, h2_generated, ch4, gray_water](rclcpp::Client<space_station_eclss::srv::GreyWater>::SharedFuture gw_future)
-            {
-              auto gw_resp = gw_future.get();
-              if (!gw_resp->success) {
-                publish_failure_diagnostics("Grey Water Dispatch", gw_resp->message);
-                result->success = false;
-                result->summary_message = "Gray water transfer failed: " + gw_resp->message;
-                goal_handle->abort(result);
-                return;
-              }
-
-              // === Feedback and Success ===
-              feedback->time_step = 1;
-              feedback->current_temperature = 293.15;
-              feedback->o2_generated = o2_generated;
-              feedback->h2_generated = h2_generated;
-              feedback->ch4_vented = ch4;
-              goal_handle->publish_feedback(feedback);
-
-              RCLCPP_INFO(this->get_logger(), "Oxygen generation complete: O2=%.2f g, CH4=%.2f g, Grey water=%.2f L",
-                          o2_generated, ch4, gray_water);
-
-              result->success = true;
-              result->total_o2_generated = o2_generated;
-              result->total_ch4_vented = ch4;
-              result->summary_message = "O2 and CH4 generation complete.";
-              goal_handle->succeed(result);
-            });
-        });
-    });
+  result->success = true;
+  result->total_o2_generated = feedback->o2_generated;
+  result->total_ch4_vented = total_ch4_vented_;
+  result->summary_message = "OGS process completed.";
+  goal_handle->succeed(result);
 }
+
 
 void OGSSystem::request_product_water(double amount_liters)
 {
@@ -324,7 +281,7 @@ void OGSSystem::publish_periodic_status()
   o2_pub_->publish(o2_msg);
 
   // Publish CH4 vented so far
-  std_msgs::msg::Float64 ch4_msg;
+  
   ch4_msg.data = total_ch4_vented_;
   ch4_pub_->publish(ch4_msg);
 
@@ -337,12 +294,4 @@ void OGSSystem::publish_periodic_status()
 }
 
 
-int main(int argc, char **argv)
-{
-  rclcpp::init(argc, argv);
-  auto ogs_system = std::make_shared<OGSSystem>();
-  rclcpp::spin(ogs_system);
- 
-  rclcpp::shutdown();
-  return 0;
 }
