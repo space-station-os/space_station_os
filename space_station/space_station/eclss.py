@@ -4,7 +4,6 @@ from PyQt5.QtWidgets import (
     QWidget, QLabel, QVBoxLayout, QGroupBox, QGridLayout, QProgressBar,
     QComboBox, QHBoxLayout
 )
-from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt, QTimer, QMetaObject, Q_ARG
 import pyqtgraph as pg
 import random
@@ -16,10 +15,13 @@ from space_station_eclss.action import AirRevitalisation, WaterRecovery
 from space_station_eclss.srv import O2Request, RequestProductWater
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
 
+# Import custom astronaut vitals msg
+from space_station_eclss.msg import AstronautHealth
+
 # ---------------- Constants ---------------- #
-MAX_O2_STORAGE = 60000.0  # grams
+MAX_O2_STORAGE = 60.0    # grams (more realistic than 60000 g)
 MAX_WATER_STORAGE = 2000.0  # liters
-MAX_CO2_STORAGE = 7000.0  # mmHg
+MAX_CO2_STORAGE = 7000.0    # mmHg
 
 STATE_QOS = QoSProfile(
     history=HistoryPolicy.KEEP_LAST,
@@ -35,7 +37,19 @@ class EclssWidget(QWidget):
         self.node = node
         self.init_ui()
         self.init_ros_interfaces()
+        
+        self.hydration_next_minute = 1
+        self.wrs_next_minute = 1
 
+        # Urine accumulation model (fraction of intake that becomes urine)
+        self.urine_accum = 0.0
+        self.URINE_FRACTION_OF_INTAKE = 0.7  # simple physiology model
+
+        # NASA-like daily physiology (per astronaut)
+        self.O2_CONS_G_PER_DAY  = 840.0    # g/day
+        self.CO2_GEN_G_PER_DAY  = 1000.0   # g/day
+        self.H2O_CONS_L_PER_DAY = 2.4      # L/day (set 3.0 for upper-bound)
+        self.MIN_PER_DAY = 1440.0
         # Simulation state
         self.sim_minutes = 0   # 1 sec real = 1 minute simulated
         self.co2_level = 400.0
@@ -43,10 +57,13 @@ class EclssWidget(QWidget):
         self.crew_size = 4
         self.total_days = 180
 
-        # Graph data (independent timelines)
+        # Graph data
         self.co2_x, self.co2_data = [], []
         self.o2_x, self.o2_data = [], []
         self.h2o_x, self.h2o_data = [], []
+        self.co2_cons_x, self.co2_cons_data = [], []
+        self.o2_cons_x, self.o2_cons_data = [], []
+        self.h2o_cons_x, self.h2o_cons_data = [], []
 
         # Timers
         self.timer = QTimer()
@@ -62,7 +79,7 @@ class EclssWidget(QWidget):
         layout = QGridLayout()
         layout.setSpacing(10)
 
-        # Quadrant 1: Tanks (horizontal)
+        # Quadrant 1: Tanks
         tanks_group = QGroupBox("Storage Tanks")
         tanks_layout = QHBoxLayout()
 
@@ -89,13 +106,13 @@ class EclssWidget(QWidget):
         prod_group.setLayout(prod_layout)
         layout.addWidget(prod_group, 0, 1)
 
-        # Quadrant 3: Consumption Graphs (placeholder for now)
+        # Quadrant 3: Consumption Graphs
         cons_group = QGroupBox("Consumption vs Reserves")
         cons_layout = QVBoxLayout()
         self.cons_plot = pg.PlotWidget(title="Consumption Over Time")
         self.cons_plot.addLegend()
         self.cons_plot.showGrid(x=True, y=True)
-        self.co2_cons_curve = self.cons_plot.plot(pen='r', name="CO₂ Consumed")
+        self.co2_cons_curve = self.cons_plot.plot(pen='r', name="CO₂ Exhaled")
         self.o2_cons_curve = self.cons_plot.plot(pen='c', name="O₂ Consumed")
         self.h2o_cons_curve = self.cons_plot.plot(pen='y', name="H₂O Consumed")
         cons_layout.addWidget(self.cons_plot)
@@ -148,50 +165,59 @@ class EclssWidget(QWidget):
         self.node.create_subscription(Float64, '/o2_storage', self.update_o2_status, 10)
         self.node.create_subscription(Float64, '/wrs/product_water_reserve', self.update_water_status, 10)
 
-    # ---------------- Simulation ---------------- #
+        # Astronaut BMS publisher
+        self.bms_pub = self.node.create_publisher(AstronautHealth, "/crew/vitals", 10)
+
     def simulate_event(self):
-        # advance simulation
         self.sim_minutes += 1
 
-        # --- Send INITIAL goals at startup ---
-        if self.sim_minutes == 1:
-            self.node.get_logger().info("[Sim] Sending initial ARS/WRS/OGS/Water goals...")
+        # Per-person metabolic rates per simulated minute (derived from daily)
+        o2_cons = self.O2_CONS_G_PER_DAY  / self.MIN_PER_DAY   # ≈0.583 g/min
+        co2_gen = self.CO2_GEN_G_PER_DAY  / self.MIN_PER_DAY   # ≈0.694 g/min
+        h2o_cons = self.H2O_CONS_L_PER_DAY / self.MIN_PER_DAY  # ≈0.001667 L/min
 
+        # Update totals / “sensed” environment
+        self.co2_level += co2_gen * self.crew_size
+        o2_used = o2_cons * self.crew_size
+        h2o_used = h2o_cons * self.crew_size
+
+        # Track consumption curves
+        self.co2_cons_x.append(self.sim_minutes)
+        self.o2_cons_x.append(self.sim_minutes)
+        self.h2o_cons_x.append(self.sim_minutes)
+        self.co2_cons_data.append(self.co2_level)
+        self.o2_cons_data.append(o2_used)
+        self.h2o_cons_data.append(h2o_used)
+        self.co2_cons_curve.setData(self.co2_cons_x, self.co2_cons_data)
+        self.o2_cons_curve.setData(self.o2_cons_x, self.o2_cons_data)
+        self.h2o_cons_curve.setData(self.h2o_cons_x, self.h2o_cons_data)
+
+        # Accumulate urine (fraction of consumed water becomes urine)
+        self.urine_accum += h2o_used * self.URINE_FRACTION_OF_INTAKE
+
+        # --- CO2 vent trigger (ARS action) when threshold exceeded ---
+        if self.co2_level >= 500.0:
+            self.node.get_logger().info("[Sim] CO₂ exceeded threshold, sending ARS goal…")
             self.send_ars_goal(self.co2_level)
+            self.co2_level = 200.0  # reset baseline after venting
 
-            total_waste = self.urine_volume + (1.5 * self.crew_size)
-            self.send_wrs_goal(total_waste)
-            self.urine_volume = 0.0
-
-            if self.o2_client.service_is_ready():
-                req = O2Request.Request()
-                req.o2_req = 800.0 * self.crew_size
-                self.o2_client.call_async(req)
-
+        # --- Hydration: first at minute 1, then every 120 minutes ---
+        if self.sim_minutes >= self.hydration_next_minute:
             if self.water_client.service_is_ready():
+                per_astronaut_interval = self.H2O_CONS_L_PER_DAY / 12.0   # 2 h = 1/12 day
                 req = RequestProductWater.Request()
-                req.amount = 10.0 * self.crew_size
+                req.amount = per_astronaut_interval * self.crew_size
+                self.node.get_logger().info(f"[Sim] Hydration request: {req.amount:.2f} L")
                 self.water_client.call_async(req)
+            self.hydration_next_minute += 120  # schedule next after 120 min
 
-        # --- Then every 30 simulated minutes ---
-        elif self.sim_minutes % 30 == 0:
-            self.node.get_logger().info("[Sim] Sending scheduled ARS/WRS/OGS/Water goals...")
-
-            self.send_ars_goal(self.co2_level)
-
-            total_waste = self.urine_volume + (1.5 * self.crew_size)
-            self.send_wrs_goal(total_waste)
-            self.urine_volume = 0.0
-
-            if self.o2_client.service_is_ready():
-                req = O2Request.Request()
-                req.o2_req = 800.0 * self.crew_size
-                self.o2_client.call_async(req)
-
-            if self.water_client.service_is_ready():
-                req = RequestProductWater.Request()
-                req.amount = 10.0 * self.crew_size
-                self.water_client.call_async(req)
+        # --- WRS urine flush: first at minute 1, then every 120 minutes ---
+        if self.sim_minutes >= self.wrs_next_minute:
+            if self.wrs_client.wait_for_server(timeout_sec=0.5) and self.urine_accum > 0.0:
+                self.node.get_logger().info(f"[Sim] Sending WRS goal (urine={self.urine_accum:.2f} L)")
+                self.send_wrs_goal(self.urine_accum)
+                self.urine_accum = 0.0
+            self.wrs_next_minute += 120  # schedule next after 120 min
 
     # ---------------- Health ---------------- #
     def update_mock_health(self):
@@ -201,6 +227,7 @@ class EclssWidget(QWidget):
         bp_dia = random.randint(70, 85)
         temp = round(random.uniform(36.5, 37.5), 1)
 
+        # Update GUI
         QMetaObject.invokeMethod(self.hr_label, "setText", Qt.QueuedConnection,
             Q_ARG(str, f"Heart Rate: {hr} bpm"))
         QMetaObject.invokeMethod(self.spo2_label, "setText", Qt.QueuedConnection,
@@ -209,6 +236,14 @@ class EclssWidget(QWidget):
             Q_ARG(str, f"Blood Pressure: {bp_sys}/{bp_dia} mmHg"))
         QMetaObject.invokeMethod(self.temp_label, "setText", Qt.QueuedConnection,
             Q_ARG(str, f"Temp: {temp} °C"))
+
+        # Publish BMS data
+        msg = AstronautHealth()
+        msg.astronautname = self.crew_dropdown.currentText()
+        msg.heartrate = float(hr)
+        msg.spo2 = float(spo2)
+        msg.bp = float(bp_sys + bp_dia/100.0)  # simple encoding
+        self.bms_pub.publish(msg)
 
     # ---------------- Status Updates ---------------- #
     def update_co2_status(self, msg):

@@ -22,6 +22,7 @@ find_package(ament_index_cpp REQUIRED)
 # find_package(<dependency> REQUIRED)
 
 set(msg_files
+  "msg/AstronautHealth.msg"
   "action/AirRevitalisation.action"
   "action/OxygenGeneration.action"
   "action/WaterRecovery.action"
@@ -64,6 +65,43 @@ ament_target_dependencies(ars_systems
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(ars_systems ${cpp_typesupport_target})
 
+
+add_library(ogs_systems
+    src/ors_systems/src/ogs_systems.cpp
+)
+
+ament_target_dependencies(ogs_systems
+  rclcpp
+  rclcpp_action
+  std_msgs
+  diagnostic_msgs
+  behaviortree_cpp_v3
+  ament_index_cpp
+  std_srvs
+  sensor_msgs
+)
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(ogs_systems ${cpp_typesupport_target})
+
+
+add_library(wrs_systems
+    src/wrs_systems/src/wrs_systems.cpp
+)
+
+ament_target_dependencies(wrs_systems
+  rclcpp
+  rclcpp_action
+  std_msgs
+  diagnostic_msgs
+  behaviortree_cpp_v3
+  ament_index_cpp
+  std_srvs
+  sensor_msgs
+)
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(wrs_systems ${cpp_typesupport_target})
+
+
 # ------------------------------------------------------------------
 # executable
 # ------------------------------------------------------------------
@@ -71,13 +109,14 @@ add_executable(ars src/ars_systems/ars_main_node.cpp)
 target_link_libraries(ars ars_systems)
 ament_target_dependencies(ars rclcpp)
 
-add_executable(ogs src/ors_systems/src/ogs_systems.cpp)
-ament_target_dependencies(ogs std_srvs rosidl_default_generators rclcpp rclcpp_action diagnostic_msgs)
-rosidl_target_interfaces(ogs ${PROJECT_NAME} "rosidl_typesupport_cpp")
+add_executable(ogs src/ors_systems/src/ogs_main_node.cpp)
+target_link_libraries(ogs ogs_systems)
+ament_target_dependencies(ogs rclcpp)
 
-add_executable(wrs src/wrs_systems/src/wrs_systems.cpp)
-ament_target_dependencies(wrs rosidl_default_generators rclcpp rclcpp_action diagnostic_msgs std_srvs)
-rosidl_target_interfaces(wrs ${PROJECT_NAME} "rosidl_typesupport_cpp")
+add_executable(wrs src/wrs_systems/src/wrs_main_node.cpp)
+target_link_libraries(wrs wrs_systems)
+ament_target_dependencies(wrs rclcpp)
+
 
 
 install(TARGETS
@@ -110,6 +149,15 @@ if(BUILD_TESTING)
     $<INSTALL_INTERFACE:include>
   )
   target_link_libraries(ars_test ars_systems)
+
+
+
+  ament_add_gtest(ogs_test test/test_ogs_action_server.cpp)
+  target_include_directories(ogs_test PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+  )
+  target_link_libraries(ogs_test ogs_systems)
 endif()
 
 ament_package()
