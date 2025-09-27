@@ -2,10 +2,10 @@ name: Docker Publish
 
 on:
   push:
-    branches: ["**"]        
+    branches: ["**"]
   pull_request:
     branches: ["**"]
-  workflow_dispatch:        
+  workflow_dispatch:
 
 jobs:
   build:
@@ -23,25 +23,23 @@ jobs:
         run: |
           apt update
           apt install -y python3-colcon-common-extensions python3-pip git
-          apt install -y libsdl2-dev
-          apt install -y build-essential
+          apt install -y libsdl2-dev build-essential
+          apt install -y ros-humble-behaviortree-cpp-v3
+          rosdep init || true
           rosdep update
           rosdep install --from-paths . --ignore-src -r -y
 
       - name: Install OpenCV
         run: |
-          apt update 
+          apt update
           apt install -y libopencv-dev python3-opencv
 
-      - name: Install Python packages (casadi)
+      - name: Install Python packages
         run: |
           pip install casadi
-          
+
       - name: Build the workspace
         run: |
           source /opt/ros/humble/setup.bash
           colcon build --event-handlers console_direct+
         shell: bash
-
-      
-          
