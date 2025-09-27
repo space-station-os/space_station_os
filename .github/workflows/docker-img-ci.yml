@@ -25,6 +25,22 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+
+      - name: Add OSRF apt repo (Gazebo)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y wget lsb-release gnupg
+          sudo sh -c 'echo "deb http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" > /etc/apt/sources.list.d/gazebo-stable.list'
+          wget https://packages.osrfoundation.org/gazebo.key -O - | sudo apt-key add -
+          sudo apt-get update -y
+          # meta package for Gazebo Harmonic
+          sudo apt-get install -y gz-harmonic
+
+      - name: Install system deps (fallback)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y libeigen3-dev
+
       - name: Sanitize tag name
         id: vars
         run: |

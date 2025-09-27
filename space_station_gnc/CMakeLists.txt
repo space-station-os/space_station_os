@@ -29,6 +29,7 @@ find_package(action_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(urdf REQUIRED)        # provides target urdf::urdf
 find_package(yaml-cpp REQUIRED)    # YAML tables support
+find_package(ament_index_cpp REQUIRED)
 
 # Generate interfaces
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -67,7 +68,7 @@ ament_target_dependencies(physics_motion rclcpp std_msgs tf2 tf2_ros tf2_geometr
 ament_target_dependencies(orbit_dynamics rclcpp std_msgs nav_msgs tf2 tf2_ros tf2_geometry_msgs visualization_msgs)
 ament_target_dependencies(physics_sensor rclcpp std_msgs tf2 tf2_ros tf2_geometry_msgs visualization_msgs)
 ament_target_dependencies(sense_estimate rclcpp std_msgs tf2 tf2_ros nav_msgs tf2_geometry_msgs visualization_msgs)
-ament_target_dependencies(control_torque rclcpp std_msgs tf2 tf2_ros nav_msgs tf2_geometry_msgs visualization_msgs)
+ament_target_dependencies(control_torque rclcpp std_msgs tf2 tf2_ros nav_msgs tf2_geometry_msgs visualization_msgs ament_index_cpp)
 ament_target_dependencies(thruster_matrix rclcpp)
 
 
@@ -108,6 +109,8 @@ ament_export_include_directories(
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
+
+ament_export_dependencies(Eigen3)
 
 target_link_libraries(control_torque ${cpp_typesupport_target})
 target_link_libraries(physics_motion ${cpp_typesupport_target})
