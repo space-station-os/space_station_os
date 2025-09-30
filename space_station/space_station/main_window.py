@@ -9,7 +9,8 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QPixmap
 import rclpy
-from rclpy.executors import SingleThreadedExecutor
+from rclpy.executors import MultiThreadedExecutor
+
 from rclpy.node import Node
 from space_station.video_player import VideoPlayer
 from space_station.theme import load_dark_theme, load_light_theme
@@ -20,12 +21,11 @@ from space_station.thermal import ThermalWidget
 from space_station.gnc import GncWidget
 from space_station.comms import CommsWidget
 from space_station.system_status import SystemStatusWidget
-from space_station.eps import EPSWidget   # <-- correct import
+from space_station.eps import EPSWidget   
 
-# Left panel with AI Assist (must include ask_ai signal and append_ai_response method)
+
 from space_station.left_panel import LeftPanel
 
-# AI agent that reads ROS 2 topics via shared GUI node and calls local LLM
 from space_station.agent import SsosAIAgent
 
 # --- Resources API (Py 3.9+ files/as_file) ---
@@ -52,7 +52,8 @@ class MainWindow(QMainWindow):
         rclpy.init(args=None, context=self._ros_ctx)
 
         self.node: Node = rclpy.create_node('space_station_gui_node', context=self._ros_ctx)
-        self.executor = SingleThreadedExecutor(context=self._ros_ctx)
+        self.executor = MultiThreadedExecutor(context=self._ros_ctx, num_threads=4)
+
         self.executor.add_node(self.node)
 
         # Pump ROS callbacks
