@@ -12,7 +12,8 @@
 #include "space_station_eclss/srv/request_product_water.hpp"
 #include "space_station_eclss/srv/grey_water.hpp"
 #include <std_msgs/msg/bool.hpp>
-
+#include <behaviortree_cpp_v3/bt_factory.h>
+#include <ament_index_cpp/get_package_share_directory.hpp>
 #include <memory>
 #include <string>
 
@@ -54,7 +55,7 @@ private:
   // System parameters
   float product_water_capacity_;
   float waste_collector_capacity_;
-
+  float iodine_addition_;
   float upa_valve_pressure_;
   float ionization_valve_pressure_;
   float filter_valve_pressure_;

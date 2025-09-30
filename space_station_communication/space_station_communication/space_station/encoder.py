@@ -18,7 +18,7 @@ class TelemetryEncoderNode(Node):
     def __init__(self):
         super().__init__('telemetry_encoder')
         self.declare_parameter('apid_config', 'config/apid_mapping.yaml')
-        self.declare_parameter('starlink_uri', 'ws://localhost:8080')  
+        self.declare_parameter('starlink_uri', 'ws://localhost:8081')  
 
         self.packet_queue = Queue()
         self.seq_count = 0

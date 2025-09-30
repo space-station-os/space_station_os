@@ -1,49 +1,46 @@
-#ifndef SPACE_STATION_ECLSS__OGS_SYSTEM_HPP_
-#define SPACE_STATION_ECLSS__OGS_SYSTEM_HPP_
+#pragma once
 
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
-#include <std_msgs/msg/float64.hpp>
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
+#include <std_msgs/msg/float64.hpp>
+#include <std_msgs/msg/bool.hpp>
 
 #include "space_station_eclss/action/oxygen_generation.hpp"
-#include "space_station_eclss/srv/o2_request.hpp"
 #include "space_station_eclss/srv/request_product_water.hpp"
 #include "space_station_eclss/srv/co2_request.hpp"
+#include "space_station_eclss/srv/o2_request.hpp"
 #include "space_station_eclss/srv/grey_water.hpp"
-#include <std_msgs/msg/bool.hpp>
+
+// BehaviorTree
+#include <behaviortree_cpp_v3/bt_factory.h>
+#include <ament_index_cpp/get_package_share_directory.hpp>
+
+namespace space_station_eclss{
+
 
 class OGSSystem : public rclcpp::Node
 {
 public:
-  OGSSystem();
+  using OxygenGeneration = space_station_eclss::action::OxygenGeneration;
+  using GoalHandleOGS = rclcpp_action::ServerGoalHandle<OxygenGeneration>;
+
+  explicit OGSSystem(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
+  static BT::PortsList providedPorts()
+  {
+    return {
+      BT::InputPort<double>("Water_in"),
+      BT::OutputPort<double>("O2_out"),
+      BT::OutputPort<double>("H2_out"),
+      BT::InputPort<double>("CO2_in"),
+      BT::InputPort<double>("H2_in"),
+      BT::OutputPort<double>("Water_out"),
+      BT::OutputPort<double>("GreyWater_out")
+    };
+  }
 
 private:
-  // Action server
-  rclcpp_action::Server<space_station_eclss::action::OxygenGeneration>::SharedPtr action_server_;
-  rclcpp_action::GoalResponse handle_goal(
-    const rclcpp_action::GoalUUID & uuid,
-    std::shared_ptr<const space_station_eclss::action::OxygenGeneration::Goal> goal);
-  rclcpp_action::CancelResponse handle_cancel(
-    const std::shared_ptr<rclcpp_action::ServerGoalHandle<space_station_eclss::action::OxygenGeneration>> goal_handle);
-  void execute_goal(
-    const std::shared_ptr<rclcpp_action::ServerGoalHandle<space_station_eclss::action::OxygenGeneration>> goal_handle);
-
-  // Service clients
-  rclcpp::Client<space_station_eclss::srv::RequestProductWater>::SharedPtr water_client_;
-  rclcpp::Client<space_station_eclss::srv::Co2Request>::SharedPtr co2_client_;
-  rclcpp::Client<space_station_eclss::srv::GreyWater>::SharedPtr gray_water_client_;
-
-  // Service server
-  rclcpp::Service<space_station_eclss::srv::O2Request>::SharedPtr o2_server_;
-
-  // Publishers
-  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr o2_pub_;
-  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr ch4_pub_;
-  rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticStatus>::SharedPtr diag_pub_;
-  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr disable_failure_;
-  // Timers
-  rclcpp::TimerBase::SharedPtr timer_;
+  // Parameters
   bool enable_failure_;
   double electrolysis_temp_;
   double o2_efficiency_;
@@ -53,23 +50,44 @@ private:
   double min_o2_capacity_;
   double max_o2_capacity_;
 
-  // Storage
   double latest_o2_ = 0.0;
   double total_ch4_vented_ = 0.0;
+  double last_h2_generated_ = 0.0;
+  double last_o2_generated_ = 0.0;
+  double h2_generated = 0.0; 
+  // ROS entities
+  rclcpp_action::Server<OxygenGeneration>::SharedPtr action_server_;
+  rclcpp::Client<space_station_eclss::srv::RequestProductWater>::SharedPtr water_client_;
+  rclcpp::Client<space_station_eclss::srv::Co2Request>::SharedPtr co2_client_;
+  rclcpp::Client<space_station_eclss::srv::GreyWater>::SharedPtr gray_water_client_;
+  rclcpp::Service<space_station_eclss::srv::O2Request>::SharedPtr o2_server_;
 
-  void request_product_water(double amount_liters);
-  void request_co2(double co2_mass_kg);
-  void send_gray_water(double amount_liters);
+  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr o2_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr ch4_pub_;
+  rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticStatus>::SharedPtr diag_pub_;
 
+  rclcpp::TimerBase::SharedPtr timer_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr disable_failure_;
+  std_msgs::msg::Float64 ch4_msg;
+  // Callbacks
+  rclcpp_action::GoalResponse handle_goal(const rclcpp_action::GoalUUID &,
+                                          std::shared_ptr<const OxygenGeneration::Goal> goal);
+  rclcpp_action::CancelResponse handle_cancel(const std::shared_ptr<GoalHandleOGS> goal_handle);
+  void execute_goal(const std::shared_ptr<GoalHandleOGS> goal_handle);
 
-  // Service callback
   void o2_service_callback(
     const std::shared_ptr<space_station_eclss::srv::O2Request::Request> request,
     std::shared_ptr<space_station_eclss::srv::O2Request::Response> response);
 
-  // Diagnostics
   void publish_failure_diagnostics(const std::string &unit, const std::string &reason);
   void publish_periodic_status();
-};
 
-#endif  // SPACE_STATION_ECLSS__OGS_SYSTEM_HPP_
+  // Support functions (same as your current ones)
+  void request_product_water(double amount_liters);
+  void request_co2(double co2_mass_kg);
+  void send_gray_water(double amount_liters);
+
+  // === BehaviorTree XML path ===
+  std::string bt_xml_file_;
+};
+}

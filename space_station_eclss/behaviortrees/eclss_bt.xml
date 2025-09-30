@@ -1,0 +1,25 @@
+<root main_tree_to_execute="ECLSS_Main">
+  <BehaviorTree ID="ECLSS_Main">
+
+    <Sequence name="ECLSS_Flow">
+
+      <!-- Step 1: ARS vents/stores CO₂ -->
+      <SubTree ID="ARS" CO2_out="{co2_from_ars}"/>
+
+      <!-- Step 2: OGS produces O₂ from water, recycles H₂ + CO₂ into more water -->
+      <SubTree ID="OGS" 
+               CO2_in="{co2_from_ars}"
+               Water_in="{purified_water}"
+               Water_out="{recycled_water}"
+               GreyWater_out="{grey_water_volume}"/>
+
+      <!-- Step 3: WRS collects grey water, recycles, and provides purified water -->
+      <SubTree ID="WRS" 
+               GreyWater_in="{grey_water_volume}"
+               Water_in="{recycled_water}"
+               PurifiedWater_out="{purified_water}"/>
+
+    </Sequence>
+
+  </BehaviorTree>
+</root>
