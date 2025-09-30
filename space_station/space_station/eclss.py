@@ -19,7 +19,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPo
 from space_station_eclss.msg import AstronautHealth
 
 # ---------------- Constants ---------------- #
-MAX_O2_STORAGE = 60.0    # grams (more realistic than 60000 g)
+MAX_O2_STORAGE = 60.0    # grams 
 MAX_WATER_STORAGE = 2000.0  # liters
 MAX_CO2_STORAGE = 7000.0    # mmHg
 
@@ -73,7 +73,7 @@ class EclssWidget(QWidget):
         self.health_timer = QTimer()
         self.health_timer.timeout.connect(self.update_mock_health)
         self.health_timer.start(3000)
-
+        self.send_initial_goals()
     # ---------------- UI ---------------- #
     def init_ui(self):
         layout = QGridLayout()
@@ -140,7 +140,8 @@ class EclssWidget(QWidget):
         layout.addWidget(health_group, 1, 1)
 
         self.setLayout(layout)
-
+    
+        
     def _create_horizontal_tank(self, name, color):
         box = QGroupBox(name)
         vbox = QVBoxLayout()
@@ -167,6 +168,30 @@ class EclssWidget(QWidget):
 
         # Astronaut BMS publisher
         self.bms_pub = self.node.create_publisher(AstronautHealth, "/crew/vitals", 10)
+
+    def send_initial_goals(self):
+        # --- Initial CO₂ vent ---
+        if self.ars_client.wait_for_server(timeout_sec=2.0):
+            goal = AirRevitalisation.Goal()
+            goal.initial_co2_mass = self.co2_level
+            goal.initial_moisture_content = 0.8 * 2.5 * self.crew_size
+            goal.initial_contaminants = 25.0
+            self.node.get_logger().info("[Startup] Sending initial ARS goal...")
+            self.ars_client.send_goal_async(goal)
+
+        # --- Initial Hydration request ---
+        if self.water_client.service_is_ready():
+            req = RequestProductWater.Request()
+            req.amount = (self.H2O_CONS_L_PER_DAY / 12.0) * self.crew_size
+            self.node.get_logger().info(f"[Startup] Initial hydration request: {req.amount:.2f} L")
+            self.water_client.call_async(req)
+
+        # --- Initial Urine flush (WRS) ---
+        if self.wrs_client.wait_for_server(timeout_sec=2.0):
+            goal = WaterRecovery.Goal()
+            goal.urine_volume = 10.0  
+            self.node.get_logger().info("[Startup] Sending initial WRS goal...")
+            self.wrs_client.send_goal_async(goal)
 
     def simulate_event(self):
         self.sim_minutes += 1
@@ -201,7 +226,6 @@ class EclssWidget(QWidget):
             self.send_ars_goal(self.co2_level)
             self.co2_level = 200.0  # reset baseline after venting
 
-        # --- Hydration: first at minute 1, then every 120 minutes ---
         if self.sim_minutes >= self.hydration_next_minute:
             if self.water_client.service_is_ready():
                 per_astronaut_interval = self.H2O_CONS_L_PER_DAY / 12.0   # 2 h = 1/12 day
