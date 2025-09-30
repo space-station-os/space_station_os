@@ -17,7 +17,7 @@ class GroundReceiverNode(Node):
         super().__init__('ground_receiver_node')
         self.declare_parameter('apid_config', 'config/apid_mapping.yaml')
         self.declare_parameter('forward_uri', 'ws://localhost:9090')
-        self.declare_parameter('receive_uri', 'ws://localhost:8080')
+        self.declare_parameter('receive_uri', 'ws://localhost:8081')
 
         config_path = self.get_parameter('apid_config').get_parameter_value().string_value
         self.forward_uri = self.get_parameter('forward_uri').get_parameter_value().string_value
