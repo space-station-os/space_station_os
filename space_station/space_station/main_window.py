@@ -50,7 +50,7 @@ class MainWindow(QMainWindow):
         # ---- ROS init ----
         self._ros_ctx = rclpy.context.Context()
         rclpy.init(args=None, context=self._ros_ctx)
-
+        
         self.node: Node = rclpy.create_node('space_station_gui_node', context=self._ros_ctx)
         self.executor = MultiThreadedExecutor(context=self._ros_ctx, num_threads=4)
 

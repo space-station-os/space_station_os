@@ -159,7 +159,7 @@ void ARSActionServer::execute(const std::shared_ptr<GoalHandleARS> goal_handle)
  std::string bt_xml_file = ament_index_cpp::get_package_share_directory("space_station_eclss") +
                           "/behaviortrees/ars_bt.xml";
 
-  RCLCPP_INFO(this->get_logger(), "Loading BT from: %s", bt_xml_file.c_str());
+  // RCLCPP_INFO(this->get_logger(), "Loading BT from: %s", bt_xml_file.c_str());
 
   auto tree = factory.createTreeFromFile(bt_xml_file);
 
