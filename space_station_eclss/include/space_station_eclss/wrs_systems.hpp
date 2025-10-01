@@ -6,14 +6,16 @@
 
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
 #include <std_msgs/msg/float64.hpp>
+#include <std_msgs/msg/bool.hpp>
 
 #include "space_station_eclss/action/water_recovery.hpp"
 #include "space_station_eclss/action/oxygen_generation.hpp"
 #include "space_station_eclss/srv/request_product_water.hpp"
 #include "space_station_eclss/srv/grey_water.hpp"
-#include <std_msgs/msg/bool.hpp>
+
 #include <behaviortree_cpp_v3/bt_factory.h>
 #include <ament_index_cpp/get_package_share_directory.hpp>
+
 #include <memory>
 #include <string>
 
@@ -25,14 +27,14 @@ class WRSActionServer : public rclcpp::Node
 public:
   explicit WRSActionServer(const rclcpp::NodeOptions & options);
 
-private:
-  // Action types
+  // Action typedefs must be public so .cpp can use them
   using WRS = space_station_eclss::action::WaterRecovery;
   using GoalHandleWRS = rclcpp_action::ServerGoalHandle<WRS>;
 
   using OGS = space_station_eclss::action::OxygenGeneration;
   using GoalHandleOGS = rclcpp_action::ClientGoalHandle<OGS>;
 
+private:
   // Action server
   rclcpp_action::Server<WRS>::SharedPtr action_server_;
 
@@ -48,10 +50,12 @@ private:
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr reserve_pub_;
   rclcpp::TimerBase::SharedPtr reserve_timer_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr disable_failure_;
+
   // Internal state
   float product_water_reserve_;
   float waste_collector_current_;
   float min_product_water_capacity_;
+
   // System parameters
   float product_water_capacity_;
   float waste_collector_capacity_;
@@ -69,7 +73,10 @@ private:
   bool enable_failure_;
 
   // Action server handlers
-  rclcpp_action::GoalResponse handle_goal(const rclcpp_action::GoalUUID & uuid, std::shared_ptr<const WRS::Goal> goal);
+  rclcpp_action::GoalResponse handle_goal(
+    const rclcpp_action::GoalUUID & uuid,
+    std::shared_ptr<const WRS::Goal> goal);
+
   rclcpp_action::CancelResponse handle_cancel(const std::shared_ptr<GoalHandleWRS> goal_handle);
   void handle_accepted(const std::shared_ptr<GoalHandleWRS> goal_handle);
   void execute(const std::shared_ptr<GoalHandleWRS> goal_handle);

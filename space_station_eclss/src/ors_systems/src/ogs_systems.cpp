@@ -140,7 +140,7 @@ void OGSSystem::execute_goal(const std::shared_ptr<GoalHandleOGS> goal_handle)
   bt_xml_file_ = ament_index_cpp::get_package_share_directory("space_station_eclss") + "/behaviortrees/ogs_bt.xml";
   auto tree = factory.createTreeFromFile(bt_xml_file_);
 
-  RCLCPP_INFO(this->get_logger(), "Executing OGS BT from: %s", bt_xml_file_.c_str());
+  // RCLCPP_INFO(this->get_logger(), "Executing OGS BT from: %s", bt_xml_file_.c_str());
 
   BT::NodeStatus status = tree.tickRoot();
   if (status == BT::NodeStatus::FAILURE) {
