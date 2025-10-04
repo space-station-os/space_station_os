@@ -29,6 +29,8 @@
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Vector3.h>
 
+#include "space_station_gnc/srv/set_gnc_mode_actuation.hpp"
+
 static std::string resolve_package_url_to_path(const std::string &uri) {
   const std::string prefix = "package://";
   if (uri.rfind(prefix, 0) == 0) {
@@ -49,14 +51,15 @@ class ControlTorque : public rclcpp::Node {
 public:
   using unloading = space_station_gnc::action::Unloading;
   using GoalHandleUnloading = rclcpp_action::ServerGoalHandle<unloading>;
+
+  using SetModeSrv = space_station_gnc::srv::SetGncModeActuation;
+
   ControlTorque() : Node("control_torque") {
 
     // Declare parameters for PD gains
     this->declare_parameter("kp_cmg", 300000.0);
     this->declare_parameter("kd_cmg", 300000.0);
     this->declare_parameter("k_unload", 10.0);
-    // this->declare_parameter("kp_thruster", 500.0);
-    // this->declare_parameter("kd_thruster", 100.0);
     this->declare_parameter("kp_thruster", 1000000.0);
     this->declare_parameter("kd_thruster", 1000000.0);
 
@@ -101,21 +104,25 @@ public:
         "/gnc/cmg_h", rclcpp::QoS(10),
         std::bind(&ControlTorque::callback_cmg_h, this, std::placeholders::_1));
 
+    /*  REMOVED: legacy topic-based mode switching subscriber
+    // Reason: To avoid ambiguity and race conditions, switching is now handled
+    // exclusively by the synchronous service /gnc/set_mode_actuation.
     control_mode_sub_ = this->create_subscription<std_msgs::msg::String>(
-        "/gnc/mode_gnc_control", 10,
-        [this](const std_msgs::msg::String::SharedPtr msg) {
-          const std::string &mode = msg->data;
-          if (mode == "cmg" || mode == "thruster") {
-            mode_gnc_control_ = mode;
-            RCLCPP_WARN(this->get_logger(), "Control mode set to: %s",
-                        mode_gnc_control_.c_str());
-          } else {
-            RCLCPP_WARN(
-                this->get_logger(),
-                "Received invalid control mode: '%s'. Keeping current mode: %s",
-                mode.c_str(), mode_gnc_control_.c_str());
-          }
-        });
+            "/gnc/mode_gnc_control", 10,
+            [this](const std_msgs::msg::String::SharedPtr msg) {
+              const std::string &mode = msg->data;
+              if (mode == "cmg" || mode == "thruster") {
+                mode_gnc_control_ = mode;
+                RCLCPP_WARN(this->get_logger(), "Control mode set to: %s",
+                            mode_gnc_control_.c_str());
+              } else {
+                RCLCPP_WARN(
+                    this->get_logger(),
+                    "Received invalid control mode: '%s'. Keeping current mode:
+       %s", mode.c_str(), mode_gnc_control_.c_str());
+              }
+            });
+    */
 
     urdf_sub_ = this->create_subscription<std_msgs::msg::String>(
         "/robot_description",
@@ -196,6 +203,26 @@ public:
     thr_force_pub_ = this->create_publisher<std_msgs::msg::Float32MultiArray>(
         "/gnc/thr_force_cmd", 10);
 
+    // Publisher for current actuation mode (latched) for UI/OpenMCT.
+    // Using transient_local so that late-joining subscribers receive the last
+    // state.
+    mode_actuation_pub_ = this->create_publisher<std_msgs::msg::String>(
+        "/gnc/mode_actuation", rclcpp::QoS(1).transient_local());
+
+    // Service for switching actuation mode (replaces topic-based command).
+    set_mode_srv_ = this->create_service<SetModeSrv>(
+        "/gnc/set_mode_actuation",
+        [this](const std::shared_ptr<SetModeSrv::Request> req,
+               std::shared_ptr<SetModeSrv::Response> res) {
+          const bool ok = this->handle_mode_request(req->mode, "service");
+          res->success = ok;
+          res->current_mode = mode_gnc_control_;
+          res->message = ok ? "Accepted" : "Rejected";
+        });
+
+    // Initialize mode and publish initial state
+    set_current_mode_and_publish("cmg", "startup");
+
     // Action server for unloading
     unloading_server_ = rclcpp_action::create_server<unloading>(
         this, "gnc/unloading",
@@ -209,6 +236,38 @@ public:
   }
 
 private:
+  // normalize + validate + apply switching + publish current state
+  bool handle_mode_request(std::string mode_in, const std::string &source) {
+    std::transform(mode_in.begin(), mode_in.end(), mode_in.begin(), ::tolower);
+
+    if (mode_in != "cmg" && mode_in != "thruster" && mode_in != "auto") {
+      RCLCPP_WARN(
+          this->get_logger(),
+          "[%s] invalid actuation mode '%s' (expected: cmg|thruster|auto)",
+          source.c_str(), mode_in.c_str());
+      return false;
+    }
+
+    // TODO: add inhibit checks if needed (e.g., thruster firing blocks CMG
+    // switch)
+    set_current_mode_and_publish(mode_in, source);
+    RCLCPP_INFO(this->get_logger(), "Actuation mode set to: %s (by %s)",
+                mode_in.c_str(), source.c_str());
+    return true;
+  }
+
+  // single source of truth for updating mode + notifying others
+  void set_current_mode_and_publish(const std::string &mode,
+                                    const std::string &source) {
+    mode_gnc_control_ = mode;
+
+    std_msgs::msg::String state;
+    state.data = mode_gnc_control_;
+    mode_actuation_pub_->publish(state);
+
+    (void)source; // reserved for future provenance logging
+  }
+
   // Publish a 3D zero torque on /gnc/cmg_torque_cmd
   void publish_zero_cmg_torque() {
     geometry_msgs::msg::Vector3 zero;
@@ -676,7 +735,8 @@ private:
     }
   }
 
-  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr control_mode_sub_;
+  // rclcpp::Subscription<std_msgs::msg::String>::SharedPtr control_mode_sub_;
+  // default actuation mode & new state publisher / service handles
   std::string mode_gnc_control_ = "cmg"; // default
 
   rclcpp::Subscription<geometry_msgs::msg::Quaternion>::SharedPtr pose_ref_sub_;
@@ -690,6 +750,11 @@ private:
   rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr thr_duty_pub_;
   rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr thr_force_pub_;
   rclcpp_action::Server<unloading>::SharedPtr unloading_server_;
+
+  // NEW: publish current actuation mode (latched)
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr mode_actuation_pub_;
+  // NEW: service server for switching actuation mode
+  rclcpp::Service<SetModeSrv>::SharedPtr set_mode_srv_;
 
   rclcpp_action::GoalResponse
   handle_goal(const rclcpp_action::GoalUUID &uuid,
@@ -738,7 +803,7 @@ private:
   double angvel_filter_timeconst{0.15}; // [s]
   double angvel_filter_alpha{0.0};
   Eigen::Vector3d angpos_filter_state{Eigen::Vector3d::Zero()};
-  double angpos_filter_timeconst{0.0}; // [s] 0で無効
+  double angpos_filter_timeconst{0.0}; // [s]
   double angpos_filter_alpha{0.0};
   double lpf_dt{0.1}; // [s]
 
