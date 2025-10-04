@@ -120,108 +120,93 @@ void WRSActionServer::execute(const std::shared_ptr<GoalHandleWRS> goal_handle)
 
   BT::BehaviorTreeFactory factory;
 
-  // --- UPA stage ---
+  // --- UPA stage (urine to distillate + brine) ---
   factory.registerSimpleAction("UPAStage", [&](BT::TreeNode &) {
     if (urine <= 0.0f) return BT::NodeStatus::SUCCESS;
-    float input = std::min(urine, 5.0f);
+
+    float input = std::min(urine, 5.0f); // process 5 L per cycle
     urine -= input;
     ++cycles;
-    float after_upa = input * 0.85f; // 85% recovery
-    float upa_temp = 40.0f + static_cast<float>(rand() % 30);
-    if (upa_temp > upa_max_temperature_) {
-      publish_diagnostics("UPA", true, "UPA overheating");
-      fail_goal(goal_handle, result, cycles, purified_total, "UPA overheating");
-      return BT::NodeStatus::FAILURE;
-    }
-    stage_output = after_upa;
+
+    float distillate = input * 0.85f;   // 85% recovery
+    float brine      = input - distillate; // 15% loss
+    stage_output     = distillate;
+
+    waste_collector_current_ += brine;  // brine sent to collector
+
     feedback->time_step = cycles;
     feedback->current_tank_level = product_water_reserve_;
-    feedback->current_purification_efficiency = after_upa / input;
+    feedback->current_purification_efficiency = distillate / input;
     feedback->unit_name = "UPA";
     feedback->failure_detected = false;
     goal_handle->publish_feedback(feedback);
+
+    RCLCPP_INFO(this->get_logger(),
+                "UPA Cycle %d: Input %.2f L, Distillate %.2f L, Brine %.2f L",
+                cycles, input, distillate, brine);
+
     return BT::NodeStatus::SUCCESS;
   });
 
-  // --- Filter stage ---
+  // --- Filter stage (95% pass) ---
   factory.registerSimpleAction("FilterStage", [&](BT::TreeNode &) {
-    float after_filter = stage_output * 0.90f;
-    float filter_temp = 40.0f + static_cast<float>(rand() % 20);
-    if (filter_temp > filter_max_temperature_) {
-      publish_diagnostics("Filter", true, "Filter overheating");
-      fail_goal(goal_handle, result, cycles, purified_total, "Filter overheating");
-      return BT::NodeStatus::FAILURE;
-    }
+    float after_filter = stage_output * 0.95f;
     stage_output = after_filter;
-    feedback->unit_name = "Filter";
-    feedback->current_purification_efficiency = after_filter / stage_output;
-    goal_handle->publish_feedback(feedback);
     return BT::NodeStatus::SUCCESS;
   });
 
-  // --- Ionization stage ---
+  // --- Ionization stage (98% pass) ---
   factory.registerSimpleAction("IonizationStage", [&](BT::TreeNode &) {
     float after_ion = stage_output * 0.98f;
-    float ion_temp = 45.0f + static_cast<float>(rand() % 25);
-    if (ion_temp > ionization_max_temperature_) {
-      publish_diagnostics("Ionization", true, "Ionization overheating");
-      fail_goal(goal_handle, result, cycles, purified_total, "Ionization overheating");
-      return BT::NodeStatus::FAILURE;
-    }
     stage_output = after_ion;
-    feedback->unit_name = "Ionization";
-    feedback->current_purification_efficiency = after_ion / stage_output;
-    goal_handle->publish_feedback(feedback);
     return BT::NodeStatus::SUCCESS;
   });
 
   // --- Tank stage ---
   factory.registerSimpleAction("TankStage", [&](BT::TreeNode &) {
-    if (enable_failure_ && product_water_reserve_ + stage_output > product_water_capacity_) {
-      std::string msg = "Tank capacity exceeded: " + std::to_string(product_water_reserve_ + stage_output);
+    if (product_water_reserve_ + stage_output > product_water_capacity_) {
+      std::string msg = "Tank capacity exceeded";
       publish_diagnostics("Tank", true, msg);
-      fail_goal(goal_handle, result, cycles, purified_total, "Tank full");
+      fail_goal(goal_handle, result, cycles, purified_total, msg);
       return BT::NodeStatus::FAILURE;
     }
     product_water_reserve_ += stage_output;
     purified_total += stage_output;
-    RCLCPP_INFO(this->get_logger(), "Cycle %d: Added %.2f L, Reserve now: %.2f",
+    RCLCPP_INFO(this->get_logger(),
+                "Cycle %d: Added %.2f L, Reserve now: %.2f",
                 cycles, stage_output, product_water_reserve_);
     return BT::NodeStatus::SUCCESS;
   });
 
+  // --- Grey Water Collection (service-driven only) ---
   factory.registerSimpleAction("CollectGreyWater", [&](BT::TreeNode &) {
     if (waste_collector_current_ <= 0.0f) {
-   
-      RCLCPP_WARN(this->get_logger(), "No grey water collected this cycle.");
+      RCLCPP_INFO(this->get_logger(), "No grey water collected this cycle.");
       return BT::NodeStatus::SUCCESS;
     }
-
-    if (waste_collector_current_ > waste_collector_capacity_) {
-      publish_diagnostics("WasteCollector", true, "Waste collector full");
-      fail_goal(goal_handle, result, cycles, purified_total, "Waste collector full");
-      return BT::NodeStatus::FAILURE;
-    }
-
     RCLCPP_INFO(this->get_logger(),
-                "Grey water available: %.2f L in collector (capacity %.2f L)",
-                waste_collector_current_, waste_collector_capacity_);
+                "Grey water collector currently: %.2f L",
+                waste_collector_current_);
     return BT::NodeStatus::SUCCESS;
   });
 
-
-
-  // --- Grey Water Recycling Stage ---
+  // --- Grey Water Recycling (BPA, 80% recovery) ---
   factory.registerSimpleAction("RecycleGreyWater", [&](BT::TreeNode &) {
     if (waste_collector_current_ <= 0.0f) {
-      publish_diagnostics("WasteCollector", true, "No grey water to recycle");
+      RCLCPP_INFO(this->get_logger(), "No grey water to recycle.");
       return BT::NodeStatus::SUCCESS;
     }
-    float recycled = waste_collector_current_ * 0.5f; // 50% recovery
-    waste_collector_current_ -= recycled;
+
+    float recycled = waste_collector_current_ * 0.80f; // 80% recovery
+    float residual = waste_collector_current_ - recycled;
+
     product_water_reserve_ += recycled;
-    RCLCPP_INFO(this->get_logger(), "Recycled %.2f L from grey water, Reserve now: %.2f L",
-                recycled, product_water_reserve_);
+    waste_collector_current_ = residual; // leave concentrated brine
+
+    RCLCPP_INFO(this->get_logger(),
+                "BPA recycled %.2f L grey water, %.2f L residual brine, Reserve now: %.2f",
+                recycled, residual, product_water_reserve_);
+
     return BT::NodeStatus::SUCCESS;
   });
 
@@ -248,6 +233,7 @@ void WRSActionServer::execute(const std::shared_ptr<GoalHandleWRS> goal_handle)
   RCLCPP_INFO(this->get_logger(),"Purified Water : %.2f",purified_total);
   send_water_to_ogs(purified_total * 0.9f, iodine_addition_);
 }
+
 
 void WRSActionServer::send_water_to_ogs(float volume, float iodine_ppm)
 {
