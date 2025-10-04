@@ -5,7 +5,7 @@
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
 #include <std_msgs/msg/float64.hpp>
 #include <std_msgs/msg/bool.hpp>
-
+#include <atomic>
 #include "space_station_eclss/action/oxygen_generation.hpp"
 #include "space_station_eclss/srv/request_product_water.hpp"
 #include "space_station_eclss/srv/co2_request.hpp"
@@ -61,6 +61,7 @@ private:
   rclcpp::Client<space_station_eclss::srv::Co2Request>::SharedPtr co2_client_;
   rclcpp::Client<space_station_eclss::srv::GreyWater>::SharedPtr gray_water_client_;
   rclcpp::Service<space_station_eclss::srv::O2Request>::SharedPtr o2_server_;
+  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr co2_storage_sub_;
 
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr o2_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr ch4_pub_;
@@ -89,5 +90,7 @@ private:
 
   // === BehaviorTree XML path ===
   std::string bt_xml_file_;
+  rclcpp::Time last_co2_request_time_;
+  std::atomic<double> co2_storage_{0.0};
 };
 }

@@ -63,6 +63,15 @@ OGSSystem::OGSSystem(const rclcpp::NodeOptions & options)
     }
   );
 
+  co2_storage_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+    "/co2_storage", rclcpp::QoS(10),
+    [this](const std_msgs::msg::Float64::SharedPtr msg) {
+      co2_storage_.store(msg->data, std::memory_order_relaxed);
+    }
+    );
+
+  
+  last_co2_request_time_ = this->now() - rclcpp::Duration::from_seconds(30.0);  
   RCLCPP_INFO(this->get_logger(), "OGS system ready.");
 }
 
@@ -91,16 +100,19 @@ void OGSSystem::execute_goal(const std::shared_ptr<GoalHandleOGS> goal_handle)
 
   // Register BT nodes inline
   factory.registerSimpleAction("RequestProductWater", [&](BT::TreeNode &) {
-    request_product_water(goal->input_water_mass);
+    request_product_water(5.0);
     return BT::NodeStatus::SUCCESS;
   });
 
   factory.registerSimpleAction("Electrolysis", [&](BT::TreeNode &) {
-  double water = goal->input_water_mass;  // grams of H2O
-  double o2_generated = 0.89 * water;     // g O2
-  double h2_generated = 0.11 * water;     // g H2
+    double water_litres = goal->input_water_mass;     // litres of H2O
+    double water_mass_g = water_litres * 1000.0;      // convert L → g (1 L = 1000 g)
 
-  latest_o2_ += o2_generated;
+    // Mass split: 88.9% O2, 11.1% H2
+    double o2_generated = 0.889 * water_mass_g;       // g O2
+    double h2_generated = 0.111 * water_mass_g;       // g H2
+
+    latest_o2_ += o2_generated;
 
     if (enable_failure_ && latest_o2_ > max_o2_capacity_) {
       publish_failure_diagnostics("O2Storage", "Overflow during Electrolysis");
@@ -110,17 +122,32 @@ void OGSSystem::execute_goal(const std::shared_ptr<GoalHandleOGS> goal_handle)
     feedback->o2_generated = o2_generated;
     feedback->h2_generated = h2_generated;
     goal_handle->publish_feedback(feedback);
+
     return BT::NodeStatus::SUCCESS;
   });
 
-  factory.registerSimpleAction("SabatierReactor", [&](BT::TreeNode &) {
-    double h2_generated = feedback->h2_generated;   // use stored feedback value
 
-    double co2_req = (44.0/8.0) * h2_generated;     // ~5.5 g CO₂ per g H₂
-    request_co2(co2_req);
+  factory.registerSimpleAction("SabatierReactor", [&, this](BT::TreeNode &) {
+    // Throttle to 30 s
+    const rclcpp::Time now = this->now();
+    const auto since_last = now - last_co2_request_time_;
+    const bool time_to_request = since_last >= rclcpp::Duration::from_seconds(30.0);
 
-    double ch4_generated = 2.0 * h2_generated;      // g CH₄ vented
-    double grey_water = 4.5 * h2_generated;         // g H₂O recycled
+    // Latest CO₂ storage value (from subscription)
+    const double co2_storage = co2_storage_.load(std::memory_order_relaxed);
+
+    // Only request if enough CO₂ is available
+    if (time_to_request && co2_storage > 1e-6) {   // >0 g available
+      const double co2_req = 0.30 * co2_storage;
+      request_co2(co2_req);
+      last_co2_request_time_ = now;
+    }
+
+    // H₂ feedback → generate CH₄ + H₂O
+    double h2_generated = feedback->h2_generated;
+
+    double ch4_generated = 2.0 * h2_generated;   // g CH₄
+    double grey_water    = 4.5 * h2_generated;   // g H₂O
 
     total_ch4_vented_ += ch4_generated;
 
@@ -129,7 +156,7 @@ void OGSSystem::execute_goal(const std::shared_ptr<GoalHandleOGS> goal_handle)
     ch4_pub_->publish(ch4_msg);
 
     return BT::NodeStatus::SUCCESS;
-  });
+});
 
   factory.registerSimpleAction("SendGreyWater", [&](BT::TreeNode &) {
     send_gray_water(0.9 * goal->input_water_mass);
