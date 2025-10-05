@@ -53,13 +53,14 @@ export default {
       this.ros.on("connection", () => {
         const sub = new ROSLIB.Topic({
           ros: this.ros,
-          name: "/gnc/control_mode",
-          messageType: "ssos_msgs/msg/GncControlMode", // adjust if bridged differently
+          name: "/gnc/mode_actuation",
+          messageType: "std_msgs/msg/String", // adjust if bridged differently
         });
         sub.subscribe((msg) => {
-          this.mode = msg.mode;
-          const sec = msg.stamp?.sec ?? Math.floor(Date.now() / 1000);
-          this.lastUpdate = new Date(sec * 1000).toLocaleString();
+          const s = (msg.data || "").toLowerCase();
+          this.mode =
+            s === "auto" ? 0 : s === "cmg" ? 1 : s === "thruster" ? 2 : null;
+          this.lastUpdate = new Date().toLocaleString();
         });
       });
       this.ros.on("error", (e) => {
@@ -74,19 +75,18 @@ export default {
       this.busy = true;
       const service = new ROSLIB.Service({
         ros: this.ros,
-        name: "/gnc/set_control_mode",
-        serviceType: "ssos_msgs/srv/SetGncControlMode",
+        name: "/gnc/set_mode_actuation",
+        serviceType: "space_station_gnc/srv/SetGncModeActuation",
       });
+
+      const map = ["auto", "cmg", "thruster"];
       const request = new ROSLIB.ServiceRequest({
-        desired_mode: this.desiredMode,
-        requester: "gnc-dashboard",
-        reason: "manual",
+        mode: map[this.desiredMode] || "auto", // default to "auto" if out of range
       });
       service.callService(
         request,
         (resp) => {
-          this.toast =
-            resp.message || (resp.accepted ? "Accepted" : "Rejected");
+          this.toast = resp.message || (resp.success ? "Accepted" : "Rejected");
           this.busy = false;
         },
         (err) => {
