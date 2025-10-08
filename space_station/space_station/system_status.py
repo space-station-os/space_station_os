@@ -1,5 +1,4 @@
-# space_station/system_status.py
-
+import subprocess
 from PyQt5.QtWidgets import (
     QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton,
     QTableWidget, QTableWidgetItem, QTextEdit, QDialog
@@ -42,6 +41,7 @@ class SystemStatusWidget(QWidget):
         self.node = node
         self.subsystem_map = {}
         self.log_buffer = []
+        self.log_viewer = None
         self.init_ui()
         self.init_ros_interfaces()
 
@@ -129,10 +129,15 @@ class SystemStatusWidget(QWidget):
         btn_layout = QHBoxLayout()
         self.check_btn = QPushButton("Run Self-Check")
         self.logs_btn = QPushButton("View Logs")
+        self.reconfig_btn = QPushButton("Open rqt_reconfigure")
+
         self.logs_btn.clicked.connect(self.open_log_viewer)
+        self.reconfig_btn.clicked.connect(self.launch_rqt_reconfigure)
+
         btn_layout.addStretch()
         btn_layout.addWidget(self.check_btn)
         btn_layout.addWidget(self.logs_btn)
+        btn_layout.addWidget(self.reconfig_btn)
 
         layout.addLayout(btn_layout)
         layout.addStretch()
@@ -195,3 +200,13 @@ class SystemStatusWidget(QWidget):
     def open_log_viewer(self):
         self.log_viewer = LogViewerDialog(self.log_buffer, self)
         self.log_viewer.show()
+
+    def launch_rqt_reconfigure(self):
+        """Launch rqt_reconfigure as a subprocess."""
+        try:
+            subprocess.Popen(["rqt"])
+
+        except FileNotFoundError:
+            self.node.get_logger().error("rqt not found. Please install with: sudo apt install ros-humble-rqt-reconfigure")
+        except Exception as e:
+            self.node.get_logger().error(f"Failed to launch rqt_reconfigure: {e}")

@@ -39,7 +39,7 @@ ARSActionServer::ARSActionServer(const rclcpp::NodeOptions & options)
   combustion_timer_ = this->create_wall_timer(10s, [this]() { monitor_combustion_and_contaminants(); });
 
   contaminant_timer_ = this->create_wall_timer(3s, [this]() {
-    contaminant_level_ += static_cast<float>(std::rand() % 4);
+    contaminant_level_ += 1.0f;
     contaminant_level_ = std::min(contaminant_level_, 500.0f);
     if (contaminant_level_ > contaminant_limit_) {
       publish_bed_heartbeat("ARS", false, "Contaminant threshold exceeded", "Contaminant_Monitor");
@@ -159,7 +159,7 @@ void ARSActionServer::execute(const std::shared_ptr<GoalHandleARS> goal_handle)
  std::string bt_xml_file = ament_index_cpp::get_package_share_directory("space_station_eclss") +
                           "/behaviortrees/ars_bt.xml";
 
-  RCLCPP_INFO(this->get_logger(), "Loading BT from: %s", bt_xml_file.c_str());
+  // RCLCPP_INFO(this->get_logger(), "Loading BT from: %s", bt_xml_file.c_str());
 
   auto tree = factory.createTreeFromFile(bt_xml_file);
 
@@ -184,12 +184,26 @@ void ARSActionServer::execute(const std::shared_ptr<GoalHandleARS> goal_handle)
   }
 
   if (total_co2_storage_ > max_co2_storage_) {
-    publish_bed_heartbeat("ARS", false, "CO2 partial pressure exceeds safe limit", "CO2_storage");
-    result->success = false;
-    result->summary_message = "Exceeded CO2 storage pressure limit";
-    goal_handle->abort(result);
-    return;
+    double excess = total_co2_storage_ - max_co2_storage_;
+    total_co2_storage_ = max_co2_storage_;  
+
+    RCLCPP_WARN(this->get_logger(),
+                "CO₂ storage exceeded safe limit by %.2f g. Venting excess...",
+                excess);
+
+    // Publish venting diagnostic
+    publish_bed_heartbeat("ARS", true,
+                          "Auto-venting triggered due to CO₂ buildup",
+                          "CO2_storage");
+
+    feedback->venting = true;
+    feedback->vent_bed_id = 99;  // special "safety vent"
+    feedback->vent_amount = excess;
+    goal_handle->publish_feedback(feedback);
+
+    vents++;
   }
+
 
   std_msgs::msg::Float64 co2_msg;
   co2_msg.data = total_co2_storage_;
@@ -286,16 +300,27 @@ void ARSActionServer::handle_co2_service(
   }
 
   if (total_co2_storage_ >= req->co2_req) {
+    // Reduce from storage
     total_co2_storage_ -= req->co2_req;
+
     res->co2_resp = req->co2_req;
     res->success = true;
     res->message = "CO2 successfully delivered";
+
+    RCLCPP_INFO(this->get_logger(),
+                "CO₂ request of %.2f accepted. Remaining storage: %.2f",
+                req->co2_req, total_co2_storage_);
   } else {
     res->co2_resp = 0.0;
     res->success = false;
-    res->message = "Insufficient CO2 in storage";
+    res->message = "Insufficient CO₂ in storage";
+
+    RCLCPP_WARN(this->get_logger(),
+                "CO₂ request of %.2f rejected. Only %.2f left in storage.",
+                req->co2_req, total_co2_storage_);
   }
 
+  // Publish updated CO₂ storage every time
   std_msgs::msg::Float64 msg;
   msg.data = total_co2_storage_;
   co2_storage_pub_->publish(msg);
@@ -303,13 +328,3 @@ void ARSActionServer::handle_co2_service(
 
 }  // namespace space_station_eclss
 
-
-int main(int argc, char **argv)
-{
-  rclcpp::init(argc, argv);
-  auto node_options = rclcpp::NodeOptions();
-  auto ars_node = std::make_shared<space_station_eclss::ARSActionServer>(node_options);
-  rclcpp::spin(ars_node);
-  rclcpp::shutdown();
-  return 0;
-}
