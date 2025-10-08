@@ -19,7 +19,7 @@ def generate_launch_description():
     pkg_ros_gz_sim = get_package_share_directory('ros_gz_sim')
 
     # Add your own gazebo library path here
-    gazebo_models_path = "/home/siddarth/ssos_ws/src/demo_space_station_gazebo/space_station_description/urdf"
+    gazebo_models_path = "/home/siddarth/ssos_ws/src/space_station_gazebo/space_station_description/urdf"
     os.environ["GZ_SIM_RESOURCE_PATH"] += os.pathsep + gazebo_models_path
 
 
