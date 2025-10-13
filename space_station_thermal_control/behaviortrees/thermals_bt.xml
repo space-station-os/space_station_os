@@ -1,0 +1,20 @@
+<root main_tree_to_execute="Main">
+  <BehaviorTree ID="Main">
+    <Sequence name="ThermalControlSequence">
+
+      <!-- Check if internal loop is hot -->
+      <IsTempHigh/>
+
+      <!-- Run internal cooling loop -->
+      <CoolLoop/>
+
+      <!-- Check ammonia side and vent if needed -->
+      <IsAmmoniaHot/>
+      <VentHeat/>
+
+      <!-- Periodically refresh water from WRS -->
+      <RefreshWater/>
+
+    </Sequence>
+  </BehaviorTree>
+</root>

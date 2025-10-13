@@ -1,5 +1,3 @@
-# space_station/gnc.py
-
 from PyQt5.QtWidgets import (
     QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QGroupBox,
     QSizePolicy
