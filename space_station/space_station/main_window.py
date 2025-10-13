@@ -1,5 +1,3 @@
-# space_station/main_window.py
-
 import os
 import sys
 from PyQt5.QtWidgets import (
@@ -82,7 +80,7 @@ class MainWindow(QMainWindow):
         self.ai_agent.ai_reply.connect(self.left_panel.append_ai_response)
 
         # Startup splash
-        self._play_startup_video()
+        # self._play_startup_video()
 
     # ---------------- ROS pump ----------------
     def _spin_ros_once(self):
@@ -150,7 +148,7 @@ class MainWindow(QMainWindow):
         self.day_label.setStyleSheet("color: white;")
         self.shutdown_button = QPushButton("Shutdown GUI")
         self.diagnose_button = QPushButton("Run Diagnose")
-        self.shutdown_button.clicked.connect(self._play_shutdown_video)
+        # self.shutdown_button.clicked.connect(self._play_shutdown_video)
 
         footer.addWidget(self.crew_label)
         footer.addWidget(self.day_label)

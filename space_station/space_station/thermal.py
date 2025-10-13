@@ -1,13 +1,11 @@
-
 from PyQt5.QtWidgets import (
     QWidget, QLabel, QVBoxLayout, QHBoxLayout, QGroupBox, QFormLayout,
     QSplitter, QTableWidget, QTableWidgetItem
 )
 from PyQt5.QtCore import Qt, QTimer
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from collections import deque
 import threading
+import pyqtgraph as pg
 
 import rclpy
 from rclpy.node import Node
@@ -21,7 +19,7 @@ class ThermalWidget(QWidget):
     def __init__(self, gui_node: Node, parent=None):
         super().__init__(parent)
         self.node = gui_node
-        self.node.get_logger().info("[ThermalWidget] Quadrant UI Initializing (PyQt5)")
+        self.node.get_logger().info("[ThermalWidget] Quadrant UI Initializing (PyQtGraph)")
 
         # --- Cached state ---
         self._lock = threading.Lock()
@@ -32,11 +30,11 @@ class ThermalWidget(QWidget):
             "ammonia_temp_c": None,
             "vented_heat_kj": None
         }
-        self._time_counter = 0
 
         # histories for avg temp plot
         self.temp_time = deque(maxlen=300)
         self.avg_temp_history = deque(maxlen=300)
+        self._time_counter = 0
 
         # --- Build UI ---
         self._build_ui()
@@ -52,8 +50,8 @@ class ThermalWidget(QWidget):
     # ------------------- UI -------------------
     def _build_ui(self):
         root_splitter = QSplitter(Qt.Vertical)
-        self.setLayout(QVBoxLayout())
-        self.layout().addWidget(root_splitter)
+        layout = QVBoxLayout(self)
+        layout.addWidget(root_splitter)
 
         # --- Top half: Nodes + Links ---
         top_splitter = QSplitter(Qt.Horizontal)
@@ -81,7 +79,7 @@ class ThermalWidget(QWidget):
         bottom_splitter = QSplitter(Qt.Horizontal)
         root_splitter.addWidget(bottom_splitter)
 
-        # Quadrant 3: Coolant Status (from action feedback)
+        # Quadrant 3: Coolant Status
         coolant_group = QGroupBox("Coolant Status (Feedback)")
         coolant_layout = QFormLayout()
         self.coolant_internal_temp = QLabel("--")
@@ -93,16 +91,18 @@ class ThermalWidget(QWidget):
         coolant_group.setLayout(coolant_layout)
         bottom_splitter.addWidget(coolant_group)
 
-        # Quadrant 4: Avg Temp Plot
-        plot_group = QGroupBox("Avg Node Temp (°C)")
+        # Quadrant 4: Avg Temp Plot (PyQtGraph)
+        plot_group = QGroupBox("Avg Node Temperature (°C)")
         plot_layout = QVBoxLayout()
-        fig, self.ax = plt.subplots(figsize=(4, 3), dpi=100)
-        self.canvas = FigureCanvas(fig)
-        (self.temp_line,) = self.ax.plot([], [], 'r-')
-        self.ax.set_xlabel("Time (s)")
-        self.ax.set_ylabel("Temperature (°C)")
-        self.ax.grid(True)
-        plot_layout.addWidget(self.canvas)
+
+        self.temp_plot = pg.PlotWidget(title="Average Node Temperature (°C)")
+        self.temp_plot.addLegend()
+        self.temp_plot.showGrid(x=True, y=True)
+        self.temp_curve = self.temp_plot.plot(pen=pg.mkPen('r', width=2), name="Avg Temp")
+        self.temp_plot.setLabel('left', "Temperature (°C)")
+        self.temp_plot.setLabel('bottom', "Time (s)")
+
+        plot_layout.addWidget(self.temp_plot)
         plot_group.setLayout(plot_layout)
         bottom_splitter.addWidget(plot_group)
 
@@ -133,7 +133,6 @@ class ThermalWidget(QWidget):
     # ------------------- Callbacks -------------------
     def _node_cb(self, msg: ThermalNodeDataArray):
         with self._lock:
-            # Node temps are assumed to be in °C already
             self.thermal_nodes = {n.name: n.temperature for n in msg.nodes}
 
     def _link_cb(self, msg: ThermalLinkFlowsArray):
@@ -183,16 +182,8 @@ class ThermalWidget(QWidget):
             self.temp_time.append(self._time_counter)
             self.avg_temp_history.append(avg_temp_c)
 
-            self.ax.cla()
-            self.ax.plot(self.temp_time, self.avg_temp_history, 'r-')
-            self.ax.set_xlabel("Time (s)")
-            self.ax.set_ylabel("Temperature (°C)")
-            self.ax.set_title("Avg Node Temp (°C)")
-            self.ax.grid(True)
-
-            # auto-scale y axis around the data
-            ymin = min(self.avg_temp_history) - 2
-            ymax = max(self.avg_temp_history) + 2
-            self.ax.set_ylim(ymin, ymax)
-
-            self.canvas.draw()
+            self.temp_curve.setData(self.temp_time, self.avg_temp_history)
+            self.temp_plot.setYRange(
+                min(self.avg_temp_history) - 2,
+                max(self.avg_temp_history) + 2
+            )
