@@ -1,5 +1,3 @@
-# space_station/left_panel.py
-
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QTextEdit, QLabel
 )
