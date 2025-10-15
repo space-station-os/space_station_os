@@ -12,26 +12,26 @@ ARSActionServer::ARSActionServer(const rclcpp::NodeOptions & options)
 : Node("ars_systems_node", options)
 {
   declare_parameters();
+
   RCLCPP_INFO(this->get_logger(), "Switching on ARS — requesting power from DDCU...");
   load_client_ = this->create_client<space_station_eps::srv::Load>("/ddcu/load_request");
 
   powered_ = false;
   RCLCPP_INFO(this->get_logger(), "Waiting for EPS power...");
 
+  // Retry every 2s until supply_load() returns true
   power_retry_timer_ = this->create_wall_timer(2s, [this]() {
-    if (supply_load()) {
-      powered_ = true;
-      RCLCPP_INFO(this->get_logger(), "ARS powered successfully — initializing systems.");
-      initialize_systems();
-      power_retry_timer_->cancel();
-    } else {
-      RCLCPP_WARN(this->get_logger(), "Still waiting for DDCU power...");
+    if (!powered_) {
+      if (supply_load()) {
+        powered_ = true;
+        RCLCPP_INFO(this->get_logger(), "ARS powered successfully — initializing systems.");
+        initialize_systems();
+        power_retry_timer_->cancel();
+      } else {
+        RCLCPP_WARN(this->get_logger(), "Still waiting for DDCU power...");
+      }
     }
   });
-
-  initialize_systems();
-  RCLCPP_INFO(this->get_logger(), "ARS action server ready.");
-
 }
 
 void ARSActionServer::declare_parameters()
@@ -323,8 +323,8 @@ void ARSActionServer::monitor_combustion_and_contaminants()
   }
 }
 
-bool ARSActionServer::supply_load() {
-  if (powered_) return true;  
+bool ARSActionServer::supply_load()
+{
   if (!load_client_->wait_for_service(1s)) {
     RCLCPP_WARN(this->get_logger(), "DDCU load service not available yet.");
     return false;
@@ -333,23 +333,21 @@ bool ARSActionServer::supply_load() {
   auto request = std::make_shared<space_station_eps::srv::Load::Request>();
   request->load_voltage = 124.5;
 
-  auto future = load_client_->async_send_request(request);
-  auto status = rclcpp::spin_until_future_complete(shared_from_this(), future, 1s);
+  load_client_->async_send_request(request,
+    [this](rclcpp::Client<space_station_eps::srv::Load>::SharedFuture future_resp) {
+      auto response = future_resp.get();
+      if (response->success) {
+        RCLCPP_INFO(this->get_logger(), "Power granted: %s", response->message.c_str());
+        powered_ = true;   // initialization done by timer on next tick
+      } else {
+        RCLCPP_ERROR(this->get_logger(), "DDCU rejected load: %s", response->message.c_str());
+        powered_ = false;
+      }
+    });
 
-  if (status != rclcpp::FutureReturnCode::SUCCESS) {
-    RCLCPP_WARN(this->get_logger(), "No response from DDCU yet.");
-    return false;
-  }
-
-  auto response = future.get();
-  if (response->success) {
-    RCLCPP_INFO(this->get_logger(), "Power granted: %s", response->message.c_str());
-    return true;
-  } else {
-    RCLCPP_ERROR(this->get_logger(), "DDCU rejected load: %s", response->message.c_str());
-    return false;
-  }
+  return true;  // request sent
 }
+
 
 
 void ARSActionServer::handle_co2_service(
