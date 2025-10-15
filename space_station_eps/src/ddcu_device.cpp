@@ -21,7 +21,11 @@ DdcuNode::DdcuNode(const rclcpp::NodeOptions &options)
     "/ddcu/input_voltage", 10,
     std::bind(&DdcuNode::primaryVoltageCallback, this, std::placeholders::_1)
   );
-
+  load_srv_ = this->create_service<space_station_eps::srv::Load>(
+    "/ddcu/load_request",
+    std::bind(&DdcuNode::handleLoadRequest, this,
+              std::placeholders::_1, std::placeholders::_2)
+  );
   output_voltage_pub_ = this->create_publisher<std_msgs::msg::Float64>("/ddcu/output_voltage", 10);
   temperature_pub_ = this->create_publisher<std_msgs::msg::Float64>("/ddcu/temperature", 10);
   diag_pub_ = this->create_publisher<diagnostic_msgs::msg::DiagnosticStatus>("/eps/diagnostics", 10);
@@ -82,6 +86,45 @@ void DdcuNode::publishOutputVoltage(double voltage)
   output_voltage_pub_->publish(msg);
 }
 
+void DdcuNode::handleLoadRequest(
+  const std::shared_ptr<space_station_eps::srv::Load::Request> request,
+  std::shared_ptr<space_station_eps::srv::Load::Response> response)
+{
+  std::lock_guard<std::mutex> lock(voltage_mutex_);
+
+  double load_voltage = request->load_voltage;
+  RCLCPP_INFO(this->get_logger(), "[DDCU] Voltage request received: %.2f V", load_voltage);
+
+  if (input_voltage_ < 115.0 || input_voltage_ > 173.0) {
+    response->success = false;
+    response->message = "Primary bus voltage unstable — unable to provide load voltage.";
+    RCLCPP_WARN(this->get_logger(), "[DDCU] Request rejected: primary bus unstable.");
+    return;
+  }
+  if (load_voltage < (nominal_voltage_ - regulation_tolerance_) ||
+      load_voltage > (nominal_voltage_ + regulation_tolerance_)) {
+    response->success = false;
+    response->message = "Requested voltage outside regulation range.";
+    RCLCPP_WARN(this->get_logger(), "[DDCU] Request rejected: voltage out of range.");
+    return;
+  }
+  double output_voltage = nominal_voltage_;
+  output_voltage -= (load_voltage * 0.005);
+  if (output_voltage < nominal_voltage_ - regulation_tolerance_) {
+    output_voltage = nominal_voltage_ - regulation_tolerance_;
+  }
+
+  // Publish updated voltage
+  publishOutputVoltage(output_voltage);
+
+  // Return success response
+  response->success = true;
+  response->message = "Voltage supply successful at " + std::to_string(output_voltage) + " V.";
+
+  RCLCPP_INFO(this->get_logger(),
+              "[DDCU] Voltage supplied: %.2f V (requested %.2f V)",
+              output_voltage, load_voltage);
+}
 void DdcuNode::callInternalCooling(double heat_j)
 {
   constexpr double HEAT_THRESHOLD_J = 10.0;
@@ -174,7 +217,9 @@ int main (int argc, char **argv)
 {
   rclcpp::init(argc, argv);
   auto node = std::make_shared<DdcuNode>();
-  rclcpp::spin(node);
+  rclcpp::executors::MultiThreadedExecutor executor;
+  executor.add_node(node);
+  executor.spin();
   rclcpp::shutdown();
   return 0;
 }

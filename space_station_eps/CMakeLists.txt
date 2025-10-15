@@ -20,6 +20,7 @@ find_package(space_station_thermal_control REQUIRED)
 
 set(msg_files
   "msg/BCDUStatus.msg"
+  "srv/Load.srv"
  
 )
 
@@ -62,6 +63,7 @@ ament_target_dependencies(mbsu_device
 )
 
 add_executable(ddcu_device src/ddcu_device.cpp)
+rosidl_target_interfaces(ddcu_device ${PROJECT_NAME} "rosidl_typesupport_cpp")
 ament_target_dependencies(ddcu_device
   rclcpp
   std_msgs
