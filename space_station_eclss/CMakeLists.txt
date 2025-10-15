@@ -17,6 +17,7 @@ find_package(diagnostic_msgs REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(behaviortree_cpp_v3 REQUIRED)
 find_package(ament_index_cpp REQUIRED)
+find_package(space_station_eps REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -60,6 +61,7 @@ ament_target_dependencies(ars_systems
   behaviortree_cpp_v3
   ament_index_cpp
   std_srvs
+  space_station_eps
   sensor_msgs
 )
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")

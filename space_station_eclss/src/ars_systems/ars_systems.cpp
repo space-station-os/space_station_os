@@ -12,51 +12,26 @@ ARSActionServer::ARSActionServer(const rclcpp::NodeOptions & options)
 : Node("ars_systems_node", options)
 {
   declare_parameters();
+  RCLCPP_INFO(this->get_logger(), "Switching on ARS — requesting power from DDCU...");
+  load_client_ = this->create_client<space_station_eps::srv::Load>("/ddcu/load_request");
 
-  using GoalHandleAirRevitalisation = rclcpp_action::ServerGoalHandle<AirRevitalisation>;
+  powered_ = false;
+  RCLCPP_INFO(this->get_logger(), "Waiting for EPS power...");
 
-  this->action_server_ = rclcpp_action::create_server<AirRevitalisation>(
-    this,
-    "air_revitalisation",
-    std::bind(&ARSActionServer::handle_goal, this, std::placeholders::_1, std::placeholders::_2),
-    std::bind(&ARSActionServer::handle_cancel, this, std::placeholders::_1),
-    std::bind(&ARSActionServer::execute, this, std::placeholders::_1));
-
-  heartbeat_pub_ = this->create_publisher<diagnostic_msgs::msg::DiagnosticStatus>("/ars/diagnostics", 10);
-
-  co2_storage_pub_ = this->create_publisher<std_msgs::msg::Float64>("/co2_storage", 10);
-  co2_pub_timer_ = this->create_wall_timer(2s, [this]() {
-    std_msgs::msg::Float64 msg;
-    msg.data = total_co2_storage_;
-    co2_storage_pub_->publish(msg);
-  });
-
-  co2_request_srv_ = this->create_service<Co2Request>(
-    "/ars/request_co2",
-    std::bind(&ARSActionServer::handle_co2_service, this, std::placeholders::_1, std::placeholders::_2)
-  );
-
-  combustion_timer_ = this->create_wall_timer(10s, [this]() { monitor_combustion_and_contaminants(); });
-
-  contaminant_timer_ = this->create_wall_timer(3s, [this]() {
-    contaminant_level_ += 1.0f;
-    contaminant_level_ = std::min(contaminant_level_, 500.0f);
-    if (contaminant_level_ > contaminant_limit_) {
-      publish_bed_heartbeat("ARS", false, "Contaminant threshold exceeded", "Contaminant_Monitor");
+  power_retry_timer_ = this->create_wall_timer(2s, [this]() {
+    if (supply_load()) {
+      powered_ = true;
+      RCLCPP_INFO(this->get_logger(), "ARS powered successfully — initializing systems.");
+      initialize_systems();
+      power_retry_timer_->cancel();
+    } else {
+      RCLCPP_WARN(this->get_logger(), "Still waiting for DDCU power...");
     }
   });
 
-  disable_failure_ = this->create_subscription<std_msgs::msg::Bool>(
-    "/ars/self_diagnosis",
-    10,
-    [this](const std_msgs::msg::Bool::SharedPtr msg) {
-      this->set_parameter(rclcpp::Parameter("enable_failure", msg->data));
-      enable_failure_ = msg->data;
-      RCLCPP_INFO(this->get_logger(), "Failure simulation %s", enable_failure_ ? "enabled" : "disabled");
-    }
-  );
-
+  initialize_systems();
   RCLCPP_INFO(this->get_logger(), "ARS action server ready.");
+
 }
 
 void ARSActionServer::declare_parameters()
@@ -104,8 +79,68 @@ void ARSActionServer::declare_parameters()
   ads2_temp_limit_ = this->get_parameter("ads2_temp_limit").as_double();
 }
 
+
+void ARSActionServer::initialize_systems()
+{
+  using GoalHandleAirRevitalisation = rclcpp_action::ServerGoalHandle<AirRevitalisation>;
+
+  this->action_server_ = rclcpp_action::create_server<AirRevitalisation>(
+    this,
+    "air_revitalisation",
+    std::bind(&ARSActionServer::handle_goal, this, std::placeholders::_1, std::placeholders::_2),
+    std::bind(&ARSActionServer::handle_cancel, this, std::placeholders::_1),
+    std::bind(&ARSActionServer::execute, this, std::placeholders::_1));
+
+  heartbeat_pub_ = this->create_publisher<diagnostic_msgs::msg::DiagnosticStatus>("/ars/diagnostics", 10);
+
+  co2_storage_pub_ = this->create_publisher<std_msgs::msg::Float64>("/co2_storage", 10);
+  co2_pub_timer_ = this->create_wall_timer(2s, [this]() {
+    std_msgs::msg::Float64 msg;
+    msg.data = total_co2_storage_;
+    co2_storage_pub_->publish(msg);
+  });
+
+  co2_request_srv_ = this->create_service<Co2Request>(
+    "/ars/request_co2",
+    std::bind(&ARSActionServer::handle_co2_service, this, std::placeholders::_1, std::placeholders::_2)
+  );
+
+  combustion_timer_ = this->create_wall_timer(10s, [this]() { monitor_combustion_and_contaminants(); });
+
+  contaminant_timer_ = this->create_wall_timer(3s, [this]() {
+    contaminant_level_ += 1.0f;
+    contaminant_level_ = std::min(contaminant_level_, 500.0f);
+    if (contaminant_level_ > contaminant_limit_) {
+      publish_bed_heartbeat("ARS", false, "Contaminant threshold exceeded", "Contaminant_Monitor");
+    }
+  });
+
+  disable_failure_ = this->create_subscription<std_msgs::msg::Bool>(
+    "/ars/self_diagnosis",
+    10,
+    [this](const std_msgs::msg::Bool::SharedPtr msg) {
+      this->set_parameter(rclcpp::Parameter("enable_failure", msg->data));
+      enable_failure_ = msg->data;
+      RCLCPP_INFO(this->get_logger(), "Failure simulation %s", enable_failure_ ? "enabled" : "disabled");
+    }
+  );
+
+
+  
+}
+
 void ARSActionServer::execute(const std::shared_ptr<GoalHandleARS> goal_handle)
 {
+
+  if (!powered_) {
+    RCLCPP_WARN(this->get_logger(), "ARS cannot start — system not powered.");
+    auto result = std::make_shared<AirRevitalisation::Result>();
+    result->success = false;
+    result->summary_message = "ARS unpowered — unable to start process.";
+    goal_handle->abort(result);
+    return;
+  }
+
   auto feedback = std::make_shared<AirRevitalisation::Feedback>();
   auto result = std::make_shared<AirRevitalisation::Result>();
 
@@ -287,6 +322,35 @@ void ARSActionServer::monitor_combustion_and_contaminants()
     publish_bed_heartbeat("ARS", false, "Atmospheric anomaly detected", "ARS_Monitor");
   }
 }
+
+bool ARSActionServer::supply_load() {
+  if (powered_) return true;  
+  if (!load_client_->wait_for_service(1s)) {
+    RCLCPP_WARN(this->get_logger(), "DDCU load service not available yet.");
+    return false;
+  }
+
+  auto request = std::make_shared<space_station_eps::srv::Load::Request>();
+  request->load_voltage = 124.5;
+
+  auto future = load_client_->async_send_request(request);
+  auto status = rclcpp::spin_until_future_complete(shared_from_this(), future, 1s);
+
+  if (status != rclcpp::FutureReturnCode::SUCCESS) {
+    RCLCPP_WARN(this->get_logger(), "No response from DDCU yet.");
+    return false;
+  }
+
+  auto response = future.get();
+  if (response->success) {
+    RCLCPP_INFO(this->get_logger(), "Power granted: %s", response->message.c_str());
+    return true;
+  } else {
+    RCLCPP_ERROR(this->get_logger(), "DDCU rejected load: %s", response->message.c_str());
+    return false;
+  }
+}
+
 
 void ARSActionServer::handle_co2_service(
   const std::shared_ptr<Co2Request::Request> req,
