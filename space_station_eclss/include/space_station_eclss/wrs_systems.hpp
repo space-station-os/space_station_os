@@ -12,7 +12,7 @@
 #include "space_station_eclss/action/oxygen_generation.hpp"
 #include "space_station_eclss/srv/request_product_water.hpp"
 #include "space_station_eclss/srv/grey_water.hpp"
-
+#include "space_station_eps/srv/load.hpp"
 #include <behaviortree_cpp_v3/bt_factory.h>
 #include <ament_index_cpp/get_package_share_directory.hpp>
 
@@ -40,7 +40,7 @@ private:
 
   // Action client
   rclcpp_action::Client<OGS>::SharedPtr ogs_client_;
-
+  rclcpp::Client<space_station_eps::srv::Load>::SharedPtr load_client_;
   // Service servers
   rclcpp::Service<space_station_eclss::srv::RequestProductWater>::SharedPtr water_request_server_;
   rclcpp::Service<space_station_eclss::srv::GreyWater>::SharedPtr gray_water_service_;
@@ -49,6 +49,7 @@ private:
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticStatus>::SharedPtr diag_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr reserve_pub_;
   rclcpp::TimerBase::SharedPtr reserve_timer_;
+  rclcpp::TimerBase::SharedPtr power_retry_timer_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr disable_failure_;
 
   // Internal state
@@ -71,7 +72,7 @@ private:
   float catalytic_max_temperature_;
 
   bool enable_failure_;
-
+  bool powered_;
   // Action server handlers
   rclcpp_action::GoalResponse handle_goal(
     const rclcpp_action::GoalUUID & uuid,
@@ -100,6 +101,8 @@ private:
 
   void publish_diagnostics(const std::string & unit, bool failure, const std::string & message);
   void publish_reserve();
+  void initialize_systems();
+  bool supply_load();
 };
 
 }  // namespace space_station_eclss
