@@ -81,6 +81,7 @@ ament_target_dependencies(ogs_systems
   ament_index_cpp
   std_srvs
   sensor_msgs
+  space_station_eps
 )
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(ogs_systems ${cpp_typesupport_target})
@@ -99,6 +100,7 @@ ament_target_dependencies(wrs_systems
   ament_index_cpp
   std_srvs
   sensor_msgs
+  space_station_eps
 )
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(wrs_systems ${cpp_typesupport_target})

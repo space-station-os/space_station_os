@@ -11,14 +11,14 @@
 #include "space_station_eclss/srv/co2_request.hpp"
 #include "space_station_eclss/srv/o2_request.hpp"
 #include "space_station_eclss/srv/grey_water.hpp"
-
+#include "space_station_eps/srv/load.hpp"
 // BehaviorTree
 #include <behaviortree_cpp_v3/bt_factory.h>
 #include <ament_index_cpp/get_package_share_directory.hpp>
-
+#include <chrono>
 namespace space_station_eclss{
 
-
+using namespace std::chrono_literals;
 class OGSSystem : public rclcpp::Node
 {
 public:
@@ -50,6 +50,7 @@ private:
   double min_o2_capacity_;
   double max_o2_capacity_;
 
+  bool powered_;
   double latest_o2_ = 0.0;
   double total_ch4_vented_ = 0.0;
   double last_h2_generated_ = 0.0;
@@ -66,8 +67,9 @@ private:
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr o2_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr ch4_pub_;
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticStatus>::SharedPtr diag_pub_;
-
+  rclcpp::Client<space_station_eps::srv::Load>::SharedPtr load_client_;
   rclcpp::TimerBase::SharedPtr timer_;
+  rclcpp::TimerBase::SharedPtr power_retry_timer_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr disable_failure_;
   std_msgs::msg::Float64 ch4_msg;
   // Callbacks
@@ -82,12 +84,13 @@ private:
 
   void publish_failure_diagnostics(const std::string &unit, const std::string &reason);
   void publish_periodic_status();
-
+  void initialize_systems();
+  bool supply_load();
   // Support functions (same as your current ones)
   void request_product_water(double amount_liters);
   void request_co2(double co2_mass_kg);
   void send_gray_water(double amount_liters);
-
+  
   // === BehaviorTree XML path ===
   std::string bt_xml_file_;
   rclcpp::Time last_co2_request_time_;
