@@ -13,22 +13,29 @@ def generate_launch_description():
     return LaunchDescription([
         
 
-        Node(
-            package='space_station_thermal_control',
-            executable='coolant',
-            name='internal_coolant',
-            output='screen',
+        # Node(
+        #     package='space_station_thermal_control',
+        #     executable='coolant',
+        #     name='internal_coolant',
+        #     output='screen',
             
-            emulate_tty=True
-        ),
+        #     emulate_tty=True
+        # ),
 
+        # Node(
+        #     package='space_station_thermal_control',
+        #     executable='external_loop',
+        #     name='external_loop',
+        #     output='screen',
+        #     emulate_tty=True
+        # ),
         Node(
             package='space_station_thermal_control',
-            executable='external_loop',
-            name='external_loop',
-            output='screen',
-            emulate_tty=True
-        ),
+            executable='cooling_server',
+            name='cooling_server',
+            emulate_tty=True,
+            output='screen'),
+        
         Node(
             package='space_station_thermal_control',
             executable='radiator',
