@@ -29,7 +29,6 @@
 #include <utility>
 
 
-
 /// @brief Utilities for extracting thruster-related information from URDF.
 class URDFUtils
 {
@@ -37,7 +36,7 @@ public:
   URDFUtils();
 
   bool isThruster(const std::string & name) const;
- 
+
   /// @brief Count all thrusters (based on child link name rule)
   std::size_t getNumAct(const urdf::ModelInterfaceSharedPtr & model) const;
 
@@ -57,34 +56,34 @@ public:
 
 struct ThrusterConfig
 {
-    std::string name;
-    Eigen::Vector3d position;   ///< URDF: position in body frame
-    Eigen::Vector3d direction;  ///< URDF: direction vector
-    double max_force = 100.0;     ///< properties.yaml: [N]
-    double isp = 0.0;           ///< properties.yaml: [s]
-    double efficiency = 1.0;    ///< properties.yaml: [-]
-    bool active = false;        ///< table.yaml: mode-dependent activation
+  std::string name;
+  Eigen::Vector3d position;     ///< URDF: position in body frame
+  Eigen::Vector3d direction;    ///< URDF: direction vector
+  double max_force = 100.0;       ///< properties.yaml: [N]
+  double isp = 0.0;             ///< properties.yaml: [s]
+  double efficiency = 1.0;      ///< properties.yaml: [-]
+  bool active = false;          ///< table.yaml: mode-dependent activation
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
 // Forward declarations
 using ThrusterConfigVec = std::vector<
-    ThrusterConfig,
-    Eigen::aligned_allocator<ThrusterConfig>>;
+  ThrusterConfig,
+  Eigen::aligned_allocator<ThrusterConfig>>;
 
 using PinvMat = Eigen::Matrix<double, Eigen::Dynamic, 6>;
 using PinvCacheMap = std::map<
-    std::string,
-    PinvMat,
-    std::less<>,
-    Eigen::aligned_allocator<std::pair<const std::string, PinvMat>>>;
+  std::string,
+  PinvMat,
+  std::less<>,
+  Eigen::aligned_allocator<std::pair<const std::string, PinvMat>>>;
 
 using ThrusterCfgMap = std::map<
-    std::string,
-    ThrusterConfig,
-    std::less<>,
-    Eigen::aligned_allocator<std::pair<const std::string, ThrusterConfig>>>;
+  std::string,
+  ThrusterConfig,
+  std::less<>,
+  Eigen::aligned_allocator<std::pair<const std::string, ThrusterConfig>>>;
 
 
 /**
@@ -94,15 +93,15 @@ using ThrusterCfgMap = std::map<
 struct ThrusterWeight
 {
   Eigen::Vector3d torque_weight = Eigen::Vector3d::Zero();   // [Tx, Ty, Tz]
-  Eigen::Vector3d force_weight  = Eigen::Vector3d::Zero();   // [Fx, Fy, Fz]
+  Eigen::Vector3d force_weight = Eigen::Vector3d::Zero();    // [Fx, Fy, Fz]
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
 using ThrusterTable = std::map<
-    std::string,
-    ThrusterWeight,
-    std::less<>,
-    Eigen::aligned_allocator<std::pair<const std::string, ThrusterWeight>>
+  std::string,
+  ThrusterWeight,
+  std::less<>,
+  Eigen::aligned_allocator<std::pair<const std::string, ThrusterWeight>>
 >;
 
 //using ThrusterTable = std::map<std::string, ThrusterWeight>;     // map<thruster_name, weights> for one mode
@@ -126,42 +125,42 @@ using ThrusterTableSet = std::map<std::string, ThrusterTable>;   // map<mode_nam
 class ThrusterMatrix
 {
 public:
-    ThrusterMatrix();
+  ThrusterMatrix();
 
-    /// @brief Initialize merged thruster configuration
-    ///        Combine URDF, properties.yaml, and table.yaml
-    void initialize(const std::string& urdf_xml);
+  /// @brief Initialize merged thruster configuration
+  ///        Combine URDF, properties.yaml, and table.yaml
+  void initialize(const std::string & urdf_xml);
 
-    /// @brief Load URDF-defined thruster geometry
-    void loadURDF(const urdf::ModelInterfaceSharedPtr& model);
+  /// @brief Load URDF-defined thruster geometry
+  void loadURDF(const urdf::ModelInterfaceSharedPtr & model);
 
-    /// @brief Load thruster properties from properties.yaml
-    void loadProperties(const std::string& yaml_file);
+  /// @brief Load thruster properties from properties.yaml
+  void loadProperties(const std::string & yaml_file);
 
-    /// @brief Load thruster table (modes) from table.yaml
-    void loadTable(const std::string& yaml_file);
+  /// @brief Load thruster table (modes) from table.yaml
+  void loadTable(const std::string & yaml_file);
 
-    /// @brief Select current mode (table) by name. Throws if not found.
-    void setThrusterTable(const std::string & table_name);
+  /// @brief Select current mode (table) by name. Throws if not found.
+  void setThrusterTable(const std::string & table_name);
 
-    /// @brief Change base link frame and rebuild geometry and caches.
-    /// @note Changing base invalidates geometry-dependent caches (e.g., pinv(W)).
-    void setBaseLink(const std::string & link_name);
+  /// @brief Change base link frame and rebuild geometry and caches.
+  /// @note Changing base invalidates geometry-dependent caches (e.g., pinv(W)).
+  void setBaseLink(const std::string & link_name);
 
-    /// @brief Current base link name (empty means URDF root)
-    std::string base_link_name_{};
+  /// @brief Current base link name (empty means URDF root)
+  std::string base_link_name_{};
 
 
-     /// @brief Get full thruster list (URDF-defined, regardless of active state)
-    std::vector<std::string> getAllThrusterNames() const;
+  /// @brief Get full thruster list (URDF-defined, regardless of active state)
+  std::vector<std::string> getAllThrusterNames() const;
 
-    /// @brief Get active thruster configs (for current mode)
-    //std::vector<ThrusterConfig> getActiveThrusters() const;
-    ThrusterConfigVec getActiveThrusters() const;
+  /// @brief Get active thruster configs (for current mode)
+  //std::vector<ThrusterConfig> getActiveThrusters() const;
+  ThrusterConfigVec getActiveThrusters() const;
 
-    std::size_t getNumThr();
+  std::size_t getNumThr();
 
-    bool isReady();
+  bool isReady();
 
   // --------------------------------------------------------------------------
   // Table path (6xN W * u = desired_wrench)
@@ -182,7 +181,7 @@ public:
     const Eigen::VectorXd & desired_wrench,
     Eigen::VectorXd & thruster_output) const;
 
-   // --------------------------------------------------------------------------
+  // --------------------------------------------------------------------------
   // Legacy path (URDF-only 3xN moment allocation)
   // --------------------------------------------------------------------------
 
@@ -203,8 +202,6 @@ public:
   /// @deprecated Use loadTable() instead. Kept for backward compatibility.
   void loadThrusterTableFromYaml(const std::string & yaml_path);
 
-
-
 private:
 /*
   template<typename _Matrix_Type_1_, typename _Matrix_Type_2_>
@@ -213,11 +210,11 @@ private:
     double epsilon = std::numeric_limits<double>::epsilon()) const
   {
     Eigen::JacobiSVD<_Matrix_Type_1_> svd(a, Eigen::ComputeThinU | Eigen::ComputeThinV);
- 
-    const auto & s = svd.singularValues(); 
-    const double s_max = (s.size() > 0) ? s.maxCoeff() : 0.0; 
-    const double tol = epsilon * std::max(a.cols(), a.rows()) * s_max; 
-    //double tol = epsilon * std::max(a.cols(), a.rows()) * svd.singularValues().array().abs()(0); 
+
+    const auto & s = svd.singularValues();
+    const double s_max = (s.size() > 0) ? s.maxCoeff() : 0.0;
+    const double tol = epsilon * std::max(a.cols(), a.rows()) * s_max;
+    //double tol = epsilon * std::max(a.cols(), a.rows()) * svd.singularValues().array().abs()(0);
     //Eigen::ArrayXd inv = svd.singularValues().array();
     Eigen::ArrayXd inv = s.array();
 
@@ -228,8 +225,9 @@ private:
   }
 */
   template<typename MatA, typename MatPinv>
-  MatPinv pseudoInverse(const MatA& a,
-                      double epsilon = std::numeric_limits<double>::epsilon()) const
+  MatPinv pseudoInverse(
+    const MatA & a,
+    double epsilon = std::numeric_limits<double>::epsilon()) const
   {
     using Index = Eigen::Index;
 
@@ -241,13 +239,13 @@ private:
     }
 
     // 1) SVD
-    Eigen::MatrixXd A = a;  // 
+    Eigen::MatrixXd A = a;  //
     Eigen::JacobiSVD<Eigen::MatrixXd> svd(
       A, Eigen::ComputeThinU | Eigen::ComputeThinV);
 
-    const auto& s = svd.singularValues();
+    const auto & s = svd.singularValues();
     const double smax = (s.size() ? s.array().abs().maxCoeff() : 0.0);
-    const double tol  = epsilon * static_cast<double>(std::max<Index>(a.rows(), a.cols())) * smax;
+    const double tol = epsilon * static_cast<double>(std::max<Index>(a.rows(), a.cols())) * smax;
 
     // 2) Build Σ^+ with tolerance
     Eigen::VectorXd sinv = s;
@@ -275,7 +273,7 @@ private:
   // URDF-based structure
   URDFUtils urdfUtils;
   urdf::ModelInterfaceSharedPtr model_urdf_;
- 
+
   // Stable column order for all matrices (derived from URDF traversal)
   std::vector<std::string> thruster_order_;
 

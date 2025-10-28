@@ -82,11 +82,11 @@ inline constexpr double J2 = 1.08263e-3;
 // Very simple atmospheric density model
 inline double atmospheric_density(double altitude)
 {
-  if (altitude < 150e3) return 4e-9;
-  if (altitude < 200e3) return 1e-9;
-  if (altitude < 300e3) return 1e-10;
-  if (altitude < 400e3) return 1e-11;
-  if (altitude < 500e3) return 1e-12;
+  if (altitude < 150e3) {return 4e-9;}
+  if (altitude < 200e3) {return 1e-9;}
+  if (altitude < 300e3) {return 1e-10;}
+  if (altitude < 400e3) {return 1e-11;}
+  if (altitude < 500e3) {return 1e-12;}
   return 1e-13;
 }
 
@@ -110,7 +110,7 @@ inline double mean_to_true_anomaly(double M, double e, double tol = 1e-10)
     const double df = 1.0 - e * std::cos(E);
     const double dE = f / df;
     E -= dE;
-    if (std::abs(dE) < tol) break;
+    if (std::abs(dE) < tol) {break;}
   }
 
   const double cosE = std::cos(E);

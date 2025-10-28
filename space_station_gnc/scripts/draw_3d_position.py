@@ -1,4 +1,19 @@
 #!/usr/bin/env python3
+#
+# Copyright 2025 Space Station OS
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Vector3
@@ -41,7 +56,13 @@ class LiveOrbitPlotter(Node):
         x = earth_radius * np.outer(np.cos(u), np.sin(v))
         y = earth_radius * np.outer(np.sin(u), np.sin(v))
         z = earth_radius * np.outer(np.ones(np.size(u)), np.cos(v))
-        self.ax3d.plot_surface(x, y, z, color='blue', alpha=0.3, edgecolor='none')
+        self.ax3d.plot_surface(
+            x,
+            y,
+            z,
+            color='blue',
+            alpha=0.3,
+            edgecolor='none')
 
     def eci_callback(self, msg: Vector3):
         if not all(np.isfinite([msg.x, msg.y, msg.z])):
@@ -67,7 +88,6 @@ class LiveOrbitPlotter(Node):
             self.eci_y = self.eci_y[-max_points:]
             self.eci_z = self.eci_z[-max_points:]
 
-
     def update_plot(self):
         if len(self.eci_x) < 2:
             return
@@ -79,7 +99,10 @@ class LiveOrbitPlotter(Node):
         self.setup_earth()
 
         # Plot orbit trace
-        x, y, z = np.array(self.eci_x), np.array(self.eci_y), np.array(self.eci_z)
+        x, y, z = np.array(
+            self.eci_x), np.array(
+            self.eci_y), np.array(
+            self.eci_z)
         self.ax3d.plot(x, y, z, color='red', linewidth=1.5)
         self.ax3d.set_xlabel('ECI X [m]')
         self.ax3d.set_ylabel('ECI Y [m]')
@@ -99,13 +122,11 @@ class LiveOrbitPlotter(Node):
         plt.pause(0.001)
 
 
-
-
 def main(args=None):
     rclpy.init(args=args)
     node = LiveOrbitPlotter()
     try:
-        plt.show(block=False)  
+        plt.show(block=False)
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
