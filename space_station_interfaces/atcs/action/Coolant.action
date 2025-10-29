@@ -1,0 +1,13 @@
+# Goal
+float64 input_temperature_c   # Incoming subsystem/component temperature (°C)
+string component_id      # Unique identifier for the component
+---
+# Result
+bool success
+string message
+
+---
+# Feedback
+float64 internal_temp_c       # Current internal loop temperature
+float64 ammonia_temp_c        # Ammonia tank temperature
+float64 vented_heat_kj        # Total heat vented so far
