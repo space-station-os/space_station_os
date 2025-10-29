@@ -6,10 +6,10 @@
 #include <std_msgs/msg/float64.hpp>
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
 
-#include "space_station_thermal_control/action/coolant.hpp"
-#include "space_station_eps/srv/load.hpp"
+#include "space_station_interfaces/atcs/action/coolant.hpp"
+#include "space_station_interfaces/eps/srv/load.hpp"
 #include <mutex>
-namespace space_station_eps
+namespace space_station_interfaces/eps/
 {
 
 class DdcuNode : public rclcpp::Node
@@ -23,9 +23,9 @@ private:
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr output_voltage_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr temperature_pub_;
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticStatus>::SharedPtr diag_pub_;
-  rclcpp::Service<space_station_eps::srv::Load>::SharedPtr load_srv_;
+  rclcpp::Service<space_station_interfaces::eps::srv::Load>::SharedPtr load_srv_;
   // === Action Client for coolant ===
-  using Coolant = space_station_thermal_control::action::Coolant;
+  using Coolant = space_station_interfaces::atcs::action::Coolant;
   using GoalHandleCoolant = rclcpp_action::ClientGoalHandle<Coolant>;
   rclcpp_action::Client<Coolant>::SharedPtr coolant_client_;
   std::mutex voltage_mutex_;
@@ -42,8 +42,8 @@ private:
   void callInternalCooling(double heat_j);
   void publishDiagnostics(double input_voltage, double output_voltage);
   void handleLoadRequest(
-    const std::shared_ptr<space_station_eps::srv::Load::Request> request,
-    std::shared_ptr<space_station_eps::srv::Load::Response> response);
+    const std::shared_ptr<space_station_interfaces/eps/::srv::Load::Request> request,
+    std::shared_ptr<space_station_interfaces/eps/::srv::Load::Response> response);
 };
 
-} // namespace space_station_eps
+} // namespace space_station_interfaces/eps/

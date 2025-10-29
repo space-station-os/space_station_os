@@ -3,7 +3,7 @@
 #include "space_station_thermal_control/action/coolant.hpp"
 
 using namespace space_station_eps;
-using Coolant = space_station_thermal_control::action::Coolant;
+using Coolant = space_station_interfaces::atcs::action::Coolant;
 using GoalHandleCoolant = rclcpp_action::ClientGoalHandle<Coolant>;
 
 DdcuNode::DdcuNode(const rclcpp::NodeOptions &options)
@@ -21,7 +21,7 @@ DdcuNode::DdcuNode(const rclcpp::NodeOptions &options)
     "/ddcu/input_voltage", 10,
     std::bind(&DdcuNode::primaryVoltageCallback, this, std::placeholders::_1)
   );
-  load_srv_ = this->create_service<space_station_eps::srv::Load>(
+  load_srv_ = this->create_service<space_station_interfaces::eps::srv::Load>(
     "/ddcu/load_request",
     std::bind(&DdcuNode::handleLoadRequest, this,
               std::placeholders::_1, std::placeholders::_2)
