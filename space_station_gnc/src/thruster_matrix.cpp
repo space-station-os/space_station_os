@@ -18,6 +18,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sstream>
 #include <stdexcept>
+#include <algorithm>
 #include <unordered_set>
 
 // ===========================
@@ -427,7 +428,7 @@ void ThrusterMatrix::loadTable(const std::string &yaml_file) {
                 << "' is underactuated (rank=" << rank << "). Continuing with pinv cache.\n";
     }
     auto pinvW = pseudoInverse<Eigen::Matrix<double, 6, Eigen::Dynamic>,
-                               Eigen::Matrix<double, Eigen::Dynamic, 6>>(W);
+        Eigen::Matrix<double, Eigen::Dynamic, 6>>(W);
     pinv_cache_.emplace(mode, std::move(pinvW));
   }
 #endif
@@ -719,7 +720,7 @@ void ThrusterMatrix::generateCommandFromTable(
       }
       // Rank-deficient OK
       pinvW = pseudoInverse<Eigen::Matrix<double, 6, Eigen::Dynamic>,
-                            Eigen::Matrix<double, Eigen::Dynamic, 6>>(W);
+          Eigen::Matrix<double, Eigen::Dynamic, 6>>(W);
       // cache for next time
       const_cast<ThrusterMatrix *>(this)->pinv_cache_[current_mode_] = pinvW;
     }

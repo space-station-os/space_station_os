@@ -17,3 +17,5 @@ orbit_dynamics_node:
     topics.pose_eci: "gnc/pose_eci"
     topics.path_eci: "gnc/path_eci"
     viz.path_max_points: 5000
+    dynamics.consider_j2: true
+    dynamics.consider_air_drag: false
