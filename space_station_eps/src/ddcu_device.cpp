@@ -1,10 +1,7 @@
 #include "space_station_eps/ddcu_device.hpp"
-#include <rclcpp_action/rclcpp_action.hpp>
-#include "space_station_thermal_control/action/coolant.hpp"
+
 
 using namespace space_station_eps;
-using Coolant = space_station_interfaces::atcs::action::Coolant;
-using GoalHandleCoolant = rclcpp_action::ClientGoalHandle<Coolant>;
 
 DdcuNode::DdcuNode(const rclcpp::NodeOptions &options)
 : Node("ddcu_node", options), ddcu_temperature_(25.0)  // Initial temp: 25°C
@@ -21,7 +18,7 @@ DdcuNode::DdcuNode(const rclcpp::NodeOptions &options)
     "/ddcu/input_voltage", 10,
     std::bind(&DdcuNode::primaryVoltageCallback, this, std::placeholders::_1)
   );
-  load_srv_ = this->create_service<space_station_interfaces::eps::srv::Load>(
+  load_srv_ = this->create_service<space_station_interfaces::srv::Load>(
     "/ddcu/load_request",
     std::bind(&DdcuNode::handleLoadRequest, this,
               std::placeholders::_1, std::placeholders::_2)
@@ -87,8 +84,8 @@ void DdcuNode::publishOutputVoltage(double voltage)
 }
 
 void DdcuNode::handleLoadRequest(
-  const std::shared_ptr<space_station_eps::srv::Load::Request> request,
-  std::shared_ptr<space_station_eps::srv::Load::Response> response)
+  const std::shared_ptr<space_station_interfaces::srv::Load::Request> request,
+  std::shared_ptr<space_station_interfaces::srv::Load::Response> response)
 {
   std::lock_guard<std::mutex> lock(voltage_mutex_);
 

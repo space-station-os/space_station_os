@@ -26,6 +26,9 @@ set(msg_files
   "eclss/srv/Co2Request.srv"
   "eclss/srv/O2Request.srv"
   "eclss/srv/GreyWater.srv"
+  "eclss/action/AirRevitalisation.action"
+  "eclss/action/OxygenGeneration.action"
+  "eclss/action/WaterRecovery.action"
   # EPS
   "eps/srv/Load.srv"
   "eps/msg/BCDUStatus.msg"
@@ -45,7 +48,7 @@ set(msg_files
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${msg_files} 
-  DEPENDENCIES  std_msgs sensor_msgs visualization_msgs
+  DEPENDENCIES  std_msgs sensor_msgs visualization_msgs rclcpp_action
 )
 
 ament_export_dependencies(rosidl_default_runtime)

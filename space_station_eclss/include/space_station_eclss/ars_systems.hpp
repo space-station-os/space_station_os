@@ -6,10 +6,10 @@
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
 #include <std_msgs/msg/bool.hpp>
 
-#include "space_station_eclss/action/air_revitalisation.hpp"
-#include "space_station_eclss/srv/co2_request.hpp"
+#include "space_station_interfaces/action/air_revitalisation.hpp"
+#include "space_station_interfaces/srv/co2_request.hpp"
 #include "ament_index_cpp/get_package_share_directory.hpp"
-#include "space_station_eps/srv/load.hpp"
+#include "space_station_interfaces/srv/load.hpp"
 // BehaviorTree.CPP v3.x
 #include <behaviortree_cpp_v3/bt_factory.h>
 
@@ -19,10 +19,10 @@ namespace space_station_eclss
 class ARSActionServer : public rclcpp::Node
 {
 public:
-  using AirRevitalisation = space_station_eclss::action::AirRevitalisation;
+  using AirRevitalisation = space_station_interfaces::action::AirRevitalisation;
   using GoalHandleARS = rclcpp_action::ServerGoalHandle<AirRevitalisation>;
-  using Co2Request = space_station_eclss::srv::Co2Request;
-  rclcpp::Client<space_station_eps::srv::Load>::SharedPtr load_client_;
+  using Co2Request = space_station_interfaces::srv::Co2Request;
+  rclcpp::Client<space_station_interfaces::srv::Load>::SharedPtr load_client_;
   explicit ARSActionServer(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
 
   /// Utility getter so tests can check failure flag

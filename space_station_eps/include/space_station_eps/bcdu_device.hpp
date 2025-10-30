@@ -6,7 +6,7 @@
 #include <std_srvs/srv/trigger.hpp>
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
 
-#include <space_station_interfaces/eps/msg/bcdu_status.hpp>
+#include <space_station_interfaces/msg/bcdu_status.hpp>
 
 #include <map>
 #include <mutex>
@@ -53,7 +53,7 @@ private:
 
   // Subscriptions and publishers
   rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr ssu_sub_;
-  rclcpp::Publisher<space_station_interfaces::eps::msg::BCDUStatus>::SharedPtr status_pub_;
+  rclcpp::Publisher<space_station_interfaces::msg::BCDUStatus>::SharedPtr status_pub_;
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticStatus>::SharedPtr diag_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr mbsu_voltage_pub_;
   std::unordered_map<int, rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr> channel_voltage_pubs_;

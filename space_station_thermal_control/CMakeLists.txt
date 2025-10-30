@@ -45,7 +45,7 @@ set(msg_files
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${msg_files} 
-  DEPENDENCIES  std_msgs sensor_msgs space_station_eclss
+  DEPENDENCIES  std_msgs sensor_msgs 
 )
 
 ament_export_dependencies(rosidl_default_runtime)
