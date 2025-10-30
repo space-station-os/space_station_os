@@ -13,9 +13,9 @@ physics_motion:
   ros__parameters:
     dynamics:
       J:
-        xx: 280e6
-        yy: 140e6
-        zz: 420e6
+        xx: 4.2e6
+        yy: 4.2e6
+        zz: 6.7e6
       mu: 3.986e14
       r_orbit:  7e6
 

@@ -24,17 +24,21 @@ find_package(SDL2 REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 find_package(rosidl_default_generators REQUIRED)
-find_package(rosidl_default_runtime REQUIRED)
+# find_package(rosidl_default_runtime REQUIRED)
 find_package(action_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(urdf REQUIRED)        # provides target urdf::urdf
 find_package(yaml-cpp REQUIRED)    # YAML tables support
+find_package(ament_index_cpp REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 
-# Generate interfaces
+# Generate both the action and the service in one rosidl_generate_interfaces call
 rosidl_generate_interfaces(${PROJECT_NAME}
   "action/Unloading.action"
+  "srv/SetGncModeActuation.srv"
   DEPENDENCIES action_msgs std_msgs
 )
+
 # Include directories
 include_directories(
   ${OpenCV_INCLUDE_DIRS}
@@ -69,12 +73,14 @@ ament_target_dependencies(physics_motion rclcpp std_msgs tf2 tf2_ros tf2_geometr
 ament_target_dependencies(orbit_dynamics rclcpp std_msgs nav_msgs tf2 tf2_ros tf2_geometry_msgs visualization_msgs)
 ament_target_dependencies(physics_sensor rclcpp std_msgs tf2 tf2_ros tf2_geometry_msgs visualization_msgs)
 ament_target_dependencies(sense_estimate rclcpp std_msgs tf2 tf2_ros nav_msgs tf2_geometry_msgs visualization_msgs)
-ament_target_dependencies(control_torque rclcpp std_msgs tf2 tf2_ros nav_msgs tf2_geometry_msgs visualization_msgs)
+ament_target_dependencies(control_torque rclcpp std_msgs tf2 tf2_ros nav_msgs tf2_geometry_msgs visualization_msgs ament_index_cpp)
 ament_target_dependencies(thruster_matrix rclcpp)
 
 ament_target_dependencies(orbit_dynamics_mock rclcpp std_msgs tf2 tf2_ros tf2_geometry_msgs visualization_msgs)
 rosidl_get_typesupport_target(cpp_typesupport_target
   ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+
 
 
 
@@ -93,6 +99,8 @@ target_include_directories(thruster_matrix
 # - Link the control nodes with the generated typesupport and thruster_matrix.
 # - Link thruster_matrix with Eigen, URDF, and YAML-CPP.
 # --------------------------------------------------------------------------
+#rosidl_target_interfaces(control_torque
+#  ${PROJECT_NAME} "rosidl_typesupport_cpp")
 rosidl_get_typesupport_target(cpp_typesupport_target
   ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
@@ -122,6 +130,8 @@ ament_export_include_directories(
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
+
+ament_export_dependencies(Eigen3)
 
 target_link_libraries(control_torque ${cpp_typesupport_target})
 target_link_libraries(physics_motion ${cpp_typesupport_target})
@@ -157,28 +167,6 @@ install(DIRECTORY include/
   DESTINATION include
 )
 
-#launch files
-install(
-    DIRECTORY launch
-    DESTINATION share/${PROJECT_NAME}/
-)
-
-# URDFfile
-install(DIRECTORY urdf/
-  DESTINATION share/${PROJECT_NAME}/urdf
-)
-
-install(DIRECTORY urdf/meshes/
-  DESTINATION share/${PROJECT_NAME}/urdf/meshes
-)
-
-install(DIRECTORY rviz
-  DESTINATION share/${PROJECT_NAME}
-)
-
-install(DIRECTORY config
-  DESTINATION share/${PROJECT_NAME}
-)
 
 install(PROGRAMS
   scripts/draw_3d_position.py
@@ -216,6 +204,7 @@ if(BUILD_TESTING)
 endif()
 
 
+
 set(CONFIG_PATH "${CMAKE_CURRENT_SOURCE_DIR}/config/config.json")
 set(OUTPUT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
@@ -235,6 +224,51 @@ endif()
 ament_export_include_directories(
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
+)
+
+ament_export_dependencies(Eigen3)
+ament_export_dependencies(rosidl_default_runtime)
+
+# source by c++
+install(TARGETS
+  space_station_gnc_node
+  demo1a_nauka_incident_estimate
+  demo1b_crisis_mainengine
+  demo1c_small_incident
+  torque_collector
+  physics_motion
+  physics_sensor
+  sense_estimate
+  control_torque
+  thruster_matrix
+  DESTINATION lib/${PROJECT_NAME})
+
+# Install public headers so downstream packages can include thruster_matrix.hpp
+install(DIRECTORY include/
+  DESTINATION include
+)
+
+#launch files
+install(
+    DIRECTORY launch
+    DESTINATION share/${PROJECT_NAME}/
+)
+
+# URDFfile
+install(DIRECTORY urdf/
+  DESTINATION share/${PROJECT_NAME}/urdf
+)
+
+install(DIRECTORY urdf/meshes/
+  DESTINATION share/${PROJECT_NAME}/urdf/meshes
+)
+
+install(DIRECTORY rviz
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(DIRECTORY config
+  DESTINATION share/${PROJECT_NAME}
 )
 
 ament_package()
