@@ -52,7 +52,7 @@ WRSActionServer::WRSActionServer(const rclcpp::NodeOptions & options)
   catalytic_max_temperature_  = this->get_parameter("catalytic_max_temperature").as_double();
 
   RCLCPP_INFO(this->get_logger(), "Switching on WRS — requesting power from DDCU...");
-  load_client_ = this->create_client<space_station_eps::srv::Load>("/ddcu/load_request");
+  load_client_ = this->create_client<space_station_interfaces::srv::Load>("/ddcu/load_request");
 
   powered_ = false;
   RCLCPP_INFO(this->get_logger(), "Waiting for EPS power...");
@@ -79,11 +79,11 @@ bool WRSActionServer::supply_load(){
     return false;
   }
 
-  auto request = std::make_shared<space_station_eps::srv::Load::Request>();
+  auto request = std::make_shared<space_station_interfaces::srv::Load::Request>();
   request->load_voltage = 124.5;
 
   load_client_->async_send_request(request,
-    [this](rclcpp::Client<space_station_eps::srv::Load>::SharedFuture future_resp) {
+    [this](rclcpp::Client<space_station_interfaces::srv::Load>::SharedFuture future_resp) {
       auto response = future_resp.get();
       if (response->success) {
         RCLCPP_INFO(this->get_logger(), "Power granted: %s", response->message.c_str());
@@ -107,14 +107,14 @@ void WRSActionServer::initialize_systems(){
     std::bind(&WRSActionServer::handle_accepted, this, std::placeholders::_1)
   );
 
-  ogs_client_ = rclcpp_action::create_client<space_station_eclss::action::OxygenGeneration>(this, "oxygen_generation");
+  ogs_client_ = rclcpp_action::create_client<space_station_interfaces::action::OxygenGeneration>(this, "oxygen_generation");
 
-  water_request_server_ = this->create_service<space_station_eclss::srv::RequestProductWater>(
+  water_request_server_ = this->create_service<space_station_interfaces::srv::RequestProductWater>(
     "wrs/product_water_request",
     std::bind(&WRSActionServer::handle_product_water_request, this, std::placeholders::_1, std::placeholders::_2)
   );
 
-  gray_water_service_ = this->create_service<space_station_eclss::srv::GreyWater>(
+  gray_water_service_ = this->create_service<space_station_interfaces::srv::GreyWater>(
     "/grey_water",
     std::bind(&WRSActionServer::handle_gray_water_request, this, std::placeholders::_1, std::placeholders::_2)
   );
@@ -290,10 +290,10 @@ void WRSActionServer::send_water_to_ogs(float volume, float iodine_ppm)
     return;
   }
 
-  space_station_eclss::action::OxygenGeneration::Goal goal;
+  space_station_interfaces::action::OxygenGeneration::Goal goal;
   goal.input_water_mass = volume;
 
-  auto send_goal_options = rclcpp_action::Client<space_station_eclss::action::OxygenGeneration>::SendGoalOptions();
+  auto send_goal_options = rclcpp_action::Client<space_station_interfaces::action::OxygenGeneration>::SendGoalOptions();
   send_goal_options.result_callback = [this](const GoalHandleOGS::WrappedResult & result) {
     if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
       RCLCPP_INFO(this->get_logger(), "OGS processed water successfully.");
@@ -321,8 +321,8 @@ void WRSActionServer::fail_goal(
 }
 
 void WRSActionServer::handle_product_water_request(
-  const std::shared_ptr<space_station_eclss::srv::RequestProductWater::Request> request,
-  std::shared_ptr<space_station_eclss::srv::RequestProductWater::Response> response)
+  const std::shared_ptr<space_station_interfaces::srv::RequestProductWater::Request> request,
+  std::shared_ptr<space_station_interfaces::srv::RequestProductWater::Response> response)
 {
   if (request->amount <= product_water_reserve_) {
     product_water_reserve_ -= request->amount;
@@ -342,8 +342,8 @@ void WRSActionServer::handle_product_water_request(
 }
 
 void WRSActionServer::handle_gray_water_request(
-  const std::shared_ptr<space_station_eclss::srv::GreyWater::Request> request,
-  std::shared_ptr<space_station_eclss::srv::GreyWater::Response> response)
+  const std::shared_ptr<space_station_interfaces::srv::GreyWater::Request> request,
+  std::shared_ptr<space_station_interfaces::srv::GreyWater::Response> response)
 {
   float volume = request->gray_water_liters;
   if (volume <= 0.0f) {

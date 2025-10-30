@@ -13,8 +13,8 @@ from PyQt5.QtGui import QPixmap
 import random
 from rclpy.action import ActionClient
 from std_msgs.msg import Float64
-from space_station_eclss.action import AirRevitalisation, WaterRecovery
-from space_station_eclss.srv import O2Request, RequestProductWater
+from space_station_interfaces.action import AirRevitalisation, WaterRecovery
+from space_station_interfaces.srv import O2Request, RequestProductWater
 from astro_mode import AstronautSimGui
 from developer_mode import DeveloperSimGui
 from user_mode import UserSimGui

@@ -51,7 +51,7 @@ add_executable(bcdu_node src/bcdu_device.cpp)
 rosidl_target_interfaces(bcdu_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
 ament_target_dependencies(bcdu_node
   rclcpp 
-  std_msgs sensor_msgs diagnostic_msgs std_srvs
+  std_msgs sensor_msgs diagnostic_msgs std_srvs space_station_interfaces
 
 )
 
