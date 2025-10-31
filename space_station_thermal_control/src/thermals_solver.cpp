@@ -7,13 +7,13 @@ ThermalSolverNode::ThermalSolverNode()
 {
   RCLCPP_INFO(this->get_logger(), "Initializing Thermal Solver Node...");
 
-  node_pub_ = this->create_publisher<space_station_thermal_control::msg::ThermalNodeDataArray>(
+  node_pub_ = this->create_publisher<space_station_interfaces::msg::ThermalNodeDataArray>(
     "/thermal/nodes/state", 10);
-  link_pub_ = this->create_publisher<space_station_thermal_control::msg::ThermalLinkFlowsArray>(
+  link_pub_ = this->create_publisher<space_station_interfaces::msg::ThermalLinkFlowsArray>(
     "/thermal/links/flux", 10);
   diag_pub_ = this->create_publisher<diagnostic_msgs::msg::DiagnosticStatus>(
     "/thermals/diagnostics", 10);
-  cooling_client_ = rclcpp_action::create_client<space_station_thermal_control::action::Coolant>(
+  cooling_client_ = rclcpp_action::create_client<space_station_interfaces::action::Coolant>(
       this,"/coolant_heat_transfer");
 
   this->declare_parameter("enable_failure", false);
@@ -123,7 +123,7 @@ double ThermalSolverNode::compute_dTdt(
 
 void ThermalSolverNode::coolingCallback()
 {
-  using namespace space_station_thermal_control::action;
+  using namespace space_station_interfaces::action;
 
   if (!cooling_active_ && enable_cooling_ && avg_temperature_ > cooling_trigger_threshold_) {
     if (!cooling_client_->wait_for_action_server(1s)) {
@@ -302,9 +302,9 @@ void ThermalSolverNode::updateSimulation()
 
 
 
-  space_station_thermal_control::msg::ThermalNodeDataArray node_msg;
+  space_station_interfaces::msg::ThermalNodeDataArray node_msg;
   for (const auto &[name, node] : thermal_nodes_) {
-    space_station_thermal_control::msg::ThermalNodeData data;
+    space_station_interfaces::msg::ThermalNodeData data;
     data.name = name;
     data.temperature = node.temperature;
     data.heat_capacity = node.heat_capacity;
@@ -314,9 +314,9 @@ void ThermalSolverNode::updateSimulation()
   node_pub_->publish(node_msg);
   publishThermalNetworkDiag(node_msg.nodes);
 
-  space_station_thermal_control::msg::ThermalLinkFlowsArray link_msg;
+  space_station_interfaces::msg::ThermalLinkFlowsArray link_msg;
   for (const auto &link : thermal_links_) {
-    space_station_thermal_control::msg::ThermalLinkFlows l;
+    space_station_interfaces::msg::ThermalLinkFlows l;
     l.node_a = link.from;
     l.node_b = link.to;
     l.conductance = link.conductance;
@@ -331,7 +331,7 @@ void ThermalSolverNode::updateSimulation()
 }
 
 void ThermalSolverNode::publishThermalNetworkDiag(
-    const std::vector<space_station_thermal_control::msg::ThermalNodeData> &nodes)
+    const std::vector<space_station_interfaces::msg::ThermalNodeData> &nodes)
 {
   using diagnostic_msgs::msg::DiagnosticStatus;
   using diagnostic_msgs::msg::KeyValue;
