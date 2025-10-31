@@ -21,7 +21,7 @@ CoolantActionServer::CoolantActionServer(const rclcpp::NodeOptions &options)
 
   internal_loop_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>(
       "/tcs/internal_loop_heat", 10);
-  external_loop_pub_ = this->create_publisher<space_station_thermal_control::msg::ExternalLoopStatus>(
+  external_loop_pub_ = this->create_publisher<space_station_interfaces::msg::ExternalLoopStatus>(
       "/tcs/external_loop_a/status", 10);
 
   if (diagnostics_enabled_)
@@ -30,13 +30,13 @@ CoolantActionServer::CoolantActionServer(const rclcpp::NodeOptions &options)
         "/thermals/diagnostics", 10);
   }
 
-  product_water_client_ = this->create_client<space_station_eclss::srv::RequestProductWater>(
+  product_water_client_ = this->create_client<space_station_interfaces::srv::RequestProductWater>(
       "/wrs/product_water_request");
 
   grey_water_client_ = this->create_client<std_srvs::srv::Trigger>(
       "/grey_water");
 
-  radiator_client_ = this->create_client<space_station_thermal_control::srv::VentHeat>(
+  radiator_client_ = this->create_client<space_station_interfaces::srv::VentHeat>(
     "/tcs/radiator_a/vent_heat");
 
 
@@ -162,7 +162,7 @@ void CoolantActionServer::execute(const std::shared_ptr<GoalHandle> goal_handle)
               node_temp, vented_total);
 
   if (vented_total > 0.0) {
-      auto req = std::make_shared<space_station_thermal_control::srv::VentHeat::Request>();
+      auto req = std::make_shared<space_station_interfaces::srv::VentHeat::Request>();
       req->excess_heat = vented_total;
 
       if (radiator_client_->wait_for_service(2s)) {
@@ -200,7 +200,7 @@ BT::NodeStatus CoolantActionServer::isAmmoniaHot()
 
 BT::NodeStatus CoolantActionServer::ventHeat()
 {
-  auto req = std::make_shared<space_station_thermal_control::srv::VentHeat::Request>();
+  auto req = std::make_shared<space_station_interfaces::srv::VentHeat::Request>();
   req->excess_heat = ammonia_heat_kj_;
 
   if (!vent_client_)
@@ -229,7 +229,7 @@ BT::NodeStatus CoolantActionServer::coolLoop()
 
 BT::NodeStatus CoolantActionServer::refreshWater()
 {
-  auto req = std::make_shared<space_station_eclss::srv::RequestProductWater::Request>();
+  auto req = std::make_shared<space_station_interfaces::srv::RequestProductWater::Request>();
   req->amount = 2.0;
 
   if (!wrs_client_)
@@ -282,7 +282,7 @@ void CoolantActionServer::publishInternalLoop()
 
 void CoolantActionServer::publishExternalLoop(double received_heat_kj)
 {
-  space_station_thermal_control::msg::ExternalLoopStatus msg;
+  space_station_interfaces::msg::ExternalLoopStatus msg;
   msg.received_heat_kj = received_heat_kj;
   msg.loop_inlet_temp = 6.0;
   msg.loop_outlet_temp = 12.0;
@@ -293,7 +293,7 @@ void CoolantActionServer::publishExternalLoop(double received_heat_kj)
 
 void CoolantActionServer::recycleWater()
 {
-  auto water_req = std::make_shared<space_station_eclss::srv::RequestProductWater::Request>();
+  auto water_req = std::make_shared<space_station_interfaces::srv::RequestProductWater::Request>();
   water_req->amount = 5.0;
   if (product_water_client_->wait_for_service(1s))
   {
