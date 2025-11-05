@@ -20,15 +20,20 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 import os
 from ament_index_python.packages import get_package_share_directory
-import xacro
+
+
 
 def launch_nodes(context, *args, **kwargs):
     def output_for(flag_name):
-        return 'log' if LaunchConfiguration(flag_name).perform(context) == 'true' else 'screen'
+        return 'log' if LaunchConfiguration(
+            flag_name).perform(context) == 'true' else 'screen'
 
     def arguments_for(flag_name):
-        return ['--ros-args', '--log-level', 'warn'] if LaunchConfiguration(flag_name).perform(context) == 'true' else []
-    
+        return [
+            '--ros-args',
+            '--log-level',
+            'warn'] if LaunchConfiguration(flag_name).perform(context) == 'true' else []
+
     # share_dir = get_package_share_directory('space_station_description')
 
     # xacro_file = os.path.join(share_dir, 'urdf', 'space_station.xacro')
@@ -58,7 +63,12 @@ def launch_nodes(context, *args, **kwargs):
             name='physics_motion',
             output=output_for('quiet_motion'),
             arguments=arguments_for('quiet_motion'),
-            parameters=[os.path.join(get_package_share_directory("space_station_gnc"), 'config', 'ros_config.yaml'), ],
+            parameters=[
+                os.path.join(
+                    get_package_share_directory("space_station_gnc"),
+                    'config',
+                    'ros_config.yaml'),
+            ],
         ),
         Node(
             package='space_station_gnc',
@@ -66,7 +76,12 @@ def launch_nodes(context, *args, **kwargs):
             name='physics_sensor',
             output=output_for('quiet_sensor'),
             arguments=arguments_for('quiet_sensor'),
-            parameters=[os.path.join(get_package_share_directory("space_station_gnc"), 'config', 'ros_config.yaml'), ],
+            parameters=[
+                os.path.join(
+                    get_package_share_directory("space_station_gnc"),
+                    'config',
+                    'ros_config.yaml'),
+            ],
         ),
         Node(
             package='space_station_gnc',
@@ -83,6 +98,7 @@ def launch_nodes(context, *args, **kwargs):
         # ),
     ]
 
+
 def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('quiet_torque', default_value='false'),
@@ -93,4 +109,3 @@ def generate_launch_description():
 
         OpaqueFunction(function=launch_nodes)
     ])
-

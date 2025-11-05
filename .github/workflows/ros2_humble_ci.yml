@@ -43,5 +43,20 @@ jobs:
           colcon build --event-handlers console_direct+
         shell: bash
 
-      
-          
+      # -----------------------------
+      # non-blocking test run 
+      - name: Test (non-blocking)
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon test --event-handlers console_cohesion+ --ctest-args --output-on-failure
+          colcon test-result --verbose || true
+        shell: bash
+        continue-on-error: true
+
+      - name: Archive ctest logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ctest-logs
+          path: build/**/Testing/Temporary/LastTest.log
+      # -----------------------------          

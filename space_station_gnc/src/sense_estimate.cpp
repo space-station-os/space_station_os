@@ -19,7 +19,8 @@
 #include <tf2/LinearMath/Quaternion.h>
 
 // NO sensor estimation algorithms are implemented in this file.Rather just republishing
-class SenseEstimate : public rclcpp::Node {
+class SenseEstimate : public rclcpp::Node
+{
 public:
   SenseEstimate()
   : Node("sense_estimate")

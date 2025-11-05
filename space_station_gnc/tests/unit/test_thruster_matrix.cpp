@@ -18,13 +18,14 @@
 
 #include "space_station_gnc/thruster_matrix.hpp"
 
-namespace {
+namespace
+{
 
 // ---------------------------------------------------------------------
 // Small helpers
 // ---------------------------------------------------------------------
 
-static std::string writeTextFile(const std::string& path, const std::string& text)
+static std::string writeTextFile(const std::string & path, const std::string & text)
 {
   std::ofstream ofs(path);
   ofs << text;
@@ -35,7 +36,8 @@ static std::string writeTextFile(const std::string& path, const std::string& tex
 // 1-thruster URDF (child link name uses accepted "thr_" prefix)
 static std::string makeURDF_OneThruster()
 {
-  return R"(
+  return
+    R"(
 <robot name="one_thr">
   <link name="base"/>
   <joint name="j_thr" type="continuous">
@@ -52,7 +54,8 @@ static std::string makeURDF_OneThruster()
 // 6-thruster URDF: +/-X, +/-Y, +/-Z (names with "th_" prefix)
 static std::string makeURDF_Eagle6()
 {
-  return R"(
+  return
+    R"(
 <robot name="eagle6">
   <link name="base"/>
 
@@ -92,7 +95,8 @@ static std::string makeURDF_Eagle6()
 // URDF with 3 thrusters using different accepted prefixes: th_, thr_, thruster_
 static std::string makeURDF_NamePrefixes()
 {
-  return R"(
+  return
+    R"(
 <robot name="prefixes">
   <link name="base"/>
 
@@ -132,7 +136,8 @@ TEST(ThrusterMatrixTest, OneThruster_NonNegativeProjection_Works)
   ASSERT_EQ(tm.getNumThr(), static_cast<std::size_t>(1));
 
   // properties.yaml (optional; keep defaults)
-  const std::string props = R"(
+  const std::string props =
+    R"(
 thrusters:
   thr_one: { max_force: 50.0, isp: 300.0, efficiency: 0.7 }
 )";
@@ -142,7 +147,8 @@ thrusters:
   // table.yaml: choose torque around X (Tx) only, force all zero
   // This is artificial: in practice a single col cannot span 6D, but we
   // rely on LS + non-negativity projection behavior (u >= 0).
-  const std::string table_yaml = R"(
+  const std::string table_yaml =
+    R"(
 tables:
   mode_tx_only:
     thr_one:
@@ -183,7 +189,8 @@ TEST(ThrusterMatrixTest, Eagle6_Nominal_CommandIsFiniteAndNonNegative)
   ASSERT_EQ(tm.getNumThr(), static_cast<std::size_t>(6));
 
   // Optional properties (override some)
-  const std::string props = R"(
+  const std::string props =
+    R"(
 thrusters:
   th_xp: { max_force: 100.0 }
   th_xn: { max_force: 100.0 }
@@ -196,7 +203,8 @@ thrusters:
 
   // table: simple weights that allow contributing along each axis.
   // (Not a physically exact model; enough to exercise LS + projection.)
-  const std::string table_yaml = R"(
+  const std::string table_yaml =
+    R"(
 tables:
   nominal:
     th_xp: { torque: [0,0,0], force: [ 1, 0, 0] }
@@ -211,10 +219,10 @@ tables:
 
   // Few test wrenches
   const std::vector<Eigen::VectorXd> wrenches = {
-    (Eigen::VectorXd(6) << 0, 0, 0,  5, 0, 0).finished(), // +Fx
-    (Eigen::VectorXd(6) << 0, 0, 0,  0, 5, 0).finished(), // +Fy
-    (Eigen::VectorXd(6) << 0, 0, 0,  0, 0, 5).finished(), // +Fz
-    (Eigen::VectorXd(6) << 0, 0, 0,  3, 4, 5).finished()  // mixed forces
+    (Eigen::VectorXd(6) << 0, 0, 0, 5, 0, 0).finished(),  // +Fx
+    (Eigen::VectorXd(6) << 0, 0, 0, 0, 5, 0).finished(),  // +Fy
+    (Eigen::VectorXd(6) << 0, 0, 0, 0, 0, 5).finished(),  // +Fz
+    (Eigen::VectorXd(6) << 0, 0, 0, 3, 4, 5).finished()   // mixed forces
   };
 
   for (const auto & w : wrenches) {
@@ -236,7 +244,8 @@ TEST(ThrusterMatrixTest, ZeroWMode_ShouldThrow)
   ASSERT_TRUE(tm.isReady());
   ASSERT_EQ(tm.getNumThr(), static_cast<std::size_t>(1));
 
-  const std::string table_yaml = R"(
+  const std::string table_yaml =
+    R"(
 tables:
   zero_mode:
     thr_one:
@@ -262,7 +271,8 @@ TEST(ThrusterMatrixTest, NamePrefixes_AreRecognized)
   EXPECT_GE(tm.getNumThr(), static_cast<std::size_t>(3));
 
   // Minimal table enabling all three (with simple force weights) so command works
-  const std::string table_yaml = R"(
+  const std::string table_yaml =
+    R"(
 tables:
   all_on:
     th_a:        { torque: [0,0,0], force: [1,0,0] }
@@ -272,7 +282,7 @@ tables:
   tm.loadTable(writeTextFile("prefix_table.yaml", table_yaml));
   tm.setThrusterTable("all_on");
 
-  Eigen::VectorXd wrench(6); wrench << 0,0,0, 1,1,1;
+  Eigen::VectorXd wrench(6); wrench << 0, 0, 0, 1, 1, 1;
   Eigen::VectorXd u;
   tm.generateCommandFromTable(wrench, u);
   ASSERT_EQ(u.size(), tm.getNumThr());

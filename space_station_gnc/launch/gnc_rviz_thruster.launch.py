@@ -22,9 +22,11 @@ from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 import xacro
 
+
 def launch_setup(context, *args, **kwargs):
-    use_fixed_joint = str(LaunchConfiguration("use_fixed_joint").perform(context))
-    # print(f"[DEBUG] use_fixed_joint = {use_fixed_joint}") 
+    use_fixed_joint = str(LaunchConfiguration(
+        "use_fixed_joint").perform(context))
+    # print(f"[DEBUG] use_fixed_joint = {use_fixed_joint}")
     share_dir = get_package_share_directory('space_station_description')
     xacro_file = os.path.join(share_dir, 'urdf', 'space_station.xacro')
 
@@ -54,9 +56,10 @@ def launch_setup(context, *args, **kwargs):
             executable='rviz2',
             name='rviz2',
             output='screen',
-            arguments=['-d', rviz_config_path] 
+            arguments=['-d', rviz_config_path]
         )
     ]
+
 
 def generate_launch_description():
     return LaunchDescription([

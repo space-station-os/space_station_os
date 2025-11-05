@@ -117,8 +117,6 @@ CoolantManager::CoolantManager(const rclcpp::NodeOptions & options)
   heatflow_server_ = this->create_service<space_station_thermal_control::srv::NodeHeatFlow>(
     "/internal_loop_cooling", std::bind(&CoolantManager::handle_heatflow, this, _1, _2));
 
-  heater_signal_pub_ = this->create_publisher<std_msgs::msg::Bool>("/tcs/heater_state", 10);
-
   control_timer_ = this->create_wall_timer(
     std::chrono::duration_cast<std::chrono::nanoseconds>(
       std::chrono::duration<double>(control_period_s_)),
@@ -172,7 +170,6 @@ void CoolantManager::request_water(double amount_l)
   }
 
   auto req = std::make_shared<space_station_eclss::srv::RequestProductWater::Request>();
-  //req->amount = 100.0;
   req->amount = amount_l;
 
   water_future_ = water_client_->async_send_request(req);
@@ -422,16 +419,10 @@ void CoolantManager::control_cycle()
   // Heater control (with hysteresis)
   if (ammonia_temp_ < heater_on_below_c_ && !heater_on_) {
     heater_on_ = true;
-    std_msgs::msg::Bool msg;
-    msg.data = true;
-    heater_signal_pub_->publish(msg);
     RCLCPP_INFO(this->get_logger(), "[HEATER] Turning ON (%.2f°C)", ammonia_temp_);
     publish_diag(diagnostic_msgs::msg::DiagnosticStatus::OK, "Heater ON");
   } else if (ammonia_temp_ > heater_off_above_c_ && heater_on_) {
     heater_on_ = false;
-    std_msgs::msg::Bool msg;
-    msg.data = false;
-    heater_signal_pub_->publish(msg);
     RCLCPP_INFO(this->get_logger(), "[HEATER] Turning OFF (%.2f°C)", ammonia_temp_);
     publish_diag(diagnostic_msgs::msg::DiagnosticStatus::OK, "Heater OFF");
   }
@@ -457,7 +448,7 @@ void CoolantManager::control_cycle()
   status_pub_->publish(tank_status);
 }
 
-}  
+}  // namespace space_station_thermal_control
 
 // Standalone entry point (no components)
 int main(int argc, char **argv)
