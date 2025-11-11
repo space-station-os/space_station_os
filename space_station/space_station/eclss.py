@@ -31,11 +31,11 @@ import datetime
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from std_msgs.msg import Float64
-from space_station_eclss.action import AirRevitalisation, WaterRecovery
-from space_station_eclss.srv import O2Request, RequestProductWater
+from space_station_interfaces.action import AirRevitalisation, WaterRecovery
+from space_station_interfaces.srv import O2Request, RequestProductWater
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
 
-from space_station_eclss.msg import AstronautHealth
+from space_station_interfaces.msg import AstronautHealth
 
 # ---------------- Constants ---------------- #
 MAX_O2_STORAGE = 60000.0    # grams (large tank)
