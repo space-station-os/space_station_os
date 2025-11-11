@@ -19,13 +19,13 @@ import re
 from std_msgs.msg import Bool
 from ament_index_python.packages import get_package_share_directory
 from sensor_msgs.msg import BatteryState
-from space_station_eps.msg import BCDUStatus 
+from space_station_interfaces.msg import BCDUStatus 
 
 _THERMAL_MSGS_OK = True
 try:
  
-    from space_station_thermal_control.msg import ThermalNodeDataArray, ThermalLinkFlowsArray
-    from space_station_thermal_control.msg import ExternalLoopStatus,TankStatus
+    from space_station_interfaces.msg import ThermalNodeDataArray, ThermalLinkFlowsArray
+    from space_station_interfaces.msg import ExternalLoopStatus,TankStatus
 except Exception:
     _THERMAL_MSGS_OK = False
     ThermalNodeDataArray = None

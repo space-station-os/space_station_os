@@ -11,8 +11,8 @@ import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
 
-from space_station_thermal_control.msg import ThermalNodeDataArray, ThermalLinkFlowsArray
-from space_station_thermal_control.action import Coolant
+from space_station_interfaces.msg import ThermalNodeDataArray, ThermalLinkFlowsArray
+from space_station_interfaces.action import Coolant
 
 
 class ThermalWidget(QWidget):
