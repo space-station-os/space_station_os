@@ -29,22 +29,46 @@ OGSSystem::OGSSystem(const rclcpp::NodeOptions & options)
   this->declare_parameter("max_o2_capacity", 10000.0);
   max_o2_capacity_ = this->get_parameter("max_o2_capacity").as_double();
 
+  RCLCPP_INFO(this->get_logger(), "Switching on OGS — requesting power from DDCU...");
+  load_client_ = this->create_client<space_station_interfaces::srv::Load>("/ddcu/load_request");
+
+  powered_ = false;
+  RCLCPP_INFO(this->get_logger(), "Waiting for EPS power...");
+
+  // Retry every 2s until supply_load() returns true
+  power_retry_timer_ = this->create_wall_timer(2s, [this]() {
+    if (!powered_) {
+      if (supply_load()) {
+        powered_ = true;
+        RCLCPP_INFO(this->get_logger(), "OGS powered successfully — initializing systems.");
+        initialize_systems();
+        power_retry_timer_->cancel();
+      } else {
+        RCLCPP_WARN(this->get_logger(), "Still waiting for DDCU power...");
+      }
+    }
+  });
+  
+}
+
+void OGSSystem::initialize_systems()
+{
   // Setup clients, servers, publishers
-  action_server_ = rclcpp_action::create_server<space_station_eclss::action::OxygenGeneration>(
+  action_server_ = rclcpp_action::create_server<space_station_interfaces::action::OxygenGeneration>(
     this,
     "oxygen_generation",
     std::bind(&OGSSystem::handle_goal, this, std::placeholders::_1, std::placeholders::_2),
     std::bind(&OGSSystem::handle_cancel, this, std::placeholders::_1),
     std::bind(&OGSSystem::execute_goal, this, std::placeholders::_1));
 
-  water_client_ = this->create_client<space_station_eclss::srv::RequestProductWater>("/wrs/product_water_request");
-  co2_client_ = this->create_client<space_station_eclss::srv::Co2Request>("/ars/request_co2");
+  water_client_ = this->create_client<space_station_interfaces::srv::RequestProductWater>("/wrs/product_water_request");
+  co2_client_ = this->create_client<space_station_interfaces::srv::Co2Request>("/ars/request_co2");
 
-  o2_server_ = this->create_service<space_station_eclss::srv::O2Request>(
+  o2_server_ = this->create_service<space_station_interfaces::srv::O2Request>(
     "/ogs/request_o2",
     std::bind(&OGSSystem::o2_service_callback, this, std::placeholders::_1, std::placeholders::_2));
 
-  gray_water_client_ = this->create_client<space_station_eclss::srv::GreyWater>("/grey_water");
+  gray_water_client_ = this->create_client<space_station_interfaces::srv::GreyWater>("/grey_water");
 
   o2_pub_ = this->create_publisher<std_msgs::msg::Float64>("/o2_storage", 10);
   ch4_pub_ = this->create_publisher<std_msgs::msg::Float64>("/methane_vented", 10);
@@ -76,16 +100,43 @@ OGSSystem::OGSSystem(const rclcpp::NodeOptions & options)
 }
 
 
+
+bool OGSSystem::supply_load()
+{
+  if (!load_client_->wait_for_service(1s)) {
+    RCLCPP_WARN(this->get_logger(), "DDCU load service not available yet.");
+    return false;
+  }
+
+  auto request = std::make_shared<space_station_interfaces::srv::Load::Request>();
+  request->load_voltage = 124.5;
+
+  load_client_->async_send_request(request,
+    [this](rclcpp::Client<space_station_interfaces::srv::Load>::SharedFuture future_resp) {
+      auto response = future_resp.get();
+      if (response->success) {
+        RCLCPP_INFO(this->get_logger(), "Power granted: %s", response->message.c_str());
+        powered_ = true;   // initialization done by timer on next tick
+      } else {
+        RCLCPP_ERROR(this->get_logger(), "DDCU rejected load: %s", response->message.c_str());
+        powered_ = false;
+      }
+    });
+
+  return true;  // request sent
+}
+
+
 rclcpp_action::GoalResponse OGSSystem::handle_goal(
   const rclcpp_action::GoalUUID &,
-  std::shared_ptr<const space_station_eclss::action::OxygenGeneration::Goal> goal)
+  std::shared_ptr<const space_station_interfaces::action::OxygenGeneration::Goal> goal)
 {
   RCLCPP_INFO(this->get_logger(), "Received oxygen generation goal.");
   return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
 
 rclcpp_action::CancelResponse OGSSystem::handle_cancel(
-  const std::shared_ptr<rclcpp_action::ServerGoalHandle<space_station_eclss::action::OxygenGeneration>>)
+  const std::shared_ptr<rclcpp_action::ServerGoalHandle<space_station_interfaces::action::OxygenGeneration>>)
 {
   return rclcpp_action::CancelResponse::REJECT;
 }
@@ -187,7 +238,7 @@ void OGSSystem::execute_goal(const std::shared_ptr<GoalHandleOGS> goal_handle)
 
 void OGSSystem::request_product_water(double amount_liters)
 {
-  auto request = std::make_shared<space_station_eclss::srv::RequestProductWater::Request>();
+  auto request = std::make_shared<space_station_interfaces::srv::RequestProductWater::Request>();
   request->amount = amount_liters;
 
   if (!water_client_->wait_for_service(std::chrono::seconds(2))) {
@@ -197,7 +248,7 @@ void OGSSystem::request_product_water(double amount_liters)
 
   auto future = water_client_->async_send_request(
     request,
-    [this](rclcpp::Client<space_station_eclss::srv::RequestProductWater>::SharedFuture future_result) {
+    [this](rclcpp::Client<space_station_interfaces::srv::RequestProductWater>::SharedFuture future_result) {
       auto res = future_result.get();
       if (res->success) {
         RCLCPP_INFO(this->get_logger(), "Water granted: %.2f L", res->water_granted);
@@ -210,7 +261,7 @@ void OGSSystem::request_product_water(double amount_liters)
 
 void OGSSystem::request_co2(double co2_mass_kg)
 {
-  auto request = std::make_shared<space_station_eclss::srv::Co2Request::Request>();
+  auto request = std::make_shared<space_station_interfaces::srv::Co2Request::Request>();
   request->co2_req = co2_mass_kg;
 
   if (!co2_client_->wait_for_service(std::chrono::seconds(2))) {
@@ -220,7 +271,7 @@ void OGSSystem::request_co2(double co2_mass_kg)
 
   auto future = co2_client_->async_send_request(
     request,
-    [this](rclcpp::Client<space_station_eclss::srv::Co2Request>::SharedFuture future_result) {
+    [this](rclcpp::Client<space_station_interfaces::srv::Co2Request>::SharedFuture future_result) {
       auto res = future_result.get();
       if (res->success) {
         RCLCPP_INFO(this->get_logger(), "CO₂ granted: %.2f g", res->co2_resp);
@@ -233,7 +284,7 @@ void OGSSystem::request_co2(double co2_mass_kg)
 
 void OGSSystem::send_gray_water(double amount_liters)
 {
-  auto request = std::make_shared<space_station_eclss::srv::GreyWater::Request>();
+  auto request = std::make_shared<space_station_interfaces::srv::GreyWater::Request>();
   request->gray_water_liters = amount_liters;
 
   if (!gray_water_client_->wait_for_service(std::chrono::seconds(2))) {
@@ -243,7 +294,7 @@ void OGSSystem::send_gray_water(double amount_liters)
 
   auto future = gray_water_client_->async_send_request(
     request,
-    [this](rclcpp::Client<space_station_eclss::srv::GreyWater>::SharedFuture future_result) {
+    [this](rclcpp::Client<space_station_interfaces::srv::GreyWater>::SharedFuture future_result) {
       auto res = future_result.get();
       if (res->success) {
         RCLCPP_INFO(this->get_logger(), "Gray water sent successfully: %s", res->message.c_str());
@@ -256,8 +307,8 @@ void OGSSystem::send_gray_water(double amount_liters)
 
 
 void OGSSystem::o2_service_callback(
-  const std::shared_ptr<space_station_eclss::srv::O2Request::Request> request,
-  std::shared_ptr<space_station_eclss::srv::O2Request::Response> response)
+  const std::shared_ptr<space_station_interfaces::srv::O2Request::Request> request,
+  std::shared_ptr<space_station_interfaces::srv::O2Request::Response> response)
 {
   double amount = request->o2_req;
   if (latest_o2_ >= amount) {

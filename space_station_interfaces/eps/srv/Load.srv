@@ -1,0 +1,4 @@
+float64 load_voltage
+---
+bool success
+string message

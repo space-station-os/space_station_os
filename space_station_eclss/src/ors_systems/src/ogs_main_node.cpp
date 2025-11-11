@@ -3,7 +3,7 @@
 
 int main(int argc,char **argv){
   rclcpp::init(argc, argv);
-  rclcpp::executors::SingleThreadedExecutor executor;
+  rclcpp::executors::MultiThreadedExecutor executor;
   auto node = std::make_shared<space_station_eclss::OGSSystem>();
   executor.add_node(node);
   executor.spin();

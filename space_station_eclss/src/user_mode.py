@@ -13,8 +13,8 @@ from rclpy.parameter import Parameter
 import random
 from rclpy.action import ActionClient
 from std_msgs.msg import Float64
-from space_station_eclss.action import AirRevitalisation, WaterRecovery
-from space_station_eclss.srv import O2Request, RequestProductWater
+from space_station_interfaces.action import AirRevitalisation, WaterRecovery
+from space_station_interfaces.srv import O2Request, RequestProductWater
 
 
 class UserSimGui(QWidget):

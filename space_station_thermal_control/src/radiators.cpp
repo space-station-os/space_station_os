@@ -9,7 +9,7 @@ namespace space_station_thermal_control
 RadiatorController::RadiatorController()
 : Node("radiator_controller")
 {
-  vent_service_ = this->create_service<space_station_thermal_control::srv::VentHeat>(
+  vent_service_ = this->create_service<space_station_interfaces::srv::VentHeat>(
     "/tcs/radiator_a/vent_heat",
     std::bind(&RadiatorController::handle_vent_request, this, _1, _2));
 
@@ -20,8 +20,8 @@ RadiatorController::RadiatorController()
 }
 
 void RadiatorController::handle_vent_request(
-  const std::shared_ptr<space_station_thermal_control::srv::VentHeat::Request> request,
-  std::shared_ptr<space_station_thermal_control::srv::VentHeat::Response> response)
+  const std::shared_ptr<space_station_interfaces::srv::VentHeat::Request> request,
+  std::shared_ptr<space_station_interfaces::srv::VentHeat::Response> response)
 {
   double heat = request->excess_heat;
   RCLCPP_INFO(this->get_logger(), "[VENT] Received %.2f kJ to vent", heat);

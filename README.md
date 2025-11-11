@@ -94,6 +94,18 @@ source install/setup.bash
 ---
 # TO RUN THE DEMOS
 
+To quickly run the entire space station 
+
+```bash
+ros2 launch space_station space_station.launch.py"
+```
+
+To run OpenMCT (open http://localhost:9097)
+
+```bash
+./open_mct-bridge.sh
+```
+
 ([Check out our wiki](https://github.com/space-station-os/space_station_os/wiki))
 ##  Contributing
 

@@ -1,0 +1,17 @@
+# Goal
+float32 urine_volume             # in liters
+
+---
+# Result
+bool success
+float32 total_purified_water    # in liters
+int32 total_cycles
+string summary_message
+
+---
+# Feedback
+int32 time_step
+float32 current_tank_level
+float32 current_purification_efficiency
+bool failure_detected
+string unit_name

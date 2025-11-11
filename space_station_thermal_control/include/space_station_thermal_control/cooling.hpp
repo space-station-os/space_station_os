@@ -7,10 +7,10 @@
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
 #include <sensor_msgs/msg/temperature.hpp>
 #include <std_srvs/srv/trigger.hpp>
-#include <space_station_eclss/srv/request_product_water.hpp>
-#include <space_station_thermal_control/action/coolant.hpp>
-#include <space_station_thermal_control/srv/vent_heat.hpp>
-#include <space_station_thermal_control/msg/external_loop_status.hpp>
+#include <space_station_interfaces/srv/request_product_water.hpp>
+#include <space_station_interfaces/action/coolant.hpp>
+#include <space_station_interfaces/srv/vent_heat.hpp>
+#include <space_station_interfaces/msg/external_loop_status.hpp>
 #include "ament_index_cpp/get_package_share_directory.hpp"
 #include <behaviortree_cpp_v3/bt_factory.h>
 #include <behaviortree_cpp_v3/blackboard.h>
@@ -22,7 +22,7 @@ namespace space_station_thermal_control
 class CoolantActionServer : public rclcpp::Node
 {
 public:
-  using Coolant = space_station_thermal_control::action::Coolant;
+  using Coolant = space_station_interfaces::action::Coolant;
   using GoalHandle = rclcpp_action::ServerGoalHandle<Coolant>;
 
   explicit CoolantActionServer(const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
@@ -43,13 +43,13 @@ private:
 
   // Publishers
   rclcpp::Publisher<sensor_msgs::msg::Temperature>::SharedPtr internal_loop_pub_;
-  rclcpp::Publisher<space_station_thermal_control::msg::ExternalLoopStatus>::SharedPtr external_loop_pub_;
+  rclcpp::Publisher<space_station_interfaces::msg::ExternalLoopStatus>::SharedPtr external_loop_pub_;
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticStatus>::SharedPtr diag_pub_;
 
   // Clients
-  rclcpp::Client<space_station_eclss::srv::RequestProductWater>::SharedPtr product_water_client_;
+  rclcpp::Client<space_station_interfaces::srv::RequestProductWater>::SharedPtr product_water_client_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr grey_water_client_;
-  rclcpp::Client<space_station_thermal_control::srv::VentHeat>::SharedPtr radiator_client_;
+  rclcpp::Client<space_station_interfaces::srv::VentHeat>::SharedPtr radiator_client_;
 
   // Timer for BT tick
   rclcpp::TimerBase::SharedPtr timer_;
@@ -89,8 +89,8 @@ private:
   double vent_threshold_{250.0};
 
   // BT-specific clients reused from ROS interfaces
-  rclcpp::Client<space_station_thermal_control::srv::VentHeat>::SharedPtr vent_client_;
-  rclcpp::Client<space_station_eclss::srv::RequestProductWater>::SharedPtr wrs_client_;
+  rclcpp::Client<space_station_interfaces::srv::VentHeat>::SharedPtr vent_client_;
+  rclcpp::Client<space_station_interfaces::srv::RequestProductWater>::SharedPtr wrs_client_;
 };
 
 } // namespace space_station_thermal_control

@@ -8,11 +8,11 @@ using namespace space_station_thermal_control;
 FocusNodeMonitor::FocusNodeMonitor()
 : rclcpp::Node("focus_node_monitor")
 {
-  node_sub_ = this->create_subscription<space_station_thermal_control::msg::ThermalNodeDataArray>(
+  node_sub_ = this->create_subscription<space_station_interfaces::msg::ThermalNodeDataArray>(
     "/thermal/nodes/state", 10,
     std::bind(&FocusNodeMonitor::thermal_node_callback, this, _1));
 
-  service_ = this->create_service<space_station_thermal_control::srv::GetSubTopic>(
+  service_ = this->create_service<space_station_interfaces::srv::GetSubTopic>(
     "/thermal/focus_node",
     std::bind(&FocusNodeMonitor::handle_focus_request, this, _1, _2));
 
@@ -20,7 +20,7 @@ FocusNodeMonitor::FocusNodeMonitor()
 }
 
 void FocusNodeMonitor::thermal_node_callback(
-  const space_station_thermal_control::msg::ThermalNodeDataArray::SharedPtr msg)
+  const space_station_interfaces::msg::ThermalNodeDataArray::SharedPtr msg)
 {
   latest_nodes_.clear();
   for (const auto &node : msg->nodes) {
@@ -37,8 +37,8 @@ void FocusNodeMonitor::thermal_node_callback(
 }
 
 void FocusNodeMonitor::handle_focus_request(
-  const std::shared_ptr<space_station_thermal_control::srv::GetSubTopic::Request> request,
-  std::shared_ptr<space_station_thermal_control::srv::GetSubTopic::Response> response)
+  const std::shared_ptr<space_station_interfaces::srv::GetSubTopic::Request> request,
+  std::shared_ptr<space_station_interfaces::srv::GetSubTopic::Response> response)
 {
   const std::string &name = request->name;
   auto it = latest_nodes_.find(name);
@@ -51,7 +51,7 @@ void FocusNodeMonitor::handle_focus_request(
 
   if (focused_publishers_.find(name) == focused_publishers_.end()) {
     std::string topic = "/thermal/nodes/" + name;
-    focused_publishers_[name] = this->create_publisher<space_station_thermal_control::msg::ThermalNodeData>(topic, 10);
+    focused_publishers_[name] = this->create_publisher<space_station_interfaces::msg::ThermalNodeData>(topic, 10);
     RCLCPP_INFO(this->get_logger(), "Created topic: %s", topic.c_str());
   }
 

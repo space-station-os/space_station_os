@@ -51,6 +51,54 @@ WRSActionServer::WRSActionServer(const rclcpp::NodeOptions & options)
   filter_max_temperature_     = this->get_parameter("filter_max_temperature").as_double();
   catalytic_max_temperature_  = this->get_parameter("catalytic_max_temperature").as_double();
 
+  RCLCPP_INFO(this->get_logger(), "Switching on WRS — requesting power from DDCU...");
+  load_client_ = this->create_client<space_station_interfaces::srv::Load>("/ddcu/load_request");
+
+  powered_ = false;
+  RCLCPP_INFO(this->get_logger(), "Waiting for EPS power...");
+
+  // Retry every 2s until supply_load() returns true
+  power_retry_timer_ = this->create_wall_timer(2s, [this]() {
+    if (!powered_) {
+      if (supply_load()) {
+        powered_ = true;
+        RCLCPP_INFO(this->get_logger(), "WRS powered successfully — initializing systems.");
+        initialize_systems();
+        power_retry_timer_->cancel();
+      } else {
+        RCLCPP_WARN(this->get_logger(), "Still waiting for DDCU power...");
+      }
+    }
+  });
+  
+}
+
+bool WRSActionServer::supply_load(){
+  if (!load_client_->wait_for_service(1s)) {
+    RCLCPP_WARN(this->get_logger(), "DDCU load service not available yet.");
+    return false;
+  }
+
+  auto request = std::make_shared<space_station_interfaces::srv::Load::Request>();
+  request->load_voltage = 124.5;
+
+  load_client_->async_send_request(request,
+    [this](rclcpp::Client<space_station_interfaces::srv::Load>::SharedFuture future_resp) {
+      auto response = future_resp.get();
+      if (response->success) {
+        RCLCPP_INFO(this->get_logger(), "Power granted: %s", response->message.c_str());
+        powered_ = true;   // initialization done by timer on next tick
+      } else {
+        RCLCPP_ERROR(this->get_logger(), "DDCU rejected load: %s", response->message.c_str());
+        powered_ = false;
+      }
+    });
+
+  return true;  // request sent
+}
+
+void WRSActionServer::initialize_systems(){
+
   action_server_ = rclcpp_action::create_server<WRS>(
     this,
     "water_recovery_systems",
@@ -59,14 +107,14 @@ WRSActionServer::WRSActionServer(const rclcpp::NodeOptions & options)
     std::bind(&WRSActionServer::handle_accepted, this, std::placeholders::_1)
   );
 
-  ogs_client_ = rclcpp_action::create_client<space_station_eclss::action::OxygenGeneration>(this, "oxygen_generation");
+  ogs_client_ = rclcpp_action::create_client<space_station_interfaces::action::OxygenGeneration>(this, "oxygen_generation");
 
-  water_request_server_ = this->create_service<space_station_eclss::srv::RequestProductWater>(
+  water_request_server_ = this->create_service<space_station_interfaces::srv::RequestProductWater>(
     "wrs/product_water_request",
     std::bind(&WRSActionServer::handle_product_water_request, this, std::placeholders::_1, std::placeholders::_2)
   );
 
-  gray_water_service_ = this->create_service<space_station_eclss::srv::GreyWater>(
+  gray_water_service_ = this->create_service<space_station_interfaces::srv::GreyWater>(
     "/grey_water",
     std::bind(&WRSActionServer::handle_gray_water_request, this, std::placeholders::_1, std::placeholders::_2)
   );
@@ -85,8 +133,8 @@ WRSActionServer::WRSActionServer(const rclcpp::NodeOptions & options)
   );
 
   RCLCPP_INFO(this->get_logger(), "WRS Action Server initialized");
-}
 
+}
 rclcpp_action::GoalResponse WRSActionServer::handle_goal(
   const rclcpp_action::GoalUUID &,
   std::shared_ptr<const WRS::Goal> goal)
@@ -242,10 +290,10 @@ void WRSActionServer::send_water_to_ogs(float volume, float iodine_ppm)
     return;
   }
 
-  space_station_eclss::action::OxygenGeneration::Goal goal;
+  space_station_interfaces::action::OxygenGeneration::Goal goal;
   goal.input_water_mass = volume;
 
-  auto send_goal_options = rclcpp_action::Client<space_station_eclss::action::OxygenGeneration>::SendGoalOptions();
+  auto send_goal_options = rclcpp_action::Client<space_station_interfaces::action::OxygenGeneration>::SendGoalOptions();
   send_goal_options.result_callback = [this](const GoalHandleOGS::WrappedResult & result) {
     if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
       RCLCPP_INFO(this->get_logger(), "OGS processed water successfully.");
@@ -273,8 +321,8 @@ void WRSActionServer::fail_goal(
 }
 
 void WRSActionServer::handle_product_water_request(
-  const std::shared_ptr<space_station_eclss::srv::RequestProductWater::Request> request,
-  std::shared_ptr<space_station_eclss::srv::RequestProductWater::Response> response)
+  const std::shared_ptr<space_station_interfaces::srv::RequestProductWater::Request> request,
+  std::shared_ptr<space_station_interfaces::srv::RequestProductWater::Response> response)
 {
   if (request->amount <= product_water_reserve_) {
     product_water_reserve_ -= request->amount;
@@ -294,8 +342,8 @@ void WRSActionServer::handle_product_water_request(
 }
 
 void WRSActionServer::handle_gray_water_request(
-  const std::shared_ptr<space_station_eclss::srv::GreyWater::Request> request,
-  std::shared_ptr<space_station_eclss::srv::GreyWater::Response> response)
+  const std::shared_ptr<space_station_interfaces::srv::GreyWater::Request> request,
+  std::shared_ptr<space_station_interfaces::srv::GreyWater::Response> response)
 {
   float volume = request->gray_water_liters;
   if (volume <= 0.0f) {

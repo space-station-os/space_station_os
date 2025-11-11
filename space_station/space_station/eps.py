@@ -16,7 +16,7 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float64, String
 from sensor_msgs.msg import BatteryState
-from space_station_eps.msg import BCDUStatus   
+from space_station_interfaces.msg import BCDUStatus   
 
 
 class EPSWidget(QWidget):
