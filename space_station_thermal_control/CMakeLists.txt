@@ -10,7 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
-
+find_package(rclcpp_action REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(space_station_eclss REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
@@ -25,9 +25,8 @@ find_package(yaml-cpp REQUIRED)
 set(msg_files
 
   "msg/TankStatus.msg"
-  "srv/CoolantFlow.srv"
-  "srv/InternalLoop.srv"
-  "msg/InternalLoopStatus.msg"
+
+
   "msg/ExternalLoopStatus.msg"
   "srv/VentHeat.srv"
   "msg/ThermalLinkFlows.msg"
@@ -35,8 +34,10 @@ set(msg_files
   "msg/ThermalNodeData.msg"
   "msg/ThermalNodeDataArray.msg"
   "srv/GetSubTopic.srv"
-  "srv/NodeHeatFlow.srv"
+ 
   "msg/SolarPanelsQ.msg"
+
+  "action/Coolant.action"
 
 )
 
@@ -47,13 +48,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 
 ament_export_dependencies(rosidl_default_runtime)
 
-add_executable(coolant src/coolant.cpp)
-ament_target_dependencies(coolant rosidl_default_generators rclcpp  std_srvs space_station_eclss rclcpp_action diagnostic_msgs)
-rosidl_target_interfaces(coolant ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
-add_executable(external_loop src/external_loop.cpp)
-ament_target_dependencies(external_loop rosidl_default_generators rclcpp sensor_msgs space_station_eclss diagnostic_msgs)
-rosidl_target_interfaces(external_loop ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 add_executable(radiator src/radiators.cpp)
 ament_target_dependencies(radiator rosidl_default_generators rclcpp sensor_msgs space_station_eclss)
@@ -61,10 +56,11 @@ rosidl_target_interfaces(radiator ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 
 add_executable(thermal_nodes src/thermals_solver.cpp)
+ament_target_dependencies(thermal_nodes rosidl_default_generators rclcpp rclcpp_action ament_index_cpp sensor_msgs space_station_eclss diagnostic_msgs yaml-cpp )
 
-ament_target_dependencies(thermal_nodes rosidl_default_generators rclcpp ament_index_cpp sensor_msgs space_station_eclss diagnostic_msgs yaml-cpp )
-
-ament_target_dependencies(thermal_nodes rosidl_default_generators rclcpp sensor_msgs space_station_eclss diagnostic_msgs yaml-cpp )
+add_executable(cooling_server src/cooling.cpp)
+ament_target_dependencies(cooling_server rosidl_default_generators rclcpp rclcpp_action std_srvs sensor_msgs space_station_eclss diagnostic_msgs)
+rosidl_target_interfaces(cooling_server ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 rosidl_target_interfaces(thermal_nodes ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(thermal_nodes
@@ -90,8 +86,9 @@ include_directories(include)
 
 
 install(TARGETS
-  coolant
-  external_loop
+  
+  cooling_server
+
   radiator
   thermal_nodes
   demand

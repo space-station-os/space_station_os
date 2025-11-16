@@ -20,7 +20,7 @@ from PyQt5.QtGui import QFont, QPen, QBrush, QColor, QTransform, QPainter
 import rclpy
 from rclpy.node import Node
 from space_station_thermal_control.msg import (
-    ThermalNodeDataArray, ThermalLinkFlowsArray, TankStatus, InternalLoopStatus
+    ThermalNodeDataArray, ThermalLinkFlowsArray, TankStatus,
 )
 
 class ZoomableGraphicsView(QGraphicsView):
@@ -54,6 +54,7 @@ class ThermalNodeItem(QGraphicsEllipseItem):
     SIZE_SCALE = 0.04
     DEFAULT_FONT_SIZE = 7
     MIN_TEMP = 0.0
+    MAX_TEMP = 80.0
     TEMP_RANGE = 40.0
 
     def __init__(self, name, temperature, heat_capacity, internal_power, x=0, y=0, hover_callback=None):
@@ -69,7 +70,7 @@ class ThermalNodeItem(QGraphicsEllipseItem):
         self.setRect(-size / 2, -size / 2, size, size)
         self.setPos(x, y)
 
-        self._apply_color()
+        
         self.setPen(QPen(Qt.black, 2))
         self.setFlag(QGraphicsItem.ItemIsMovable)
         self.setFlag(QGraphicsItem.ItemIsSelectable)
@@ -98,13 +99,23 @@ class ThermalNodeItem(QGraphicsEllipseItem):
             f"Power: {self.internal_power:.1f} W"
         )
 
+    def set_temp_range(self, min_temp, max_temp, cold_color, hot_color):
+        self.MIN_TEMP = min_temp
+        self.MAX_TEMP = max_temp
+        self.cold_color = cold_color
+        self.hot_color = hot_color
+
     def _apply_color(self):
-        """Set node color based on temperature."""
-        temp_ratio = max(0.0, min(1.0, (self.temperature - self.MIN_TEMP) / self.TEMP_RANGE))
-        red = int(255 * temp_ratio)
-        blue = int(255 * (1.0 - temp_ratio))
-        color = QColor(red, 0, blue)
-        self.setBrush(QBrush(color))
+        ratio = 0.0
+        if self.MAX_TEMP > self.MIN_TEMP:
+            ratio = (self.temperature - self.MIN_TEMP) / (self.MAX_TEMP - self.MIN_TEMP)
+            ratio = max(0.0, min(1.0, ratio))
+
+        r = int(self.cold_color.red()   + ratio * (self.hot_color.red()   - self.cold_color.red()))
+        g = int(self.cold_color.green() + ratio * (self.hot_color.green() - self.cold_color.green()))
+        b = int(self.cold_color.blue()  + ratio * (self.hot_color.blue()  - self.cold_color.blue()))
+
+        self.setBrush(QBrush(QColor(r, g, b)))
 
     def update_data(self, temperature, heat_capacity, internal_power):
         """Update node data and appearance."""
@@ -254,18 +265,42 @@ class ThermalVisualizationNode(Node):
             self.tank_callback,
             10
         )
-        self.loop_sub = self.create_subscription(
-            InternalLoopStatus,
-            '/tcs/internal_loop_heat',
-            self.loop_callback,
-            10
-        )
+        
+        self.declare_parameter("min_temp", 270.0)
+        self.declare_parameter("max_temp", 330.0)
+        self.declare_parameter("cold_color", "blue")
+        self.declare_parameter("hot_color", "red")
+
+        self.min_temp = self.get_parameter("min_temp").value
+        self.max_temp = self.get_parameter("max_temp").value
+        self.cold_color = QColor(self.get_parameter("cold_color").value)
+        self.hot_color = QColor(self.get_parameter("hot_color").value)
+        self.add_on_set_parameters_callback(self._on_param_update)
+        
+        
         self.thermal_nodes = {}
         self.thermal_links = []
         self.tank_status = None
         self.loop_status = None
         self.node_data_received = False
         self.link_data_received = False
+
+    def _on_param_update(self, params):
+        for p in params:
+            if p.name == "min_temp":
+                self.min_temp = p.value
+            elif p.name == "max_temp":
+                self.max_temp = p.value
+            elif p.name == "cold_color":
+                self.cold_color = QColor(p.value)
+            elif p.name == "hot_color":
+                self.hot_color = QColor(p.value)
+        # force refresh of node colors
+        for item in self.node_items.values():
+            item.set_temp_range(self.min_temp, self.max_temp,
+                                self.cold_color, self.hot_color)
+            item._apply_color()
+        return rclpy.parameter.SetParametersResult(successful=True)
 
     def node_callback(self, msg):
         """Callback for thermal node data."""
@@ -301,12 +336,7 @@ class ThermalVisualizationNode(Node):
             'heater_on': msg.tank_heater_on
         }
 
-    def loop_callback(self, msg):
-        """Callback for internal loop status."""
-        self.loop_status = {
-            'loop_a_temp': msg.loop_a.temperature,
-            'loop_b_temp': msg.loop_b.temperature
-        }
+    
 
 class ThermalVisualizationGUI(QWidget):
     """
@@ -334,7 +364,7 @@ class ThermalVisualizationGUI(QWidget):
         self.selected_type = None
         self.selected_item = None
         self.init_ui()
-
+        
     def init_ui(self):
         """Initialize the user interface and details panel."""
         layout = QHBoxLayout()
@@ -430,6 +460,7 @@ class ThermalVisualizationGUI(QWidget):
         self.setLayout(layout)
         self.scene.setSceneRect(-600, -400, 1200, 800)
 
+        
     def update_display(self):
         """Update the display with latest thermal data."""
         if self.node.node_data_received:
@@ -481,6 +512,10 @@ class ThermalVisualizationGUI(QWidget):
                     x, y,
                     hover_callback=self._on_item_hover
                 )
+                item.set_temp_range(self.node.min_temp, self.node.max_temp,
+                    self.node.cold_color, self.node.hot_color)
+                item._apply_color()
+
                 self.node_items[name] = item
                 self.scene.addItem(item)
             else:
