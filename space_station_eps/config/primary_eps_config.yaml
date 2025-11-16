@@ -1,0 +1,47 @@
+/**:
+  ros__parameters:
+    num_channels: 12
+    battery_config: "config/battery_id.yaml"
+
+bcdu_node:
+  ros__parameters:
+    max_discharge_current_A: 127.0
+    max_charge_current_A: 65.0
+
+    regulation_min_V: 130.0
+    regulation_max_V: 180.0
+    regulation_voltage: 150.0
+
+    ssu_charge_enter_v: 160.0
+    ssu_discharge_enter_v: 152.0
+    ssu_nominal_v: 160.0
+
+    num_channels: 12
+    orus_per_channel: 2
+
+/mock_solar_controller:
+  ros__parameters:
+    orbit_period_s: 5400.0          # 90 minutes in seconds
+    eclipse_duration_s: 2100.0      # 35 minutes in seconds
+    ramp_window_s: 480.0            # 8 minutes in seconds
+
+    p_max_kw: 84.0
+    derate_with_beta_cosine: true
+
+    temp_ambient_c: 20.0
+    temp_per_kw_c: 0.4
+    temp_time_constant_s: 20.0
+
+    beta_max_deg: 75.0
+    beta_lock_limit_deg: 72.0
+    beta_precession_orbits: 10
+
+    ssu_v_setpoint_v: 160.0
+    ssu_v_ripple_v: 0.6
+    ssu_efficiency: 0.985
+
+ddcu_node:
+  ros__parameters:
+    ddcu_type: "DDCU-I"
+    regulation_nominal: 124.5
+    regulation_tolerance: 1.5
