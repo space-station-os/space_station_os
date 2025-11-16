@@ -1,0 +1,17 @@
+# Per-thruster physical properties (limits / performance).
+# Keys MUST match URDF child link names.
+thrusters:
+  thruster_xp1: { max_force: 100.0, isp: 60.0, efficiency: 0.90 }
+  thruster_xp2: { max_force: 100.0, isp: 60.0, efficiency: 0.90 }
+  thruster_xn1: { max_force: 100.0, isp: 60.0, efficiency: 0.90 }
+  thruster_xn2: { max_force: 100.0, isp: 60.0, efficiency: 0.90 }
+
+  thruster_yp1: { max_force: 100.0, isp: 60.0, efficiency: 0.90 }
+  thruster_yp2: { max_force: 100.0, isp: 60.0, efficiency: 0.90 }
+  thruster_yn1: { max_force: 100.0, isp: 60.0, efficiency: 0.90 }
+  thruster_yn2: { max_force: 100.0, isp: 60.0, efficiency: 0.90 }
+
+  thruster_zp1: { max_force: 100.0, isp: 60.0, efficiency: 0.90 }
+  thruster_zp2: { max_force: 100.0, isp: 60.0, efficiency: 0.90 }
+  thruster_zn1: { max_force: 100.0, isp: 60.0, efficiency: 0.90 }
+  thruster_zn2: { max_force: 100.0, isp: 60.0, efficiency: 0.90 }

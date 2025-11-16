@@ -1,0 +1,9 @@
+orbit_dynamics_node:
+  ros__parameters:
+      timing:
+        dynamics_dt: 10.0
+        publish_dt: 1.0
+      dynamics:
+        use_rk4: true
+      initial:
+        tle_line2: "2 25544  51.6452 334.5328 0004408 351.0413  99.6998 15.49890618333972"

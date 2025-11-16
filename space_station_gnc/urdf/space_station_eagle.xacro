@@ -1,0 +1,119 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="space_station">
+
+  <!-- Root body (visual/collision/inertial as before) -->
+  <link name="Root">
+    <visual>
+      <!-- Rotate the visual by yaw=pi for your mesh convention -->
+      <origin xyz="0 0 0" rpy="0 0 3.141592653589793"/>
+      <geometry>
+        <mesh filename="package://space_station_gnc/urdf/meshes/SD_SpaceStation_Ver05.dae" scale="100 100 100"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://space_station_gnc/urdf/meshes/SD_SpaceStation_Ver05.dae" scale="100 100 100"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="1.0"/>
+      <origin xyz="0 0 0"/>
+      <inertia ixx="1.0" iyy="1.0" izz="1.0" ixy="0.0" ixz="0.0" iyz="0.0"/>
+    </inertial>
+  </link>
+
+  <!--
+    Convention:
+      - The child link +X is the nozzle axis (points out of the nozzle).
+      - The physical thrust direction is the opposite of the nozzle axis.
+      - We DO NOT use <axis> on fixed joints. The orientation is fully defined by <origin rpy>.
+      - Users specify an axis (ax ay az). By default it is interpreted as a THRUST direction.
+        We convert to nozzle axis = -axis before computing rpy.
+  -->
+
+  <!-- Low-level macro: create a thruster link and a fixed joint with a given rpy -->
+  <xacro:macro name="add_thruster" params="name parent xyz rpy">
+    <link name="${name}">
+      <inertial>
+        <mass value="0.01"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <inertia ixx="1e-6" iyy="1e-6" izz="1e-6" ixy="0" ixz="0" iyz="0"/>
+      </inertial>
+    </link>
+    <joint name="${name}_joint" type="fixed">
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+      <parent link="${parent}"/>
+      <child link="${name}"/>
+    </joint>
+  </xacro:macro>
+
+  <!-- High-level macro: axis=(ax ay az) => child+X aligned to the nozzle axis.
+       axis_is_thrust=true (default): we treat (ax ay az) as THRUST direction and flip it to NOZZLE axis = -axis.
+       If axis_is_thrust=false, we accept the vector as a nozzle axis directly. -->
+  <xacro:macro name="add_thruster_axis" params="name parent xyz ax ay az axis_is_thrust:=true">
+    <!-- Normalize input vector safely -->
+    <xacro:property name="eps"  value="1e-12"/>
+    <xacro:property name="norm" value="${max(sqrt(ax*ax + ay*ay + az*az), eps)}"/>
+
+    <!-- Decide nozzle axis -->
+    <xacro:if value="${axis_is_thrust}">
+      <!-- thrust axis given -> nozzle axis = -thrust -->
+      <xacro:property name="nx" value="${-ax / norm}"/>
+      <xacro:property name="ny" value="${-ay / norm}"/>
+      <xacro:property name="nz" value="${-az / norm}"/>
+    </xacro:if>
+    <xacro:unless value="${axis_is_thrust}">
+      <!-- nozzle axis given directly -->
+      <xacro:property name="nx" value="${ ax / norm}"/>
+      <xacro:property name="ny" value="${ ay / norm}"/>
+      <xacro:property name="nz" value="${ az / norm}"/>
+    </xacro:unless>
+
+    <!-- Compute Z-Y Euler to align child+X with (nx,ny,nz):
+         yaw = atan2(ny, nx)
+         pitch = atan2(-nz, sqrt(nx^2 + ny^2))
+         roll = 0 -->
+    <xacro:property name="hyp"   value="${max(sqrt(nx*nx + ny*ny), eps)}"/>
+    <xacro:property name="yaw"   value="${atan2(ny, nx)}"/>
+    <xacro:property name="pitch" value="${atan2(-nz, hyp)}"/>
+    <xacro:property name="roll"  value="0.0"/>
+
+    <xacro:add_thruster name="${name}" parent="${parent}" xyz="${xyz}" rpy="${roll} ${pitch} ${yaw}"/>
+  </xacro:macro>
+
+  <!-- Layout parameters (meters) -->
+  <xacro:property name="Xx" value="40.0"/>
+  <xacro:property name="Xy" value="15.0"/>
+  <xacro:property name="Yy" value="20.0"/>
+  <xacro:property name="Yz" value="10.0"/>
+  <xacro:property name="Zx" value="20.0"/>
+  <xacro:property name="Zz" value="10.0"/>
+
+  <!-- 12 thrusters; names must match YAML/URDF usage -->
+  <!-- Example definitions using THRUST directions for clarity -->
+
+  <!-- +X thrust -->
+  <xacro:add_thruster_axis name="thruster_xp1" parent="Root" xyz="${Xx} -${Xy} 0" ax="1" ay="0" az="0" axis_is_thrust="true"/>
+  <xacro:add_thruster_axis name="thruster_xp2" parent="Root" xyz="${Xx}  ${Xy} 0" ax="1" ay="0" az="0" axis_is_thrust="true"/>
+
+  <!-- -X thrust -->
+  <xacro:add_thruster_axis name="thruster_xn1" parent="Root" xyz="-${Xx} -${Xy} 0" ax="-1" ay="0" az="0" axis_is_thrust="true"/>
+  <xacro:add_thruster_axis name="thruster_xn2" parent="Root" xyz="-${Xx}  ${Xy} 0" ax="-1" ay="0" az="0" axis_is_thrust="true"/>
+
+  <!-- +Y thrust -->
+  <xacro:add_thruster_axis name="thruster_yp1" parent="Root" xyz="0 ${Yy} -${Yz}" ax="0" ay="1" az="0" axis_is_thrust="true"/>
+  <xacro:add_thruster_axis name="thruster_yp2" parent="Root" xyz="0 ${Yy}  ${Yz}" ax="0" ay="1" az="0" axis_is_thrust="true"/>
+
+  <!-- -Y thrust -->
+  <xacro:add_thruster_axis name="thruster_yn1" parent="Root" xyz="0 -${Yy} -${Yz}" ax="0" ay="-1" az="0" axis_is_thrust="true"/>
+  <xacro:add_thruster_axis name="thruster_yn2" parent="Root" xyz="0 -${Yy}  ${Yz}" ax="0" ay="-1" az="0" axis_is_thrust="true"/>
+
+  <!-- +Z thrust -->
+  <xacro:add_thruster_axis name="thruster_zp1" parent="Root" xyz="-${Zx} 0 ${Zz}" ax="0" ay="0" az="1" axis_is_thrust="true"/>
+  <xacro:add_thruster_axis name="thruster_zp2" parent="Root" xyz=" ${Zx} 0 ${Zz}" ax="0" ay="0" az="1" axis_is_thrust="true"/>
+
+  <!-- -Z thrust -->
+  <xacro:add_thruster_axis name="thruster_zn1" parent="Root" xyz="-${Zx} 0 -${Zz}" ax="0" ay="0" az="-1" axis_is_thrust="true"/>
+  <xacro:add_thruster_axis name="thruster_zn2" parent="Root" xyz=" ${Zx} 0 -${Zz}" ax="0" ay="0" az="-1" axis_is_thrust="true"/>
+
+</robot>
