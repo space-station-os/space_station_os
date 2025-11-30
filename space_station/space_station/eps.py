@@ -7,8 +7,13 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QPixmap, QColor
 from PyQt5.QtCore import Qt, QTimer
+
+import matplotlib
+matplotlib.use("Qt5Agg")  # <<< REQUIRED FIX
+
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+
 from collections import deque
 import os
 

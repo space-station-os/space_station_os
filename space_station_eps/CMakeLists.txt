@@ -17,6 +17,7 @@ find_package(diagnostic_msgs REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(space_station_interfaces REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 
 set(msg_files
   "msg/BCDUStatus.msg"
@@ -41,7 +42,7 @@ ament_target_dependencies(battery_manager_node
   std_srvs
   sensor_msgs
   diagnostic_msgs
- 
+ ament_index_cpp
 )
 
 target_link_libraries(battery_manager_node yaml-cpp)
