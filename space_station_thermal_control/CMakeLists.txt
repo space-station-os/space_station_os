@@ -17,7 +17,7 @@ find_package(diagnostic_msgs REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(behaviortree_cpp_v3 REQUIRED)
-
+find_package(ament_index_cpp REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -61,7 +61,7 @@ add_executable(thermal_nodes src/thermals_solver.cpp)
 ament_target_dependencies(thermal_nodes rosidl_default_generators rclcpp rclcpp_action ament_index_cpp sensor_msgs space_station_interfaces diagnostic_msgs yaml-cpp )
 
 add_executable(cooling_server src/cooling.cpp)
-ament_target_dependencies(cooling_server rosidl_default_generators  behaviortree_cpp_v3 rclcpp rclcpp_action std_srvs sensor_msgs space_station_interfaces diagnostic_msgs)
+ament_target_dependencies(cooling_server rosidl_default_generators  behaviortree_cpp_v3 ament_index_cpp rclcpp rclcpp_action std_srvs sensor_msgs space_station_interfaces diagnostic_msgs)
 rosidl_target_interfaces(cooling_server ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 rosidl_target_interfaces(thermal_nodes ${PROJECT_NAME} "rosidl_typesupport_cpp")
