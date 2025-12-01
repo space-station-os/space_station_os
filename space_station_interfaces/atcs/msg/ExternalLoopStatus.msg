@@ -1,0 +1,5 @@
+float64 received_heat_kj
+float64 loop_inlet_temp
+float64 loop_outlet_temp
+float64 ammonia_inlet_temp
+float64 ammonia_outlet_temp

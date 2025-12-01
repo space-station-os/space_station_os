@@ -1,0 +1,5 @@
+float64 co2_req
+---
+float64 co2_resp
+bool success
+string message

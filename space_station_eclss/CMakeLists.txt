@@ -17,6 +17,7 @@ find_package(diagnostic_msgs REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(behaviortree_cpp_v3 REQUIRED)
 find_package(ament_index_cpp REQUIRED)
+find_package(space_station_interfaces REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -60,6 +61,7 @@ ament_target_dependencies(ars_systems
   behaviortree_cpp_v3
   ament_index_cpp
   std_srvs
+  space_station_interfaces
   sensor_msgs
 )
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
@@ -79,6 +81,7 @@ ament_target_dependencies(ogs_systems
   ament_index_cpp
   std_srvs
   sensor_msgs
+  space_station_interfaces
 )
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(ogs_systems ${cpp_typesupport_target})
@@ -97,6 +100,7 @@ ament_target_dependencies(wrs_systems
   ament_index_cpp
   std_srvs
   sensor_msgs
+  space_station_interfaces
 )
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(wrs_systems ${cpp_typesupport_target})

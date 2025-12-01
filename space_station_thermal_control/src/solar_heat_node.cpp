@@ -11,7 +11,7 @@ SolarHeatNode::SolarHeatNode() : Node("solar_heat_node") {
     "/sun_vector_body", 10,
     std::bind(&SolarHeatNode::sunVectorCallback, this, std::placeholders::_1));
 
-  heat_pub_ = this->create_publisher<space_station_thermal_control::msg::SolarPanelsQ>(
+  heat_pub_ = this->create_publisher<space_station_interfaces::msg::SolarPanelsQ>(
     "/thermal/solar_heat", 10);
 }
 
@@ -59,7 +59,7 @@ void SolarHeatNode::sunVectorCallback(const geometry_msgs::msg::Vector3::SharedP
   btVector3 sun_dir(msg->x, msg->y, msg->z);
   sun_dir.normalize();
 
-  space_station_thermal_control::msg::SolarPanelsQ out_msg;
+  space_station_interfaces::msg::SolarPanelsQ out_msg;
   out_msg.header.stamp = this->now();
 
   for (const auto &[name, panel] : panel_map_) {

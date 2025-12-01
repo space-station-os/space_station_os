@@ -7,8 +7,13 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QPixmap, QColor
 from PyQt5.QtCore import Qt, QTimer
+
+import matplotlib
+matplotlib.use("Qt5Agg")  # <<< REQUIRED FIX
+
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+
 from collections import deque
 import os
 
@@ -16,7 +21,7 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float64, String
 from sensor_msgs.msg import BatteryState
-from space_station_eps.msg import BCDUStatus   
+from space_station_interfaces.msg import BCDUStatus   
 
 
 class EPSWidget(QWidget):

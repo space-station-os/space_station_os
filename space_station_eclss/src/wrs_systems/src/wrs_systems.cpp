@@ -3,6 +3,10 @@
 #include <chrono>
 #include <thread>
 #include <cstdlib>
+#include <ctime>
+
+#include <ament_index_cpp/get_package_share_directory.hpp>
+
 
 using namespace std::chrono_literals;
 
@@ -14,35 +18,86 @@ WRSActionServer::WRSActionServer(const rclcpp::NodeOptions & options)
   product_water_reserve_(1760.0),
   waste_collector_current_(0.0)
 {
-  // Declare with default
+  
+  std::srand(std::time(nullptr));  // seed RNG once
+
+  // Declare with defaults
   this->declare_parameter<bool>("enable_failure", true);
   this->declare_parameter<double>("product_max_capacity", 2000.0);
   this->declare_parameter<double>("waste_max_capacity", 2000.0);
   this->declare_parameter<double>("product_min_capacity", 300.0);
-  this->declare_parameter<double>("iodine_content", 2.0);  // mg/L, realistic default
+  this->declare_parameter<double>("iodine_content", 2.0);  // mg/L
   this->declare_parameter<double>("upa_valve_pressure", 100.0);
   this->declare_parameter<double>("ionization_valve_pressure", 90.0);
   this->declare_parameter<double>("filter_valve_pressure", 85.0);
   this->declare_parameter<double>("catalytic_valve_pressure", 95.0);
   this->declare_parameter<double>("upa_max_temperature", 70.0);
-  this->declare_parameter<double>("ionization_max_temperature", 65.0);
+  this->declare_parameter<double>("ionization_max_temperature", 90.0);
   this->declare_parameter<double>("filter_max_temperature", 60.0);
   this->declare_parameter<double>("catalytic_max_temperature", 80.0);
 
   // Then get values
-  enable_failure_           = this->get_parameter("enable_failure").as_bool();
-  product_water_capacity_   = this->get_parameter("product_max_capacity").as_double();
-  waste_collector_capacity_ = this->get_parameter("waste_max_capacity").as_double();
+  enable_failure_             = this->get_parameter("enable_failure").as_bool();
+  product_water_capacity_     = this->get_parameter("product_max_capacity").as_double();
+  waste_collector_capacity_   = this->get_parameter("waste_max_capacity").as_double();
   min_product_water_capacity_ = this->get_parameter("product_min_capacity").as_double();
-  iodine_addition_          = this->get_parameter("iodine_content").as_double();
-  upa_valve_pressure_       = this->get_parameter("upa_valve_pressure").as_double();
-  ionization_valve_pressure_= this->get_parameter("ionization_valve_pressure").as_double();
-  filter_valve_pressure_    = this->get_parameter("filter_valve_pressure").as_double();
-  catalytic_valve_pressure_ = this->get_parameter("catalytic_valve_pressure").as_double();
-  upa_max_temperature_      = this->get_parameter("upa_max_temperature").as_double();
-  ionization_max_temperature_= this->get_parameter("ionization_max_temperature").as_double();
-  filter_max_temperature_   = this->get_parameter("filter_max_temperature").as_double();
-  catalytic_max_temperature_= this->get_parameter("catalytic_max_temperature").as_double();
+  iodine_addition_            = this->get_parameter("iodine_content").as_double();
+  upa_valve_pressure_         = this->get_parameter("upa_valve_pressure").as_double();
+  ionization_valve_pressure_  = this->get_parameter("ionization_valve_pressure").as_double();
+  filter_valve_pressure_      = this->get_parameter("filter_valve_pressure").as_double();
+  catalytic_valve_pressure_   = this->get_parameter("catalytic_valve_pressure").as_double();
+  upa_max_temperature_        = this->get_parameter("upa_max_temperature").as_double();
+  ionization_max_temperature_ = this->get_parameter("ionization_max_temperature").as_double();
+  filter_max_temperature_     = this->get_parameter("filter_max_temperature").as_double();
+  catalytic_max_temperature_  = this->get_parameter("catalytic_max_temperature").as_double();
+
+  RCLCPP_INFO(this->get_logger(), "Switching on WRS — requesting power from DDCU...");
+  load_client_ = this->create_client<space_station_interfaces::srv::Load>("/ddcu/load_request");
+
+  powered_ = false;
+  RCLCPP_INFO(this->get_logger(), "Waiting for EPS power...");
+
+  // Retry every 2s until supply_load() returns true
+  power_retry_timer_ = this->create_wall_timer(2s, [this]() {
+    if (!powered_) {
+      if (supply_load()) {
+        powered_ = true;
+        RCLCPP_INFO(this->get_logger(), "WRS powered successfully — initializing systems.");
+        initialize_systems();
+        power_retry_timer_->cancel();
+      } else {
+        RCLCPP_WARN(this->get_logger(), "Still waiting for DDCU power...");
+      }
+    }
+  });
+  
+}
+
+bool WRSActionServer::supply_load(){
+  if (!load_client_->wait_for_service(1s)) {
+    RCLCPP_WARN(this->get_logger(), "DDCU load service not available yet.");
+    return false;
+  }
+
+  auto request = std::make_shared<space_station_interfaces::srv::Load::Request>();
+  request->load_voltage = 124.5;
+
+  load_client_->async_send_request(request,
+    [this](rclcpp::Client<space_station_interfaces::srv::Load>::SharedFuture future_resp) {
+      auto response = future_resp.get();
+      if (response->success) {
+        RCLCPP_INFO(this->get_logger(), "Power granted: %s", response->message.c_str());
+        powered_ = true;   // initialization done by timer on next tick
+      } else {
+        RCLCPP_ERROR(this->get_logger(), "DDCU rejected load: %s", response->message.c_str());
+        powered_ = false;
+      }
+    });
+
+  return true;  // request sent
+}
+
+void WRSActionServer::initialize_systems(){
 
   action_server_ = rclcpp_action::create_server<WRS>(
     this,
@@ -52,14 +107,14 @@ WRSActionServer::WRSActionServer(const rclcpp::NodeOptions & options)
     std::bind(&WRSActionServer::handle_accepted, this, std::placeholders::_1)
   );
 
-  ogs_client_ = rclcpp_action::create_client<space_station_eclss::action::OxygenGeneration>(this, "oxygen_generation");
+  ogs_client_ = rclcpp_action::create_client<space_station_interfaces::action::OxygenGeneration>(this, "oxygen_generation");
 
-  water_request_server_ = this->create_service<space_station_eclss::srv::RequestProductWater>(
+  water_request_server_ = this->create_service<space_station_interfaces::srv::RequestProductWater>(
     "wrs/product_water_request",
     std::bind(&WRSActionServer::handle_product_water_request, this, std::placeholders::_1, std::placeholders::_2)
   );
 
-  gray_water_service_ = this->create_service<space_station_eclss::srv::GreyWater>(
+  gray_water_service_ = this->create_service<space_station_interfaces::srv::GreyWater>(
     "/grey_water",
     std::bind(&WRSActionServer::handle_gray_water_request, this, std::placeholders::_1, std::placeholders::_2)
   );
@@ -67,7 +122,6 @@ WRSActionServer::WRSActionServer(const rclcpp::NodeOptions & options)
   diag_pub_ = this->create_publisher<diagnostic_msgs::msg::DiagnosticStatus>("wrs/diagnostics", 10);
   reserve_pub_ = this->create_publisher<std_msgs::msg::Float64>("wrs/product_water_reserve", 10);
   reserve_timer_ = this->create_wall_timer(2s, std::bind(&WRSActionServer::publish_reserve, this));
-
 
   disable_failure_ = this->create_subscription<std_msgs::msg::Bool>(
     "/wrs/self_diagnosis",
@@ -77,9 +131,10 @@ WRSActionServer::WRSActionServer(const rclcpp::NodeOptions & options)
       RCLCPP_INFO(this->get_logger(), "Failure simulation %s", enable_failure_ ? "enabled" : "disabled");
     }
   );
-  RCLCPP_INFO(this->get_logger(), "WRS Action Server initialized");
-}
 
+  RCLCPP_INFO(this->get_logger(), "WRS Action Server initialized");
+
+}
 rclcpp_action::GoalResponse WRSActionServer::handle_goal(
   const rclcpp_action::GoalUUID &,
   std::shared_ptr<const WRS::Goal> goal)
@@ -100,7 +155,6 @@ void WRSActionServer::handle_accepted(const std::shared_ptr<GoalHandleWRS> goal_
   std::thread{std::bind(&WRSActionServer::execute, this, goal_handle)}.detach();
 }
 
-
 void WRSActionServer::execute(const std::shared_ptr<GoalHandleWRS> goal_handle)
 {
   const auto goal = goal_handle->get_goal();
@@ -114,118 +168,99 @@ void WRSActionServer::execute(const std::shared_ptr<GoalHandleWRS> goal_handle)
 
   BT::BehaviorTreeFactory factory;
 
-  // --- UPA stage ---
+  // --- UPA stage (urine to distillate + brine) ---
   factory.registerSimpleAction("UPAStage", [&](BT::TreeNode &) {
     if (urine <= 0.0f) return BT::NodeStatus::SUCCESS;
-    float input = std::min(urine, 5.0f);
+
+    float input = std::min(urine, 5.0f); // process 5 L per cycle
     urine -= input;
     ++cycles;
-    float after_upa = input * 0.95f;
-    float upa_temp = 40.0f + static_cast<float>(rand() % 30);
-    if (upa_temp > upa_max_temperature_) {
-      publish_diagnostics("UPA", true, "UPA overheating");
-      fail_goal(goal_handle, result, cycles, purified_total, "UPA overheating");
-      return BT::NodeStatus::FAILURE;
-    }
-    stage_output = after_upa;
+
+    float distillate = input * 0.85f;   // 85% recovery
+    float brine      = input - distillate; // 15% loss
+    stage_output     = distillate;
+
+    waste_collector_current_ += brine;  // brine sent to collector
+
     feedback->time_step = cycles;
     feedback->current_tank_level = product_water_reserve_;
-    feedback->current_purification_efficiency = after_upa / input;
+    feedback->current_purification_efficiency = distillate / input;
     feedback->unit_name = "UPA";
     feedback->failure_detected = false;
     goal_handle->publish_feedback(feedback);
+
+    RCLCPP_INFO(this->get_logger(),
+                "UPA Cycle %d: Input %.2f L, Distillate %.2f L, Brine %.2f L",
+                cycles, input, distillate, brine);
+
     return BT::NodeStatus::SUCCESS;
   });
 
-  // --- Filter stage ---
+  // --- Filter stage (95% pass) ---
   factory.registerSimpleAction("FilterStage", [&](BT::TreeNode &) {
-    float after_filter = stage_output * 0.90f;
-    float filter_temp = 40.0f + static_cast<float>(rand() % 20);
-    if (filter_temp > filter_max_temperature_) {
-      publish_diagnostics("Filter", true, "Filter overheating");
-      fail_goal(goal_handle, result, cycles, purified_total, "Filter overheating");
-      return BT::NodeStatus::FAILURE;
-    }
+    float after_filter = stage_output * 0.95f;
     stage_output = after_filter;
     return BT::NodeStatus::SUCCESS;
   });
 
-  // --- Ionization stage ---
+  // --- Ionization stage (98% pass) ---
   factory.registerSimpleAction("IonizationStage", [&](BT::TreeNode &) {
     float after_ion = stage_output * 0.98f;
-    float ion_temp = 45.0f + static_cast<float>(rand() % 25);
-    if (ion_temp > ionization_max_temperature_) {
-      publish_diagnostics("Ionization", true, "Ionization overheating");
-      fail_goal(goal_handle, result, cycles, purified_total, "Ionization overheating");
-      return BT::NodeStatus::FAILURE;
-    }
     stage_output = after_ion;
     return BT::NodeStatus::SUCCESS;
   });
 
   // --- Tank stage ---
   factory.registerSimpleAction("TankStage", [&](BT::TreeNode &) {
-    if (enable_failure_ && product_water_reserve_ + stage_output > product_water_capacity_) {
-      std::string msg = "Tank capacity exceeded: " + std::to_string(product_water_reserve_ + stage_output);
+    if (product_water_reserve_ + stage_output > product_water_capacity_) {
+      std::string msg = "Tank capacity exceeded";
       publish_diagnostics("Tank", true, msg);
-      fail_goal(goal_handle, result, cycles, purified_total, "Tank full");
+      fail_goal(goal_handle, result, cycles, purified_total, msg);
       return BT::NodeStatus::FAILURE;
     }
     product_water_reserve_ += stage_output;
     purified_total += stage_output;
-    RCLCPP_INFO(this->get_logger(), "Cycle %d: Added %.2f L, Reserve now: %.2f",
+    RCLCPP_INFO(this->get_logger(),
+                "Cycle %d: Added %.2f L, Reserve now: %.2f",
                 cycles, stage_output, product_water_reserve_);
     return BT::NodeStatus::SUCCESS;
   });
 
-  // --- Grey Water Collection Stage ---
+  // --- Grey Water Collection (service-driven only) ---
   factory.registerSimpleAction("CollectGreyWater", [&](BT::TreeNode &) {
-    float volume = static_cast<float>(rand() % 10); // simulate 0–9 L grey water input
-
-    if (volume <= 0.0f) {
-      publish_diagnostics("WasteCollector", true, "Invalid grey water input");
-      fail_goal(goal_handle, result, cycles, purified_total, "Invalid grey water");
-      return BT::NodeStatus::FAILURE;
+    if (waste_collector_current_ <= 0.0f) {
+      RCLCPP_INFO(this->get_logger(), "No grey water collected this cycle.");
+      return BT::NodeStatus::SUCCESS;
     }
-
-    if (waste_collector_current_ + volume > waste_collector_capacity_) {
-      publish_diagnostics("WasteCollector", true, "Waste collector full");
-      fail_goal(goal_handle, result, cycles, purified_total, "Waste collector full");
-      return BT::NodeStatus::FAILURE;
-    }
-
-    waste_collector_current_ += volume;
-    publish_diagnostics("WasteCollector", false, "Collected " + std::to_string(volume) + " L grey water");
-    RCLCPP_INFO(this->get_logger(), "Collected %.2f L grey water, Collector now: %.2f L",
-                volume, waste_collector_current_);
+    RCLCPP_INFO(this->get_logger(),
+                "Grey water collector currently: %.2f L",
+                waste_collector_current_);
     return BT::NodeStatus::SUCCESS;
   });
 
-  // --- Grey Water Recycling Stage ---
+  // --- Grey Water Recycling (BPA, 80% recovery) ---
   factory.registerSimpleAction("RecycleGreyWater", [&](BT::TreeNode &) {
     if (waste_collector_current_ <= 0.0f) {
-      publish_diagnostics("WasteCollector", true, "No grey water to recycle");
-      return BT::NodeStatus::FAILURE;
+      RCLCPP_INFO(this->get_logger(), "No grey water to recycle.");
+      return BT::NodeStatus::SUCCESS;
     }
 
-    float recycled = waste_collector_current_ * 0.5f; // 50% recovery efficiency
-    waste_collector_current_ -= recycled;
-    product_water_reserve_ += recycled;
+    float recycled = waste_collector_current_ * 0.80f; // 80% recovery
+    float residual = waste_collector_current_ - recycled;
 
-    RCLCPP_INFO(this->get_logger(), "Recycled %.2f L from grey water, Reserve now: %.2f L",
-                recycled, product_water_reserve_);
-    publish_diagnostics("WasteCollector", false, "Recycled grey water: " + std::to_string(recycled) + " L");
+    product_water_reserve_ += recycled;
+    waste_collector_current_ = residual; // leave concentrated brine
+
+    RCLCPP_INFO(this->get_logger(),
+                "BPA recycled %.2f L grey water, %.2f L residual brine, Reserve now: %.2f",
+                recycled, residual, product_water_reserve_);
+
     return BT::NodeStatus::SUCCESS;
   });
 
-
-  // === Load BT XML ===
   std::string bt_xml_file = ament_index_cpp::get_package_share_directory("space_station_eclss") +
                             "/behaviortrees/wrs_bt.xml";
-
   auto tree = factory.createTreeFromFile(bt_xml_file);
-
-  RCLCPP_INFO(this->get_logger(), "Executing WRS BT from: %s", bt_xml_file.c_str());
 
   while (urine > 0.0f && rclcpp::ok()) {
     BT::NodeStatus status = tree.tickRoot();
@@ -235,7 +270,6 @@ void WRSActionServer::execute(const std::shared_ptr<GoalHandleWRS> goal_handle)
     std::this_thread::sleep_for(500ms);
   }
 
-  // Success
   result->success = true;
   result->summary_message = "WRS BT processing complete";
   result->total_purified_water = purified_total;
@@ -256,10 +290,10 @@ void WRSActionServer::send_water_to_ogs(float volume, float iodine_ppm)
     return;
   }
 
-  space_station_eclss::action::OxygenGeneration::Goal goal;
+  space_station_interfaces::action::OxygenGeneration::Goal goal;
   goal.input_water_mass = volume;
 
-  auto send_goal_options = rclcpp_action::Client<space_station_eclss::action::OxygenGeneration>::SendGoalOptions();
+  auto send_goal_options = rclcpp_action::Client<space_station_interfaces::action::OxygenGeneration>::SendGoalOptions();
   send_goal_options.result_callback = [this](const GoalHandleOGS::WrappedResult & result) {
     if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
       RCLCPP_INFO(this->get_logger(), "OGS processed water successfully.");
@@ -270,6 +304,7 @@ void WRSActionServer::send_water_to_ogs(float volume, float iodine_ppm)
 
   ogs_client_->async_send_goal(goal, send_goal_options);
 }
+
 void WRSActionServer::fail_goal(
   const std::shared_ptr<GoalHandleWRS> & goal_handle,
   std::shared_ptr<WRS::Result> & result,
@@ -281,23 +316,20 @@ void WRSActionServer::fail_goal(
   result->summary_message = "Failure: " + reason;
   result->total_purified_water = total;
   result->total_cycles = cycles;
-  goal_handle->succeed(result);
+  goal_handle->abort(result);
   publish_diagnostics("WRS", true, reason);
 }
 
 void WRSActionServer::handle_product_water_request(
-  const std::shared_ptr<space_station_eclss::srv::RequestProductWater::Request> request,
-  std::shared_ptr<space_station_eclss::srv::RequestProductWater::Response> response)
+  const std::shared_ptr<space_station_interfaces::srv::RequestProductWater::Request> request,
+  std::shared_ptr<space_station_interfaces::srv::RequestProductWater::Response> response)
 {
   if (request->amount <= product_water_reserve_) {
     product_water_reserve_ -= request->amount;
-
-    // Check if we fall below minimum threshold
     if (product_water_reserve_ < min_product_water_capacity_) {
       RCLCPP_FATAL(this->get_logger(), "Product water tank below minimum threshold: %.2f L", product_water_reserve_);
       publish_diagnostics("ProductWaterTank", true, "Tank below minimum safe capacity.");
     }
-    
     response->water_granted = request->amount;
     response->success = true;
     response->message = "Water delivered";
@@ -309,10 +341,9 @@ void WRSActionServer::handle_product_water_request(
   publish_reserve();
 }
 
-
 void WRSActionServer::handle_gray_water_request(
-  const std::shared_ptr<space_station_eclss::srv::GreyWater::Request> request,
-  std::shared_ptr<space_station_eclss::srv::GreyWater::Response> response)
+  const std::shared_ptr<space_station_interfaces::srv::GreyWater::Request> request,
+  std::shared_ptr<space_station_interfaces::srv::GreyWater::Response> response)
 {
   float volume = request->gray_water_liters;
   if (volume <= 0.0f) {
@@ -321,7 +352,6 @@ void WRSActionServer::handle_gray_water_request(
     publish_diagnostics("WasteCollector", true, response->message);
     return;
   }
-
   if (waste_collector_current_ + volume > waste_collector_capacity_) {
     response->success = false;
     response->message = "Gray water rejected: Waste collector full";
@@ -332,6 +362,7 @@ void WRSActionServer::handle_gray_water_request(
     response->message = "Gray water accepted: " + std::to_string(volume) + " L";
     publish_diagnostics("WasteCollector", false, response->message);
   }
+
 }
 
 void WRSActionServer::publish_diagnostics(const std::string & unit, bool failure, const std::string & message)
@@ -352,4 +383,3 @@ void WRSActionServer::publish_reserve()
 }
 
 }  // namespace space_station_eclss
-

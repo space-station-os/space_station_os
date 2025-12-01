@@ -1,0 +1,19 @@
+# Goal
+float32 input_water_mass     # Litres of water
+float32 iodine_concentration # ppm
+
+---
+# Result
+bool success
+float32 total_o2_generated   # grams
+float32 total_ch4_vented     # grams
+string summary_message
+
+---
+# Feedback
+int32 time_step
+float32 current_temperature
+float32 iodine_removed
+float32 o2_generated
+float32 h2_generated
+float32 ch4_vented
