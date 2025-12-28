@@ -43,6 +43,7 @@ RUN apt update && apt install -y \
     ros-jazzy-ros-gz-* \
     ros-jazzy-gz-ros2-control \
     ros-jazzy-gz-ros2-control-demos \
+    ros-jazzy-behaviortree-cpp-v3 \
     ros-dev-tools \
  && curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
  && apt install -y nodejs \

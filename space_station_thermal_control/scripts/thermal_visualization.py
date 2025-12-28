@@ -19,7 +19,7 @@ from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QFont, QPen, QBrush, QColor, QTransform, QPainter
 import rclpy
 from rclpy.node import Node
-from space_station_thermal_control.msg import (
+from space_station_interfaces.msg import (
     ThermalNodeDataArray, ThermalLinkFlowsArray, TankStatus,
 )
 

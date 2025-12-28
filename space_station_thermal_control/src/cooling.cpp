@@ -21,7 +21,7 @@ CoolantActionServer::CoolantActionServer(const rclcpp::NodeOptions &options)
 
   internal_loop_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>(
       "/tcs/internal_loop_heat", 10);
-  external_loop_pub_ = this->create_publisher<space_station_thermal_control::msg::ExternalLoopStatus>(
+  external_loop_pub_ = this->create_publisher<space_station_interfaces::msg::ExternalLoopStatus>(
       "/tcs/external_loop_a/status", 10);
 
   if (diagnostics_enabled_)
@@ -30,13 +30,13 @@ CoolantActionServer::CoolantActionServer(const rclcpp::NodeOptions &options)
         "/thermals/diagnostics", 10);
   }
 
-  product_water_client_ = this->create_client<space_station_eclss::srv::RequestProductWater>(
+  product_water_client_ = this->create_client<space_station_interfaces::srv::RequestProductWater>(
       "/wrs/product_water_request");
 
   grey_water_client_ = this->create_client<std_srvs::srv::Trigger>(
       "/grey_water");
 
-  radiator_client_ = this->create_client<space_station_thermal_control::srv::VentHeat>(
+  radiator_client_ = this->create_client<space_station_interfaces::srv::VentHeat>(
     "/tcs/radiator_a/vent_heat");
 
 
@@ -49,6 +49,31 @@ CoolantActionServer::CoolantActionServer(const rclcpp::NodeOptions &options)
 
   coolant_temp_c_ = 25.0;
   // timer_ = this->create_wall_timer(5s, std::bind(&CoolantActionServer::simulateHeatRise, this));
+  
+
+  
+  BT::BehaviorTreeFactory factory;
+
+  factory.registerSimpleCondition("IsTempHigh", std::bind(&CoolantActionServer::isTempHigh, this));
+  factory.registerSimpleCondition("IsAmmoniaHot", std::bind(&CoolantActionServer::isAmmoniaHot, this));
+  factory.registerSimpleAction("VentHeat", std::bind(&CoolantActionServer::ventHeat, this));
+  factory.registerSimpleAction("CoolLoop", std::bind(&CoolantActionServer::coolLoop, this));
+  factory.registerSimpleAction("RefreshWater", std::bind(&CoolantActionServer::refreshWater, this));
+
+  this->declare_parameter("bt_xml_path","behaviortrees/thermals_bt.xml");
+  std::string pkg_share_dir = ament_index_cpp::get_package_share_directory("space_station_thermal_control");
+  std::string xml_path_param = this->get_parameter("bt_xml_path").as_string();
+  std::string xml_path = pkg_share_dir + "/" + xml_path_param;
+
+  RCLCPP_INFO(this->get_logger(), "Loading BT XML: %s", xml_path.c_str());
+  tree_ = factory.createTreeFromFile(xml_path);
+
+  // Timer to tick BT
+  timer_ = this->create_wall_timer(
+      500ms,
+      std::bind(&CoolantActionServer::tickBehaviorTree, this)
+  );
+
 
   RCLCPP_INFO(this->get_logger(),
               "Coolant action server ready. Mass: %.1f kg, Specific Heat: %.1f J/kgC, Efficiency: %.2f, Vent Threshold: %.1f kJ",
@@ -137,7 +162,7 @@ void CoolantActionServer::execute(const std::shared_ptr<GoalHandle> goal_handle)
               node_temp, vented_total);
 
   if (vented_total > 0.0) {
-      auto req = std::make_shared<space_station_thermal_control::srv::VentHeat::Request>();
+      auto req = std::make_shared<space_station_interfaces::srv::VentHeat::Request>();
       req->excess_heat = vented_total;
 
       if (radiator_client_->wait_for_service(2s)) {
@@ -159,6 +184,93 @@ void CoolantActionServer::execute(const std::shared_ptr<GoalHandle> goal_handle)
 
 }
 
+BT::NodeStatus CoolantActionServer::isTempHigh()
+{
+  if (current_temp_ > cooling_trigger_)
+    return BT::NodeStatus::SUCCESS;
+  return BT::NodeStatus::FAILURE;
+}
+
+BT::NodeStatus CoolantActionServer::isAmmoniaHot()
+{
+  if (ammonia_heat_kj_ > vent_threshold_)
+    return BT::NodeStatus::SUCCESS;
+  return BT::NodeStatus::FAILURE;
+}
+
+BT::NodeStatus CoolantActionServer::ventHeat()
+{
+  auto req = std::make_shared<space_station_interfaces::srv::VentHeat::Request>();
+  req->excess_heat = ammonia_heat_kj_;
+
+  if (!vent_client_)
+  {
+    RCLCPP_ERROR(this->get_logger(), "[BT] Vent client unavailable.");
+    return BT::NodeStatus::FAILURE;
+  }
+
+  auto fut = vent_client_->async_send_request(req);
+  if (fut.wait_for(std::chrono::seconds(2)) == std::future_status::ready)
+  {
+    auto resp = fut.get();
+    return resp->success ? BT::NodeStatus::SUCCESS : BT::NodeStatus::FAILURE;
+  }
+
+  RCLCPP_WARN(this->get_logger(), "[BT] VentHeat timed out.");
+  return BT::NodeStatus::FAILURE;
+}
+
+BT::NodeStatus CoolantActionServer::coolLoop()
+{
+  RCLCPP_DEBUG(this->get_logger(), "[BT] CoolLoop ticked.");
+
+  return BT::NodeStatus::SUCCESS;
+}
+
+BT::NodeStatus CoolantActionServer::refreshWater()
+{
+  auto req = std::make_shared<space_station_interfaces::srv::RequestProductWater::Request>();
+  req->amount = 2.0;
+
+  if (!wrs_client_)
+  {
+    RCLCPP_ERROR(this->get_logger(), "[BT] WRS client unavailable.");
+    return BT::NodeStatus::FAILURE;
+  }
+
+  wrs_client_->async_send_request(req);
+  RCLCPP_INFO(this->get_logger(), "[BT] Requested 2.0L product water from WRS.");
+  return BT::NodeStatus::SUCCESS;
+}
+
+
+
+void CoolantActionServer::tickBehaviorTree()
+{
+  try
+  {
+    if (!tree_.rootNode())
+      return;
+
+    // Tick the root node once
+    tree_.tickRoot();
+
+    // Optional diagnostic feedback
+    if (diagnostics_enabled_)
+    {
+      publishDiagnostics(true, "Behavior Tree tick executed successfully");
+    }
+  }
+  catch (const std::exception &e)
+  {
+    RCLCPP_ERROR(this->get_logger(), "[BT] Exception during tick: %s", e.what());
+    if (diagnostics_enabled_)
+    {
+      publishDiagnostics(false, "BT tick error");
+    }
+  }
+}
+
 
 void CoolantActionServer::publishInternalLoop()
 {
@@ -170,7 +282,7 @@ void CoolantActionServer::publishInternalLoop()
 
 void CoolantActionServer::publishExternalLoop(double received_heat_kj)
 {
-  space_station_thermal_control::msg::ExternalLoopStatus msg;
+  space_station_interfaces::msg::ExternalLoopStatus msg;
   msg.received_heat_kj = received_heat_kj;
   msg.loop_inlet_temp = 6.0;
   msg.loop_outlet_temp = 12.0;
@@ -181,7 +293,7 @@ void CoolantActionServer::publishExternalLoop(double received_heat_kj)
 
 void CoolantActionServer::recycleWater()
 {
-  auto water_req = std::make_shared<space_station_eclss::srv::RequestProductWater::Request>();
+  auto water_req = std::make_shared<space_station_interfaces::srv::RequestProductWater::Request>();
   water_req->amount = 5.0;
   if (product_water_client_->wait_for_service(1s))
   {

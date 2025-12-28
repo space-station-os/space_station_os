@@ -6,8 +6,8 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QSpinBox,
 from PyQt5.QtCore import QTimer
 from rclpy.parameter import Parameter
 from rclpy.action import ActionClient
-from space_station_eclss.action import AirRevitalisation, WaterRecovery
-from space_station_eclss.srv import RequestProductWater, O2Request
+from space_station_interfaces.action import AirRevitalisation, WaterRecovery
+from space_station_interfaces.srv import RequestProductWater, O2Request
 
 
 class AstronautSimGui(QWidget):

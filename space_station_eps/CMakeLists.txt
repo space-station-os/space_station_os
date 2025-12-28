@@ -16,10 +16,12 @@ find_package(visualization_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(yaml-cpp REQUIRED)
-find_package(space_station_thermal_control REQUIRED)
+find_package(space_station_interfaces REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 
 set(msg_files
   "msg/BCDUStatus.msg"
+  "srv/Load.srv"
  
 )
 
@@ -40,7 +42,7 @@ ament_target_dependencies(battery_manager_node
   std_srvs
   sensor_msgs
   diagnostic_msgs
- 
+ ament_index_cpp
 )
 
 target_link_libraries(battery_manager_node yaml-cpp)
@@ -50,7 +52,7 @@ add_executable(bcdu_node src/bcdu_device.cpp)
 rosidl_target_interfaces(bcdu_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
 ament_target_dependencies(bcdu_node
   rclcpp 
-  std_msgs sensor_msgs diagnostic_msgs std_srvs
+  std_msgs sensor_msgs diagnostic_msgs std_srvs space_station_interfaces
 
 )
 
@@ -62,13 +64,14 @@ ament_target_dependencies(mbsu_device
 )
 
 add_executable(ddcu_device src/ddcu_device.cpp)
+rosidl_target_interfaces(ddcu_device ${PROJECT_NAME} "rosidl_typesupport_cpp")
 ament_target_dependencies(ddcu_device
   rclcpp
   std_msgs
   sensor_msgs
   diagnostic_msgs
   rclcpp_action
-  space_station_thermal_control
+  space_station_interfaces
 )
 
 add_executable(solar_power src/sarj_mock.cpp)

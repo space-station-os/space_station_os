@@ -46,7 +46,7 @@ BcduNode::BcduNode(const rclcpp::NodeOptions &options)
     "/solar_controller/ssu_voltage_v", 10,
     std::bind(&BcduNode::ssuVoltageCb, this, std::placeholders::_1));
 
-  status_pub_      = this->create_publisher<space_station_eps::msg::BCDUStatus>("/bcdu/status", 10);
+  status_pub_      = this->create_publisher<space_station_interfaces::msg::BCDUStatus>("/bcdu/status", 10);
   diag_pub_        = this->create_publisher<diagnostic_msgs::msg::DiagnosticStatus>("/eps/diagnostics", 10);
   for (int ch = 0; ch < num_channels_; ++ch) {
       std::string topic = "/mbsu/channel_" + std::to_string(ch) + "/voltage";
@@ -141,7 +141,7 @@ void BcduNode::publishDiag(uint8_t level, const std::string &name, const std::st
 
 void BcduNode::publishStatus(const std::string &mode, bool fault, const std::string &fault_msg)
 {
-  space_station_eps::msg::BCDUStatus st;
+  space_station_interfaces::msg::BCDUStatus st;
   st.header.stamp = this->now();
   st.mode = mode;
   st.fault = fault;

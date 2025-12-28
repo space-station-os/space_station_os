@@ -12,10 +12,12 @@ find_package(sensor_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(std_srvs REQUIRED)
-find_package(space_station_eclss REQUIRED)
+find_package(space_station_interfaces REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(yaml-cpp REQUIRED)
+find_package(behaviortree_cpp_v3 REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -43,7 +45,7 @@ set(msg_files
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${msg_files} 
-  DEPENDENCIES  std_msgs sensor_msgs space_station_eclss
+  DEPENDENCIES  std_msgs sensor_msgs 
 )
 
 ament_export_dependencies(rosidl_default_runtime)
@@ -51,15 +53,15 @@ ament_export_dependencies(rosidl_default_runtime)
 
 
 add_executable(radiator src/radiators.cpp)
-ament_target_dependencies(radiator rosidl_default_generators rclcpp sensor_msgs space_station_eclss)
+ament_target_dependencies(radiator rosidl_default_generators rclcpp sensor_msgs space_station_interfaces)
 rosidl_target_interfaces(radiator ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 
 add_executable(thermal_nodes src/thermals_solver.cpp)
-ament_target_dependencies(thermal_nodes rosidl_default_generators rclcpp rclcpp_action ament_index_cpp sensor_msgs space_station_eclss diagnostic_msgs yaml-cpp )
+ament_target_dependencies(thermal_nodes rosidl_default_generators rclcpp rclcpp_action ament_index_cpp sensor_msgs space_station_interfaces diagnostic_msgs yaml-cpp )
 
 add_executable(cooling_server src/cooling.cpp)
-ament_target_dependencies(cooling_server rosidl_default_generators rclcpp rclcpp_action std_srvs sensor_msgs space_station_eclss diagnostic_msgs)
+ament_target_dependencies(cooling_server rosidl_default_generators  behaviortree_cpp_v3 ament_index_cpp rclcpp rclcpp_action std_srvs sensor_msgs space_station_interfaces diagnostic_msgs)
 rosidl_target_interfaces(cooling_server ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 rosidl_target_interfaces(thermal_nodes ${PROJECT_NAME} "rosidl_typesupport_cpp")
@@ -68,16 +70,16 @@ target_link_libraries(thermal_nodes
 )
 
 add_executable(demand src/on_demand_publisher.cpp)
-ament_target_dependencies(demand rosidl_default_generators rclcpp sensor_msgs space_station_eclss)
+ament_target_dependencies(demand rosidl_default_generators rclcpp sensor_msgs space_station_interfaces)
 rosidl_target_interfaces(demand ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 add_executable(sun_vector src/sun_vector.cpp)
-ament_target_dependencies(sun_vector rosidl_default_generators rclcpp sensor_msgs space_station_eclss)
+ament_target_dependencies(sun_vector rosidl_default_generators rclcpp sensor_msgs space_station_interfaces)
 rosidl_target_interfaces(sun_vector ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(sun_vector ${BULLET_LIBRARIES})
 
 add_executable(array_absorptivity src/solar_heat_node.cpp)
-ament_target_dependencies(array_absorptivity rosidl_default_generators rclcpp sensor_msgs space_station_eclss)
+ament_target_dependencies(array_absorptivity rosidl_default_generators rclcpp sensor_msgs space_station_interfaces)
 rosidl_target_interfaces(array_absorptivity ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(sun_vector ${BULLET_LIBRARIES})
 
@@ -103,6 +105,10 @@ install(DIRECTORY launch/
 install(DIRECTORY config/
    DESTINATION share/${PROJECT_NAME}/config
  )
+
+install(DIRECTORY behaviortrees/
+  DESTINATION share/${PROJECT_NAME}/behaviortrees
+)
 
 install(PROGRAMS
  scripts/thermal_visualization.py

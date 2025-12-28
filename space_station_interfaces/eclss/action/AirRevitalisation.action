@@ -1,0 +1,20 @@
+# Goal
+float32 initial_co2_mass         # Initial CO₂ in ppm
+float32 initial_moisture_content # Initial H₂O in RH (reative humidity)
+float32 initial_contaminants     # Initial contaminants in ppm
+
+---
+# Result
+bool success
+int32 cycles_completed
+int32 total_vents
+float32 total_co2_vented
+string summary_message
+
+---
+# Feedback
+int32 current_time
+float32 cabin_co2_level
+bool venting
+int32 vent_bed_id
+float32 vent_amount
