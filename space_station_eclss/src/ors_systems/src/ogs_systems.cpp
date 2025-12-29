@@ -29,26 +29,6 @@ OGSSystem::OGSSystem(const rclcpp::NodeOptions & options)
   this->declare_parameter("max_o2_capacity", 10000.0);
   max_o2_capacity_ = this->get_parameter("max_o2_capacity").as_double();
 
-  RCLCPP_INFO(this->get_logger(), "Switching on OGS — requesting power from DDCU...");
-  load_client_ = this->create_client<space_station_interfaces::srv::Load>("/ddcu/load_request");
-
-  powered_ = false;
-  RCLCPP_INFO(this->get_logger(), "Waiting for EPS power...");
-
-  // Retry every 2s until supply_load() returns true
-  power_retry_timer_ = this->create_wall_timer(2s, [this]() {
-    if (!powered_) {
-      if (supply_load()) {
-        powered_ = true;
-        RCLCPP_INFO(this->get_logger(), "OGS powered successfully — initializing systems.");
-        initialize_systems();
-        power_retry_timer_->cancel();
-      } else {
-        RCLCPP_WARN(this->get_logger(), "Still waiting for DDCU power...");
-      }
-    }
-  });
-  
 }
 
 void OGSSystem::initialize_systems()
@@ -99,32 +79,6 @@ void OGSSystem::initialize_systems()
   RCLCPP_INFO(this->get_logger(), "OGS system ready.");
 }
 
-
-
-bool OGSSystem::supply_load()
-{
-  if (!load_client_->wait_for_service(1s)) {
-    RCLCPP_WARN(this->get_logger(), "DDCU load service not available yet.");
-    return false;
-  }
-
-  auto request = std::make_shared<space_station_interfaces::srv::Load::Request>();
-  request->load_voltage = 124.5;
-
-  load_client_->async_send_request(request,
-    [this](rclcpp::Client<space_station_interfaces::srv::Load>::SharedFuture future_resp) {
-      auto response = future_resp.get();
-      if (response->success) {
-        RCLCPP_INFO(this->get_logger(), "Power granted: %s", response->message.c_str());
-        powered_ = true;   // initialization done by timer on next tick
-      } else {
-        RCLCPP_ERROR(this->get_logger(), "DDCU rejected load: %s", response->message.c_str());
-        powered_ = false;
-      }
-    });
-
-  return true;  // request sent
-}
 
 
 rclcpp_action::GoalResponse OGSSystem::handle_goal(
