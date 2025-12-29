@@ -34,7 +34,6 @@ private:
   void initialize_systems();
   void execute(const std::shared_ptr<GoalHandleARS> goal_handle);
 
-
   rclcpp_action::GoalResponse handle_goal(
     const rclcpp_action::GoalUUID & uuid,
     std::shared_ptr<const AirRevitalisation::Goal> goal);
@@ -45,8 +44,6 @@ private:
   void handle_co2_service(
     const std::shared_ptr<Co2Request::Request> req,
     std::shared_ptr<Co2Request::Response> res);
-  
-  bool supply_load();
 
   void monitor_combustion_and_contaminants();
 
@@ -79,7 +76,6 @@ private:
   float total_co2_storage_{0.0};
   float contaminant_level_{0.0};
   float contaminant_limit_{100.0};
-  bool powered_{false};
   // Bed parameters
   float des1_capacity_, des1_removal_, des1_temp_limit_;
   float des2_capacity_, des2_removal_, des2_temp_limit_;

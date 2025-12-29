@@ -16,22 +16,43 @@ ARSActionServer::ARSActionServer(const rclcpp::NodeOptions & options)
   RCLCPP_INFO(this->get_logger(), "Switching on ARS — requesting power from DDCU...");
   load_client_ = this->create_client<space_station_interfaces::srv::Load>("/ddcu/load_request");
 
-  powered_ = false;
   RCLCPP_INFO(this->get_logger(), "Waiting for EPS power...");
 
-  // Retry every 2s until supply_load() returns true
-  power_retry_timer_ = this->create_wall_timer(2s, [this]() {
-    if (!powered_) {
-      if (supply_load()) {
-        powered_ = true;
-        RCLCPP_INFO(this->get_logger(), "ARS powered successfully — initializing systems.");
-        initialize_systems();
-        power_retry_timer_->cancel();
-      } else {
-        RCLCPP_WARN(this->get_logger(), "Still waiting for DDCU power...");
-      }
+  heartbeat_pub_ = this->create_publisher<diagnostic_msgs::msg::DiagnosticStatus>("/ars/diagnostics", 10);
+
+  co2_storage_pub_ = this->create_publisher<std_msgs::msg::Float64>("/co2_storage", 10);
+  co2_pub_timer_ = this->create_wall_timer(2s, [this]() {
+    std_msgs::msg::Float64 msg;
+    msg.data = total_co2_storage_;
+    co2_storage_pub_->publish(msg);
+  });
+
+  co2_request_srv_ = this->create_service<Co2Request>(
+    "/ars/request_co2",
+    std::bind(&ARSActionServer::handle_co2_service, this, std::placeholders::_1, std::placeholders::_2)
+  );
+
+  combustion_timer_ = this->create_wall_timer(10s, [this]() { monitor_combustion_and_contaminants(); });
+
+  contaminant_timer_ = this->create_wall_timer(3s, [this]() {
+    contaminant_level_ += static_cast<float>(std::rand() % 4);
+    contaminant_level_ = std::min(contaminant_level_, 500.0f);
+    if (contaminant_level_ > contaminant_limit_) {
+      publish_bed_heartbeat("ARS", false, "Contaminant threshold exceeded", "Contaminant_Monitor");
     }
   });
+
+  disable_failure_ = this->create_subscription<std_msgs::msg::Bool>(
+    "/ars/self_diagnosis",
+    10,
+    [this](const std_msgs::msg::Bool::SharedPtr msg) {
+      this->set_parameter(rclcpp::Parameter("enable_failure", msg->data));
+      enable_failure_ = msg->data;
+      RCLCPP_INFO(this->get_logger(), "Failure simulation %s", enable_failure_ ? "enabled" : "disabled");
+    }
+  );
+
+  RCLCPP_INFO(this->get_logger(), "ARS action server ready.");
 }
 
 void ARSActionServer::declare_parameters()
@@ -132,15 +153,6 @@ void ARSActionServer::initialize_systems()
 void ARSActionServer::execute(const std::shared_ptr<GoalHandleARS> goal_handle)
 {
 
-  if (!powered_) {
-    RCLCPP_WARN(this->get_logger(), "ARS cannot start — system not powered.");
-    auto result = std::make_shared<AirRevitalisation::Result>();
-    result->success = false;
-    result->summary_message = "ARS unpowered — unable to start process.";
-    goal_handle->abort(result);
-    return;
-  }
-
   auto feedback = std::make_shared<AirRevitalisation::Feedback>();
   auto result = std::make_shared<AirRevitalisation::Result>();
 
@@ -154,29 +166,29 @@ void ARSActionServer::execute(const std::shared_ptr<GoalHandleARS> goal_handle)
   BT::BehaviorTreeFactory factory;
 
   // Desiccants
-  factory.registerSimpleAction("Desiccant1", [&](BT::TreeNode &) {
+  factory.registerSimpleAction("Desiccant1", [&](BT::TreeNode&) -> BT::NodeStatus {
     return simulate_desiccant_bed(h2o, des1_capacity_, des1_removal_, des1_temp_limit_, "Desiccant1", temp1)
              ? BT::NodeStatus::SUCCESS : BT::NodeStatus::FAILURE;
   });
 
-  factory.registerSimpleAction("Desiccant2", [&](BT::TreeNode &) {
+  factory.registerSimpleAction("Desiccant2", [&](BT::TreeNode&) -> BT::NodeStatus {
     return simulate_desiccant_bed(h2o, des2_capacity_, des2_removal_, des2_temp_limit_, "Desiccant2", temp2)
              ? BT::NodeStatus::SUCCESS : BT::NodeStatus::FAILURE;
   });
 
   // Adsorbents
-  factory.registerSimpleAction("Adsorbent1", [&](BT::TreeNode &) {
+  factory.registerSimpleAction("Adsorbent1", [&](BT::TreeNode&) -> BT::NodeStatus {
     return simulate_adsorbent_bed(co2, ads1_capacity_, ads1_removal_, ads1_temp_limit_, "Adsorbent1", temp3)
              ? BT::NodeStatus::SUCCESS : BT::NodeStatus::FAILURE;
   });
 
-  factory.registerSimpleAction("Adsorbent2", [&](BT::TreeNode &) {
+  factory.registerSimpleAction("Adsorbent2", [&](BT::TreeNode&) -> BT::NodeStatus {
     return simulate_adsorbent_bed(co2, ads2_capacity_, ads2_removal_, ads2_temp_limit_, "Adsorbent2", temp4)
              ? BT::NodeStatus::SUCCESS : BT::NodeStatus::FAILURE;
   });
 
   // Vent / Store CO₂
-  factory.registerSimpleAction("VentOrStoreCO2", [&](BT::TreeNode &) {
+  factory.registerSimpleAction("VentOrStoreCO2", [&](BT::TreeNode&) -> BT::NodeStatus {
     double vented = co2 * 0.5;
     double stored = co2 - vented;
     total_co2_storage_ += stored;
@@ -194,7 +206,7 @@ void ARSActionServer::execute(const std::shared_ptr<GoalHandleARS> goal_handle)
  std::string bt_xml_file = ament_index_cpp::get_package_share_directory("space_station_eclss") +
                           "/behaviortrees/ars_bt.xml";
 
-  // RCLCPP_INFO(this->get_logger(), "Loading BT from: %s", bt_xml_file.c_str());
+  RCLCPP_INFO(this->get_logger(), "Loading BT from: %s", bt_xml_file.c_str());
 
   auto tree = factory.createTreeFromFile(bt_xml_file);
 
@@ -219,24 +231,11 @@ void ARSActionServer::execute(const std::shared_ptr<GoalHandleARS> goal_handle)
   }
 
   if (total_co2_storage_ > max_co2_storage_) {
-    double excess = total_co2_storage_ - max_co2_storage_;
-    total_co2_storage_ = max_co2_storage_;  
-
-    RCLCPP_WARN(this->get_logger(),
-                "CO₂ storage exceeded safe limit by %.2f g. Venting excess...",
-                excess);
-
-    // Publish venting diagnostic
-    publish_bed_heartbeat("ARS", true,
-                          "Auto-venting triggered due to CO₂ buildup",
-                          "CO2_storage");
-
-    feedback->venting = true;
-    feedback->vent_bed_id = 99;  // special "safety vent"
-    feedback->vent_amount = excess;
-    goal_handle->publish_feedback(feedback);
-
-    vents++;
+    publish_bed_heartbeat("ARS", false, "CO2 partial pressure exceeds safe limit", "CO2_storage");
+    result->success = false;
+    result->summary_message = "Exceeded CO2 storage pressure limit";
+    goal_handle->abort(result);
+    return;
   }
 
 
@@ -323,33 +322,6 @@ void ARSActionServer::monitor_combustion_and_contaminants()
   }
 }
 
-bool ARSActionServer::supply_load()
-{
-  if (!load_client_->wait_for_service(1s)) {
-    RCLCPP_WARN(this->get_logger(), "DDCU load service not available yet.");
-    return false;
-  }
-
-  auto request = std::make_shared<space_station_interfaces::srv::Load::Request>();
-  request->load_voltage = 124.5;
-
-  load_client_->async_send_request(request,
-    [this](rclcpp::Client<space_station_interfaces::srv::Load>::SharedFuture future_resp) {
-      auto response = future_resp.get();
-      if (response->success) {
-        RCLCPP_INFO(this->get_logger(), "Power granted: %s", response->message.c_str());
-        powered_ = true;   // initialization done by timer on next tick
-      } else {
-        RCLCPP_ERROR(this->get_logger(), "DDCU rejected load: %s", response->message.c_str());
-        powered_ = false;
-      }
-    });
-
-  return true;  // request sent
-}
-
-
-
 void ARSActionServer::handle_co2_service(
   const std::shared_ptr<Co2Request::Request> req,
   std::shared_ptr<Co2Request::Response> res)
@@ -390,3 +362,13 @@ void ARSActionServer::handle_co2_service(
 
 }  // namespace space_station_eclss
 
+
+int main(int argc, char **argv)
+{
+  rclcpp::init(argc, argv);
+  auto node_options = rclcpp::NodeOptions();
+  auto ars_node = std::make_shared<space_station_eclss::ARSActionServer>(node_options);
+  rclcpp::spin(ars_node);
+  rclcpp::shutdown();
+  return 0;
+}
