@@ -76,11 +76,6 @@ private:
   float total_co2_storage_{0.0};
   float contaminant_level_{0.0};
   float contaminant_limit_{100.0};
-<<<<<<< HEAD
-  bool powered_{false};
-=======
-
->>>>>>> origin/feature/160-eclss
   // Bed parameters
   float des1_capacity_, des1_removal_, des1_temp_limit_;
   float des2_capacity_, des2_removal_, des2_temp_limit_;
