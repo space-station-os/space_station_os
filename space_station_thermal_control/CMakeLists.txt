@@ -50,11 +50,11 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 
 ament_export_dependencies(rosidl_default_runtime)
 
-
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 add_executable(radiator src/radiators.cpp)
 ament_target_dependencies(radiator rosidl_default_generators rclcpp sensor_msgs space_station_interfaces)
-rosidl_target_interfaces(radiator ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(radiator ${cpp_typesupport_target})
 
 
 add_executable(thermal_nodes src/thermals_solver.cpp)
@@ -62,25 +62,24 @@ ament_target_dependencies(thermal_nodes rosidl_default_generators rclcpp rclcpp_
 
 add_executable(cooling_server src/cooling.cpp)
 ament_target_dependencies(cooling_server rosidl_default_generators  behaviortree_cpp_v3 ament_index_cpp rclcpp rclcpp_action std_srvs sensor_msgs space_station_interfaces diagnostic_msgs)
-rosidl_target_interfaces(cooling_server ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(cooling_server ${cpp_typesupport_target})
 
-rosidl_target_interfaces(thermal_nodes ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(thermal_nodes
   yaml-cpp
+  ${cpp_typesupport_target}
 )
 
 add_executable(demand src/on_demand_publisher.cpp)
 ament_target_dependencies(demand rosidl_default_generators rclcpp sensor_msgs space_station_interfaces)
-rosidl_target_interfaces(demand ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(demand ${cpp_typesupport_target})
 
 add_executable(sun_vector src/sun_vector.cpp)
 ament_target_dependencies(sun_vector rosidl_default_generators rclcpp sensor_msgs space_station_interfaces)
-rosidl_target_interfaces(sun_vector ${PROJECT_NAME} "rosidl_typesupport_cpp")
-target_link_libraries(sun_vector ${BULLET_LIBRARIES})
+target_link_libraries(sun_vector ${BULLET_LIBRARIES} ${cpp_typesupport_target})
 
 add_executable(array_absorptivity src/solar_heat_node.cpp)
 ament_target_dependencies(array_absorptivity rosidl_default_generators rclcpp sensor_msgs space_station_interfaces)
-rosidl_target_interfaces(array_absorptivity ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(array_absorptivity ${cpp_typesupport_target})
 target_link_libraries(sun_vector ${BULLET_LIBRARIES})
 
 

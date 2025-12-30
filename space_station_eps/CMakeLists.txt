@@ -36,7 +36,8 @@ ament_export_dependencies(rosidl_default_runtime)
 include_directories(include)
 
 add_executable(battery_manager_node src/battery_health.cpp)
-rosidl_target_interfaces(battery_manager_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(battery_manager_node ${cpp_typesupport_target})
 ament_target_dependencies(battery_manager_node
   rclcpp
   std_srvs
@@ -49,7 +50,7 @@ target_link_libraries(battery_manager_node yaml-cpp)
 
 
 add_executable(bcdu_node src/bcdu_device.cpp)
-rosidl_target_interfaces(bcdu_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(bcdu_node ${cpp_typesupport_target})
 ament_target_dependencies(bcdu_node
   rclcpp 
   std_msgs sensor_msgs diagnostic_msgs std_srvs space_station_interfaces
@@ -64,7 +65,7 @@ ament_target_dependencies(mbsu_device
 )
 
 add_executable(ddcu_device src/ddcu_device.cpp)
-rosidl_target_interfaces(ddcu_device ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(ddcu_device ${cpp_typesupport_target})
 ament_target_dependencies(ddcu_device
   rclcpp
   std_msgs
