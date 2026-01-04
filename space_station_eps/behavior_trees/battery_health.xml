@@ -1,0 +1,19 @@
+<root main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <Fallback name="EPSFallback">
+      <PriorityDischarge channel="channel_1"/>
+      <PriorityDischarge channel="channel_2"/>
+      <PriorityDischarge channel="channel_3"/>
+      <PriorityDischarge channel="channel_4"/>
+      <PriorityDischarge channel="channel_5"/>
+      <PriorityDischarge channel="channel_6"/>
+      <PriorityDischarge channel="channel_7"/>
+      <PriorityDischarge channel="channel_8"/>
+      <PriorityDischarge channel="channel_9"/>
+      <PriorityDischarge channel="channel_10"/>
+      <PriorityDischarge channel="channel_11"/>
+      <PriorityDischarge channel="channel_12"/>
+      <EnterSafeMode/>
+    </Fallback>
+  </BehaviorTree>
+</root>

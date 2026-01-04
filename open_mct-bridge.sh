@@ -34,7 +34,7 @@ tmux new-session -d -s $SESSION -n rosbridge
 
 # Pane 1: Launch rosbridge_websocket
 tmux send-keys -t $SESSION "source $INSTALL_DIR/setup.bash" C-m
-tmux send-keys -t $SESSION 'ros2 launch rosbridge_server rosbridge_websocket_launch.xml' C-m
+tmux send-keys -t $SESSION 'ros2 launch rosbridge_server rosbridge_websocket_launch.xml delay_between_messages:=0.0' C-m
 
 # Pane 2: OpenMCT
 tmux split-window -h -t $SESSION

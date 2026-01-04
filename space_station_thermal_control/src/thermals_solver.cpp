@@ -7,14 +7,14 @@ ThermalSolverNode::ThermalSolverNode()
 {
   RCLCPP_INFO(this->get_logger(), "Initializing Thermal Solver Node...");
 
-  node_pub_ = this->create_publisher<space_station_thermal_control::msg::ThermalNodeDataArray>(
+  node_pub_ = this->create_publisher<space_station_interfaces::msg::ThermalNodeDataArray>(
     "/thermal/nodes/state", 10);
-  link_pub_ = this->create_publisher<space_station_thermal_control::msg::ThermalLinkFlowsArray>(
+  link_pub_ = this->create_publisher<space_station_interfaces::msg::ThermalLinkFlowsArray>(
     "/thermal/links/flux", 10);
   diag_pub_ = this->create_publisher<diagnostic_msgs::msg::DiagnosticStatus>(
     "/thermals/diagnostics", 10);
-  cooling_client_ = this->create_client<space_station_thermal_control::srv::NodeHeatFlow>(
-    "/internal_loop_cooling");
+  cooling_client_ = rclcpp_action::create_client<space_station_interfaces::action::Coolant>(
+      this,"/coolant_heat_transfer");
 
   this->declare_parameter("enable_failure", false);
   this->declare_parameter("enable_cooling", true);
@@ -123,28 +123,61 @@ double ThermalSolverNode::compute_dTdt(
 
 void ThermalSolverNode::coolingCallback()
 {
-  
-  if (!cooling_active_ && enable_cooling_ && avg_temperature_ > cooling_trigger_threshold_) {
-    if (cooling_client_->wait_for_service(1s)) {
-      auto req = std::make_shared<space_station_thermal_control::srv::NodeHeatFlow::Request>();
-      req->heat_flow = avg_temperature_ - REFERENCE_TEMP_CELCIUS;
+  using namespace space_station_interfaces::action;
 
-      cooling_client_->async_send_request(req,
-        [this](rclcpp::Client<space_station_thermal_control::srv::NodeHeatFlow>::SharedFuture future) {
-          auto result = future.get();
-          if (result->success) {
-            RCLCPP_WARN(this->get_logger(), "Cooling triggered: %s", result->message.c_str());
-            this->cooling_active_ = true;
-          } else {
-            RCLCPP_ERROR(this->get_logger(), "Cooling service call failed: %s", result->message.c_str());
-          }
-        });
-    } else {
-      RCLCPP_WARN(this->get_logger(), "Cooling service unavailable.");
+  if (!cooling_active_ && enable_cooling_ && avg_temperature_ > cooling_trigger_threshold_) {
+    if (!cooling_client_->wait_for_action_server(1s)) {
+      RCLCPP_WARN(this->get_logger(), "[COOLING] Cooling action server unavailable.");
+      return;
     }
+
+    Coolant::Goal goal_msg;
+    goal_msg.input_temperature_c = avg_temperature_;
+    goal_msg.component_id = "thermal_nodes";  // Set your unique ID here
+
+    RCLCPP_INFO(this->get_logger(), "[COOLING] Sending goal: avg_temperature = %.2f °C", avg_temperature_);
+
+    auto send_goal_options = rclcpp_action::Client<Coolant>::SendGoalOptions();
+
+    send_goal_options.feedback_callback =
+      [this](GoalHandleCoolant::SharedPtr,
+            const std::shared_ptr<const Coolant::Feedback> feedback) {
+        RCLCPP_INFO(this->get_logger(),
+          "[COOLING][Feedback] Internal=%.2f°C | Ammonia=%.2f°C | Vented=%.2f kJ",
+          feedback->internal_temp_c, feedback->ammonia_temp_c, feedback->vented_heat_kj);
+
+        feedback_latest_temp_ = feedback->internal_temp_c;
+
+        for (auto &[name, node] : thermal_nodes_) {
+          node.temperature = feedback_latest_temp_;
+        }
+      };
+    send_goal_options.result_callback =
+      [this](const GoalHandleCoolant::WrappedResult &result) {
+        switch (result.code) {
+          case rclcpp_action::ResultCode::SUCCEEDED:
+            RCLCPP_INFO(this->get_logger(), "[COOLING] Completed: %s", result.result->message.c_str());
+            break;
+          case rclcpp_action::ResultCode::ABORTED:
+            RCLCPP_ERROR(this->get_logger(), "[COOLING] Aborted: %s", result.result->message.c_str());
+            break;
+          case rclcpp_action::ResultCode::CANCELED:
+            RCLCPP_WARN(this->get_logger(), "[COOLING] Canceled.");
+            break;
+          default:
+            RCLCPP_ERROR(this->get_logger(), "[COOLING] Unknown result code.");
+            break;
+        }
+        cooling_active_ = false;   
+      };
+
+    // Send goal asynchronously
+    cooling_client_->async_send_goal(goal_msg, send_goal_options);
+
+    cooling_active_ = true;
   }
 }
-  
+
 void ThermalSolverNode::updateSimulation()
 {
   if (thermal_nodes_.empty()) return;
@@ -193,62 +226,85 @@ void ThermalSolverNode::updateSimulation()
 
   double hottest_temp = -std::numeric_limits<double>::infinity();
   std::string hottest_name = "n/a";
-
-  for (auto &[name, node] : thermal_nodes_) {
-    node.temperature += (k1[name] + 2 * k2[name] + 2 * k3[name] + k4[name]) / 6.0;
-    if (node.temperature > hottest_temp) {
-      hottest_temp = node.temperature;
-      hottest_name = name;
-    }
-  }
-
-
   if (cooling_active_) {
     for (auto &[name, node] : thermal_nodes_) {
-      double target_temp = initial_temperatures_[name];
-      double diff = node.temperature - target_temp;
-      if (std::abs(diff) > 0.5) {
-        node.temperature -= std::copysign(cooling_rate_ * thermal_update_dt_, diff);
-      } else {
-        node.temperature = target_temp;
+      node.temperature = feedback_latest_temp_;
+
       }
-
-      if (enable_failure_ && node.temperature > max_temp_threshold_) {
-        diagnostic_msgs::msg::DiagnosticStatus diag;
-        diag.name = "THERMAL_NODE_OVERHEAT";
-        diag.level = diagnostic_msgs::msg::DiagnosticStatus::ERROR;
-        diag.message = "Overheating after cooling";
-        diag.hardware_id = name;
-
-        diagnostic_msgs::msg::KeyValue kv;
-        kv.key = "temperature_C";
-        kv.value = std::to_string(node.temperature);
-        diag.values.push_back(kv);
-
-        diag_pub_->publish(diag);
+    } 
+  else {
+      for (auto &[name, node] : thermal_nodes_) {
+        node.temperature += (k1[name] + 2 * k2[name] + 2 * k3[name] + k4[name]) / 6.0;
+        if (node.temperature > hottest_temp) {
+          hottest_temp = node.temperature;
+          hottest_name = name;
+        }
       }
     }
+
+  if (enable_failure_ && hottest_temp > max_temp_threshold_) {
+          diagnostic_msgs::msg::DiagnosticStatus diag;
+          diag.name = "THERMAL_NODE_OVERHEAT";
+          diag.level = diagnostic_msgs::msg::DiagnosticStatus::ERROR;
+          diag.message = "Overheating after cooling";
+          diag.hardware_id = hottest_name;
+
+          diagnostic_msgs::msg::KeyValue kv;
+          kv.key = "temperature_C";
+          kv.value = std::to_string(hottest_temp);
+          diag.values.push_back(kv);
+
+          diag_pub_->publish(diag);
+        }
+  
+
+
+  // if (cooling_active_) {
+  //   for (auto &[name, node] : thermal_nodes_) {
+  //     double target_temp = initial_temperatures_[name];
+  //     double diff = node.temperature - target_temp;
+  //     if (std::abs(diff) > 0.5) {
+  //       node.temperature -= std::copysign(cooling_rate_ * thermal_update_dt_, diff);
+  //     } else {
+  //       node.temperature = target_temp;
+  //     }
+
+  //     if (enable_failure_ && node.temperature > max_temp_threshold_) {
+  //       diagnostic_msgs::msg::DiagnosticStatus diag;
+  //       diag.name = "THERMAL_NODE_OVERHEAT";
+  //       diag.level = diagnostic_msgs::msg::DiagnosticStatus::ERROR;
+  //       diag.message = "Overheating after cooling";
+  //       diag.hardware_id = name;
+
+  //       diagnostic_msgs::msg::KeyValue kv;
+  //       kv.key = "temperature_C";
+  //       kv.value = std::to_string(node.temperature);
+  //       diag.values.push_back(kv);
+
+  //       diag_pub_->publish(diag);
+  //     }
+  //   }
 
     
-    bool all_below = true;
-    for (const auto &[name, node] : thermal_nodes_) {
-      if (node.temperature > initial_temperatures_[name] + 0.5) {
-        all_below = false;
-        break;
-      }
-    }
+  //   bool all_below = true;
+  //   for (const auto &[name, node] : thermal_nodes_) {
+  //     if (node.temperature > initial_temperatures_[name] + 0.5) {
+  //       all_below = false;
+  //       break;
+  //     }
+  //   }
 
-    if (all_below) {
-      cooling_active_ = false;
-      RCLCPP_INFO(this->get_logger(), "Cooling complete, system stabilized.");
-    }
-  }
+  //   if (all_below) {
+  //     cooling_active_ = false;
+  //     RCLCPP_INFO(this->get_logger(), "Cooling complete, system stabilized.");
+  //   }
+  // }
 
 
 
-  space_station_thermal_control::msg::ThermalNodeDataArray node_msg;
+  space_station_interfaces::msg::ThermalNodeDataArray node_msg;
   for (const auto &[name, node] : thermal_nodes_) {
-    space_station_thermal_control::msg::ThermalNodeData data;
+    space_station_interfaces::msg::ThermalNodeData data;
     data.name = name;
     data.temperature = node.temperature;
     data.heat_capacity = node.heat_capacity;
@@ -258,9 +314,9 @@ void ThermalSolverNode::updateSimulation()
   node_pub_->publish(node_msg);
   publishThermalNetworkDiag(node_msg.nodes);
 
-  space_station_thermal_control::msg::ThermalLinkFlowsArray link_msg;
+  space_station_interfaces::msg::ThermalLinkFlowsArray link_msg;
   for (const auto &link : thermal_links_) {
-    space_station_thermal_control::msg::ThermalLinkFlows l;
+    space_station_interfaces::msg::ThermalLinkFlows l;
     l.node_a = link.from;
     l.node_b = link.to;
     l.conductance = link.conductance;
@@ -275,7 +331,7 @@ void ThermalSolverNode::updateSimulation()
 }
 
 void ThermalSolverNode::publishThermalNetworkDiag(
-    const std::vector<space_station_thermal_control::msg::ThermalNodeData> &nodes)
+    const std::vector<space_station_interfaces::msg::ThermalNodeData> &nodes)
 {
   using diagnostic_msgs::msg::DiagnosticStatus;
   using diagnostic_msgs::msg::KeyValue;

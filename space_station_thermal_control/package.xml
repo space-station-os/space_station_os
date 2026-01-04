@@ -11,7 +11,7 @@
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
   <depend>std_srvs</depend>
-  <depend>space_station_eclss</depend>
+  <depend>space_station_interfaces</depend>
   <!--depend>ssos_new_description</depend -->
 
   <buildtool_depend>ament_cmake</buildtool_depend>

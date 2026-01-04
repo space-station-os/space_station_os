@@ -1,0 +1,5 @@
+ddcu_node:
+  ros__parameters:
+    ddcu_type: "DDCU-I"
+    regulation_nominal: 124.5
+    regulation_tolerance: 1.5

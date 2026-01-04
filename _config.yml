@@ -1,0 +1,2 @@
+exclude:
+  - space_station_gnc/dashboard-ui/node_modules

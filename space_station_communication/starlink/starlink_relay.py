@@ -18,8 +18,8 @@ async def relay_handler(ws):
         clients.remove(ws)
 
 async def main():
-    print("Starlink relay server running on ws://localhost:8080")
-    async with websockets.serve(relay_handler, "0.0.0.0", 8080):
+    print("Starlink relay server running on ws://localhost:8081")
+    async with websockets.serve(relay_handler, "0.0.0.0", 8081):
         await asyncio.Future()
 
 if __name__ == '__main__':

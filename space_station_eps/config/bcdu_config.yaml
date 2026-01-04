@@ -1,0 +1,19 @@
+bcdu_node:
+  ros__parameters:
+    # Discharge and charge limits
+    max_discharge_current_A: 127.0      # Fault Isolator limit (FI)
+    max_charge_current_A: 65.0          # Conservative default
+
+    # Regulation voltage range
+    regulation_min_V: 130.0
+    regulation_max_V: 180.0
+    regulation_voltage: 150.0           # Nominal setpoint to MBSU during discharge
+
+    # SSU hysteresis thresholds (replace old bus_* thresholds)
+    ssu_charge_enter_v: 160.0           # Enter charge when SSU >= this
+    ssu_discharge_enter_v: 152.0        # Enter discharge when SSU <= this
+    ssu_nominal_v: 160.0                # Feed MBSU this voltage during charge
+
+    # Battery topology
+    num_channels: 12
+    orus_per_channel: 2

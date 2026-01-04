@@ -13,11 +13,13 @@
 #include "std_msgs/msg/string.hpp"
 #include "diagnostic_msgs/msg/diagnostic_status.hpp"
 #include "diagnostic_msgs/msg/key_value.hpp"
-#include "space_station_thermal_control/msg/thermal_node_data_array.hpp"
-#include "space_station_thermal_control/msg/thermal_node_data.hpp"
-#include "space_station_thermal_control/msg/thermal_link_flows_array.hpp"
-#include "space_station_thermal_control/msg/thermal_link_flows.hpp"
-#include "space_station_thermal_control/srv/node_heat_flow.hpp"
+#include "space_station_interfaces/msg/thermal_node_data_array.hpp"
+#include "space_station_interfaces/msg/thermal_node_data.hpp"
+#include "space_station_interfaces/msg/thermal_link_flows_array.hpp"
+#include "space_station_interfaces/msg/thermal_link_flows.hpp"
+
+#include <rclcpp_action/rclcpp_action.hpp>
+#include <space_station_interfaces/action/coolant.hpp>
 
 #include "yaml-cpp/yaml.h"
 #include "ament_index_cpp/get_package_share_directory.hpp"
@@ -47,16 +49,18 @@ public:
   ~ThermalSolverNode();
 
 private:
+  using GoalHandleCoolant = rclcpp_action::ClientGoalHandle<space_station_interfaces::action::Coolant>;
+
   void parseYAMLConfig(const std::string &yaml_path);
   void updateSimulation();
   double compute_dTdt(const std::string &name, const std::unordered_map<std::string, double> &temps);
   void coolingCallback();
-  void publishThermalNetworkDiag(const std::vector<space_station_thermal_control::msg::ThermalNodeData> &nodes);
+  void publishThermalNetworkDiag(const std::vector<space_station_interfaces::msg::ThermalNodeData> &nodes);
   // ROS publishers and clients
-  rclcpp::Publisher<space_station_thermal_control::msg::ThermalNodeDataArray>::SharedPtr node_pub_;
-  rclcpp::Publisher<space_station_thermal_control::msg::ThermalLinkFlowsArray>::SharedPtr link_pub_;
+  rclcpp::Publisher<space_station_interfaces::msg::ThermalNodeDataArray>::SharedPtr node_pub_;
+  rclcpp::Publisher<space_station_interfaces::msg::ThermalLinkFlowsArray>::SharedPtr link_pub_;
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticStatus>::SharedPtr diag_pub_;
-  rclcpp::Client<space_station_thermal_control::srv::NodeHeatFlow>::SharedPtr cooling_client_;
+  rclcpp_action::Client<space_station_interfaces::action::Coolant>::SharedPtr cooling_client_;
 
   rclcpp::TimerBase::SharedPtr timer_;
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_callback_;
@@ -79,6 +83,7 @@ private:
   // Simulation metrics
   double avg_temperature_ = 0.0;
   double avg_internal_power_ = 0.0;
+  double feedback_latest_temp_ = 0.0;
 
   std::string config_path_;
   std::default_random_engine rng_;

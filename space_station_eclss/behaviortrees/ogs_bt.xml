@@ -1,0 +1,10 @@
+<root main_tree_to_execute="OGSMain">
+  <BehaviorTree ID="OGSMain">
+    <Sequence name="OGS_Sequence">
+      <RequestProductWater/>
+      <Electrolysis/>
+      <SabatierReactor/>
+      <SendGreyWater/>
+    </Sequence>
+  </BehaviorTree>
+</root>

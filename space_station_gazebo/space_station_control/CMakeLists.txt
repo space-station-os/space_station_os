@@ -35,13 +35,13 @@ include_directories(include)
 add_executable(teleop src/teleop.cpp)
 ament_target_dependencies(teleop std_srvs rosidl_default_generators rclcpp sensor_msgs)
 
-rosidl_target_interfaces(teleop ${PROJECT_NAME} "rosidl_typesupport_cpp")
-
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(teleop ${cpp_typesupport_target})
 
 add_executable(mux src/mux.cpp)
 ament_target_dependencies(mux std_srvs rosidl_default_generators rclcpp sensor_msgs)
 
-rosidl_target_interfaces(mux ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(mux ${cpp_typesupport_target})
 
 install(TARGETS
   teleop

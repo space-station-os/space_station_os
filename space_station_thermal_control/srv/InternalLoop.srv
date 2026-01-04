@@ -1,6 +1,0 @@
-# Request (empty, just asks for status)
-bool status 
----
-float64 loop_capacity         # in kg
-float64 temperature           # in deg C
-float64 heat_transferred      # in kJ
