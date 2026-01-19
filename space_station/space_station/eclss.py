@@ -454,4 +454,3 @@ class EclssWidget(QWidget):
             goal.urine_volume = 5.0
             self.node.get_logger().info("[Startup] Sending initial WRS goal...")
             self.wrs_client.send_goal_async(goal)
-
