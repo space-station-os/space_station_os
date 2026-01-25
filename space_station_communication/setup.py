@@ -27,7 +27,7 @@ setup(
     maintainer_email='siddarth.dayasagar@gmail.com',
     description='ROS 2 to CCSDS bridge for space station communication, including Starlink relay and ground decoding.',
     license='MIT',
-    tests_require=['pytest'],
+
     entry_points={
         'console_scripts': [
             'space_bridge = space_station_communication.space_station.encoder:main',

@@ -1,1 +1,0 @@
-# space_station_gazebo

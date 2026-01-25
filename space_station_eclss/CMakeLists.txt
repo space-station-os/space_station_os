@@ -4,6 +4,8 @@ project(space_station_eclss)
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
@@ -124,12 +126,23 @@ ament_target_dependencies(wrs rclcpp)
 
 
 install(TARGETS
+  ars_systems
+  ogs_systems
+  wrs_systems
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
+install(TARGETS
   ars
   ogs
   wrs
-  DESTINATION lib/${PROJECT_NAME})
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
 
-  install(DIRECTORY launch/
+
+install(DIRECTORY launch/
   DESTINATION share/${PROJECT_NAME}/launch
 )
 
