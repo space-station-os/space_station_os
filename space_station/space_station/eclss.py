@@ -31,7 +31,7 @@ import datetime
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from std_msgs.msg import Float64
-from space_station_interfaces.action import AirRevitalisation, WaterRecovery
+from space_station_interfaces.action import AirRevitalisation, WaterRecovery, OxygenGeneration
 from space_station_interfaces.srv import O2Request, RequestProductWater
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
 
@@ -233,7 +233,7 @@ class EclssWidget(QWidget):
         self.wrs_client = ActionClient(self.node, WaterRecovery, '/water_recovery_systems')
         self.o2_client = self.node.create_client(O2Request, '/ogs/request_o2')
         self.water_client = self.node.create_client(RequestProductWater, '/wrs/product_water_request')
-
+        
         # Subscriptions
         self.node.create_subscription(Float64, '/co2_storage', lambda m: setattr(self, "latest_co2", m.data), 10)
         self.node.create_subscription(Float64, '/o2_storage', lambda m: setattr(self, "latest_o2", m.data), 10)

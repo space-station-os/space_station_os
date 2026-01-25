@@ -260,7 +260,7 @@ void WRSActionServer::send_water_to_ogs(float volume, float iodine_ppm)
   }
 
   space_station_interfaces::action::OxygenGeneration::Goal goal;
-  goal.input_water_mass = volume;
+  goal.input_water_mass = volume*1000;
 
   auto send_goal_options = rclcpp_action::Client<space_station_interfaces::action::OxygenGeneration>::SendGoalOptions();
   send_goal_options.result_callback = [this](const GoalHandleOGS::WrappedResult & result) {

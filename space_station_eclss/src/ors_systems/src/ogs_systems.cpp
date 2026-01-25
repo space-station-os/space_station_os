@@ -28,6 +28,9 @@ OGSSystem::OGSSystem(const rclcpp::NodeOptions & options)
 
   this->declare_parameter("max_o2_capacity", 10000.0);
   max_o2_capacity_ = this->get_parameter("max_o2_capacity").as_double();
+  
+  initialize_systems();
+
 
 }
 
@@ -264,6 +267,11 @@ void OGSSystem::o2_service_callback(
     std_msgs::msg::Float64 o2_msg;
     o2_msg.data = latest_o2_;
     o2_pub_->publish(o2_msg);
+  }
+  else {
+    response->o2_resp = 0.0;
+    response->success = false;
+    response->message = "Insufficient O2 in storage";
   }
 
 }

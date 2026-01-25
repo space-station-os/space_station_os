@@ -134,7 +134,7 @@ class MainWindow(QMainWindow):
         # Split with LeftPanel
         split_layout = QHBoxLayout()
         self.left_panel = LeftPanel()
-        self.left_panel.setFixedWidth(550)
+        
         split_layout.addWidget(self.left_panel)
         split_layout.addWidget(self.tabs)
         split_layout.setStretch(0, 0)
