@@ -13,7 +13,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from std_msgs.msg import Float64, String
 from diagnostic_msgs.msg import DiagnosticStatus
 from sensor_msgs.msg import Temperature
-from dotenv import load_dotenv
+
 from openai import OpenAI  
 import re
 from std_msgs.msg import Bool
@@ -31,12 +31,15 @@ except Exception:
     ThermalNodeDataArray = None
     ThermalLinkFlowsArray = None
     ExternalLoopStatus = None
-   
+from ament_index_python.packages import get_package_share_directory
+from dotenv import load_dotenv
 
 
 
 
-load_dotenv(override=True)
+pkg_dir = get_package_share_directory("space_station")
+env_path = os.path.join(pkg_dir, ".env")
+load_dotenv(env_path, override=True)
 class SsosAIAgent(QObject):
     """
     Reads ROS 2 telemetry via shared GUI node (ECLSS + Thermal),

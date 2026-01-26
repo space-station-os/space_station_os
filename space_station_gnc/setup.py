@@ -13,7 +13,6 @@ setup(
     maintainer_email='your-email@example.com',
     description='Description of your package',
     license='License',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'demo_crisis = space_station_gnc.demo_crisis:main',
