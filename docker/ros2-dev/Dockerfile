@@ -2,7 +2,7 @@
 FROM osrf/ros:jazzy-desktop
 
 # Maintainer
-LABEL maintainer="Space Station OS <spacestationos@spacedata.co.jp>"
+LABEL maintainer="Space Station OS <kato.hiroki@space-station-os.org>"
 
 # Environment setup
 ENV DEBIAN_FRONTEND=noninteractive
