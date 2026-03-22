@@ -8,28 +8,27 @@
   <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
-  <depend>sensor_msgs</depend>
-  <depend>std_msgs</depend>
-  <depend>std_srvs</depend>
-  <depend>space_station_interfaces</depend>
-  <!--depend>ssos_new_description</depend -->
-
-  <buildtool_depend>ament_cmake</buildtool_depend>
-  <member_of_group>rosidl_interface_packages</member_of_group>
-  
   <buildtool_depend>rosidl_default_generators</buildtool_depend>
+
   <build_depend>rosidl_default_generators</build_depend>
   <exec_depend>rosidl_default_runtime</exec_depend>
 
   <build_depend>ament_index_cpp</build_depend>
   <exec_depend>ament_index_cpp</exec_depend>
 
+
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>space_station_interfaces</depend>
   <depend>rclcpp</depend>
   <depend>urdf</depend>
   <depend>rclpy</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
+
+  <member_of_group>rosidl_interface_packages</member_of_group>
 
   <export>  
     <build_type>ament_cmake</build_type>
