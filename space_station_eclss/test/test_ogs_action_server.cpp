@@ -2,13 +2,14 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include "space_station_eclss/ogs_system.hpp"
-#include "space_station_eclss/action/oxygen_generation.hpp"
-#include "space_station_eclss/srv/request_product_water.hpp"
-#include "space_station_eclss/srv/co2_request.hpp"
-#include "space_station_eclss/srv/grey_water.hpp"
+#include "space_station_interfaces/action/oxygen_generation.hpp"
+#include "space_station_interfaces/srv/request_product_water.hpp"
+#include "space_station_interfaces/srv/co2_request.hpp"
+#include "space_station_interfaces/srv/grey_water.hpp"
 
-using OxygenGeneration = space_station_eclss::action::OxygenGeneration;
+using OxygenGeneration = space_station_interfaces::action::OxygenGeneration;
 using GoalHandleOGS = rclcpp_action::ClientGoalHandle<OxygenGeneration>;
+using namespace std::chrono_literals;
 
 class OGSTestFixture : public ::testing::Test {
 protected:
@@ -21,53 +22,44 @@ protected:
   }
 
   void SetUp() override {
-    // Main OGS node
     ogs_node_ = std::make_shared<space_station_eclss::OGSSystem>();
-
-    // Test client node
+    mock_node_ = std::make_shared<rclcpp::Node>("ogs_test_mock");
     client_node_ = std::make_shared<rclcpp::Node>("ogs_test_client");
 
-    // === Mock WRS (Product Water) ===
-    wrs_mock_ = client_node_->create_service<space_station_eclss::srv::RequestProductWater>(
+    wrs_mock_ = mock_node_->create_service<space_station_interfaces::srv::RequestProductWater>(
         "/wrs/product_water_request",
-        [](const std::shared_ptr<space_station_eclss::srv::RequestProductWater::Request> req,
-           std::shared_ptr<space_station_eclss::srv::RequestProductWater::Response> res) {
-          RCLCPP_INFO(rclcpp::get_logger("ogs_test_node"),
-                      "[MOCK WRS] Received request for %.2f L water", req->amount);
+        [](const std::shared_ptr<space_station_interfaces::srv::RequestProductWater::Request> req,
+           std::shared_ptr<space_station_interfaces::srv::RequestProductWater::Response> res) {
           res->success = true;
           res->water_granted = req->amount;
           res->message = "Mock water granted";
         });
 
-    // === Mock ARS (CO₂) ===
-    ars_mock_ = client_node_->create_service<space_station_eclss::srv::Co2Request>(
+    ars_mock_ = mock_node_->create_service<space_station_interfaces::srv::Co2Request>(
         "/ars/request_co2",
-        [](const std::shared_ptr<space_station_eclss::srv::Co2Request::Request> req,
-           std::shared_ptr<space_station_eclss::srv::Co2Request::Response> res) {
-          RCLCPP_INFO(rclcpp::get_logger("ogs_test_node"),
-                      "[MOCK ARS] Received request for %.2f g CO₂", req->co2_req);
+        [](const std::shared_ptr<space_station_interfaces::srv::Co2Request::Request> req,
+           std::shared_ptr<space_station_interfaces::srv::Co2Request::Response> res) {
           res->success = true;
           res->co2_resp = req->co2_req;
-          res->message = "Mock CO₂ granted";
+          res->message = "Mock CO2 granted";
         });
 
-    // === Mock Grey Water ===
-    grey_mock_ = client_node_->create_service<space_station_eclss::srv::GreyWater>(
+    grey_mock_ = mock_node_->create_service<space_station_interfaces::srv::GreyWater>(
         "/grey_water",
-        [](const std::shared_ptr<space_station_eclss::srv::GreyWater::Request> req,
-           std::shared_ptr<space_station_eclss::srv::GreyWater::Response> res) {
-          RCLCPP_INFO(rclcpp::get_logger("ogs_test_node"),
-                      "[MOCK GreyWater] Received %.2f L grey water", req->gray_water_liters);
+        [](const std::shared_ptr<space_station_interfaces::srv::GreyWater::Request> req,
+           std::shared_ptr<space_station_interfaces::srv::GreyWater::Response> res) {
+          (void)req;
           res->success = true;
           res->message = "Mock grey water accepted";
         });
 
-    // Executor
     executor_ = std::make_shared<rclcpp::executors::MultiThreadedExecutor>();
+    executor_->add_node(mock_node_);
     executor_->add_node(ogs_node_);
-   
+
     spin_thread_ = std::thread([this]() { executor_->spin(); });
-  }
+    rclcpp::sleep_for(300ms);
+}
 
   void TearDown() override {
     executor_->cancel();
@@ -77,13 +69,14 @@ protected:
   }
 
   std::shared_ptr<space_station_eclss::OGSSystem> ogs_node_;
+  std::shared_ptr<rclcpp::Node> mock_node_;
   std::shared_ptr<rclcpp::Node> client_node_;
   std::shared_ptr<rclcpp::Executor> executor_;
   std::thread spin_thread_;
 
-  rclcpp::Service<space_station_eclss::srv::RequestProductWater>::SharedPtr wrs_mock_;
-  rclcpp::Service<space_station_eclss::srv::Co2Request>::SharedPtr ars_mock_;
-  rclcpp::Service<space_station_eclss::srv::GreyWater>::SharedPtr grey_mock_;
+  rclcpp::Service<space_station_interfaces::srv::RequestProductWater>::SharedPtr wrs_mock_;
+  rclcpp::Service<space_station_interfaces::srv::Co2Request>::SharedPtr ars_mock_;
+  rclcpp::Service<space_station_interfaces::srv::GreyWater>::SharedPtr grey_mock_;
 };
 
 TEST_F(OGSTestFixture, ActionGoalCompletes) {
