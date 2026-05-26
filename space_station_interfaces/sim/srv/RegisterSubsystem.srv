@@ -1,0 +1,8 @@
+# Subsystem registers itself with system_manager
+string subsystem_name
+string[] published_topics
+string[] subscribed_topics
+string heartbeat_topic
+---
+bool accepted
+string message
