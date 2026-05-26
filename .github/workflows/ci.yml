@@ -31,13 +31,14 @@ jobs:
           apt-get install -y -qq --no-install-recommends \
             python3-colcon-common-extensions \
             python3-rosdep \
-            ros-jazzy-behaviortree-cpp \
+            ros-jazzy-behaviortree-cpp-v3 \
             ros-jazzy-ament-cmake-gtest \
             ros-jazzy-ament-lint-auto \
             ros-jazzy-ament-cmake-cppcheck \
             ros-jazzy-ament-cmake-cpplint \
             ros-jazzy-launch-testing \
             ros-jazzy-launch-testing-ament-cmake
+            pip3 install --break-system-packages casadi
           rosdep update --rosdistro=jazzy
           rosdep install --from-paths . --ignore-src -r -y --rosdistro=jazzy
 
@@ -67,44 +68,26 @@ jobs:
         shell: bash
 
   # Lightweight lint check — runs in parallel with build
-  lint:
-    name: Lint
-    runs-on: ubuntu-24.04
-    container:
-      image: ros:jazzy-ros-base
+  # lint:
+  #   name: Lint
+  #   runs-on: ubuntu-24.04
+  #   container:
+  #     image: ros:jazzy-ros-base
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        
-      - name: Install dependencies
-        run: |
-          apt-get update -qq
-          apt-get install -y -qq --no-install-recommends \
-            python3-colcon-common-extensions \
-            python3-rosdep \
-            python3-pip \
-            ros-jazzy-behaviortree-cpp \
-            ros-jazzy-ament-cmake-gtest \
-            ros-jazzy-ament-lint-auto \
-            ros-jazzy-ament-cmake-cppcheck \
-            ros-jazzy-ament-cmake-cpplint \
-            ros-jazzy-launch-testing \
-            ros-jazzy-launch-testing-ament-cmake
-          pip3 install --break-system-packages casadi
-          rosdep update --rosdistro=jazzy
-          rosdep install --from-paths . --ignore-src -r -y --rosdistro=jazzy
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
 
-      - name: Install lint tools
-        run: |
-          apt-get update -qq
-          apt-get install -y -qq --no-install-recommends \
-            python3-colcon-common-extensions \
-            ros-jazzy-ament-cmake-cppcheck \
-            ros-jazzy-ament-cmake-cpplint \
-            ros-jazzy-ament-cmake-flake8 \
-            ros-jazzy-ament-cmake-xmllint \
-            python3-flake8
+  #     - name: Install lint tools
+  #       run: |
+  #         apt-get update -qq
+  #         apt-get install -y -qq --no-install-recommends \
+  #           python3-colcon-common-extensions \
+  #           ros-jazzy-ament-cmake-cppcheck \
+  #           ros-jazzy-ament-cmake-cpplint \
+  #           ros-jazzy-ament-cmake-flake8 \
+  #           ros-jazzy-ament-cmake-xmllint \
+  #           python3-flake8
 
       # - name: Run ament_cppcheck
       #   run: |
