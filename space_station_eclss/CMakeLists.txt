@@ -24,21 +24,6 @@ find_package(space_station_interfaces REQUIRED)
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-set(msg_files
-  "msg/AstronautHealth.msg"
-  "action/AirRevitalisation.action"
-  "action/OxygenGeneration.action"
-  "action/WaterRecovery.action"
-  "src/wrs_systems/srv/RequestProductWater.srv"
-  "src/ars_systems/srv/Co2Request.srv"
-  "src/ors_systems/srv/O2Request.srv"
-  "src/ors_systems/srv/GreyWater.srv"
-)
-
-rosidl_generate_interfaces(${PROJECT_NAME}
-  ${msg_files} 
-  DEPENDENCIES  std_msgs sensor_msgs visualization_msgs
-)
 
 
 install(PROGRAMS
