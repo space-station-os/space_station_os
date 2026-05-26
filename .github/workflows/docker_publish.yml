@@ -1,0 +1,62 @@
+# .github/workflows/docker-publish.yml
+# Builds and publishes Docker image to GHCR
+# Only runs on main merges and version tags — NOT on PRs
+
+name: Docker Publish
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+# Don't run multiple Docker builds for the same ref
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  docker:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-24.04
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            # tag with "latest" on main
+            type=raw,value=latest,enable={{is_default_branch}}
+            # tag with version on version tags (v0.8.8 → 0.8.8)
+            type=semver,pattern={{version}}
+            # tag with short sha for traceability
+            type=sha,prefix=
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/ros2-dev/Dockerfile
+          push: true
