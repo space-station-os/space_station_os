@@ -45,6 +45,16 @@ set(msg_files
   "atcs/srv/VentHeat.srv"
   "atcs/action/Coolant.action"
 
+
+  # Sim
+  "sim/msg/FaultEvent.msg"
+  "sim/msg/SubsystemHeartbeat.msg"
+  "sim/msg/SystemState.msg"
+  "sim/msg/WorldState.msg"
+  "sim/srv/InjectFault.srv"
+  "sim/srv/RegisterSubsystem.srv"
+
+
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}

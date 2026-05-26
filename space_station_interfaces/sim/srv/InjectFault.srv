@@ -1,0 +1,8 @@
+# Request fault injection from simulation controller
+string target_subsystem
+string fault_type
+string parameters_json
+float64 duration_s
+---
+bool success
+string message
