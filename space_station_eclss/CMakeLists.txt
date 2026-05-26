@@ -51,8 +51,6 @@ ament_target_dependencies(ars_systems
   space_station_interfaces
   sensor_msgs
 )
-rosidl_get_typesupport_target(cpp_typesupport_target space_station_interfaces "rosidl_typesupport_cpp")
-target_link_libraries(ars_systems ${cpp_typesupport_target})
 
 
 add_library(ogs_systems
@@ -70,8 +68,7 @@ ament_target_dependencies(ogs_systems
   sensor_msgs
   space_station_interfaces
 )
-rosidl_get_typesupport_target(cpp_typesupport_target space_station_interfaces "rosidl_typesupport_cpp")
-target_link_libraries(ogs_systems ${cpp_typesupport_target})
+
 
 
 add_library(wrs_systems
@@ -89,8 +86,7 @@ ament_target_dependencies(wrs_systems
   sensor_msgs
   space_station_interfaces
 )
-rosidl_get_typesupport_target(cpp_typesupport_target space_station_interfaces "rosidl_typesupport_cpp")
-target_link_libraries(wrs_systems ${cpp_typesupport_target})
+
 
 
 # ------------------------------------------------------------------

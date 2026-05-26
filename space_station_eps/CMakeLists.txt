@@ -18,7 +18,7 @@ find_package(rosidl_default_generators REQUIRED)
 include_directories(include)
 
 add_executable(battery_manager_node src/battery_health.cpp)
-rosidl_get_typesupport_target(cpp_typesupport_target space_station_interfaces "rosidl_typesupport_cpp")
+
 target_link_libraries(battery_manager_node ${cpp_typesupport_target})
 ament_target_dependencies(battery_manager_node
   rclcpp
