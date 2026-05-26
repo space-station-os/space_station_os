@@ -4,15 +4,21 @@ project(space_station_eps)
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
-
-
-ament_export_dependencies(rosidl_default_runtime)
-
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclcpp_action REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(diagnostic_msgs REQUIRED)
+find_package(ament_index_cpp REQUIRED)
+find_package(space_station_interfaces REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 
 include_directories(include)
 
 add_executable(battery_manager_node src/battery_health.cpp)
-rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+rosidl_get_typesupport_target(cpp_typesupport_target space_station_interfaces "rosidl_typesupport_cpp")
 target_link_libraries(battery_manager_node ${cpp_typesupport_target})
 ament_target_dependencies(battery_manager_node
   rclcpp

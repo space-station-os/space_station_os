@@ -25,7 +25,7 @@ find_package(ament_index_cpp REQUIRED)
 
 ament_export_dependencies(rosidl_default_runtime)
 
-rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+rosidl_get_typesupport_target(cpp_typesupport_target space_station_interfaces "rosidl_typesupport_cpp")
 
 add_executable(radiator src/radiators.cpp)
 ament_target_dependencies(radiator rosidl_default_generators rclcpp sensor_msgs space_station_interfaces)
