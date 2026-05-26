@@ -38,7 +38,7 @@ jobs:
             ros-jazzy-ament-cmake-cpplint \
             ros-jazzy-launch-testing \
             ros-jazzy-launch-testing-ament-cmake
-            pip3 install --break-system-packages casadi
+            python3 -m pip install --break-system-packages casadi
           rosdep update --rosdistro=jazzy
           rosdep install --from-paths . --ignore-src -r -y --rosdistro=jazzy
 
