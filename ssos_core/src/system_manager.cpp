@@ -146,18 +146,38 @@ void SystemManager::on_heartbeat(
   it->second.last_heartbeat = *msg;
   it->second.last_heard = this->now();
 
-  // Immediate re-evaluation on health change
+  if (it->second.has_active_fault) {
+    it->second.last_heartbeat.healthy = false;
+    it->second.last_heartbeat.status_message =
+      "Fault active: " + it->second.active_fault_desc;
+  }
+
   run_evaluation();
 }
 
 void SystemManager::on_fault_event(const FaultEvent::SharedPtr msg)
 {
+  // Ignore faults from unregistered subsystems
+  if (subsystems_.find(msg->subsystem_name) == subsystems_.end()) {
+    RCLCPP_WARN(get_logger(),
+      "Fault event from unregistered subsystem '%s' — ignoring",
+      msg->subsystem_name.c_str());
+    return;
+  }
+
   RCLCPP_WARN(get_logger(), "Fault event: subsystem=%s type=%s severity=%d desc='%s'",
     msg->subsystem_name.c_str(),
     msg->fault_type.c_str(),
     msg->severity,
     msg->description.c_str());
 
+  // Mark the subsystem as unhealthy
+  subsystems_[msg->subsystem_name].last_heartbeat.healthy = false;
+  subsystems_[msg->subsystem_name].last_heartbeat.status_message =
+    "Fault: " + msg->fault_type + " — " + msg->description;
+  subsystems_[msg->subsystem_name].has_active_fault = true;
+  subsystems_[msg->subsystem_name].active_fault_desc = msg->fault_type;
+  subsystems_[msg->subsystem_name].last_heartbeat.healthy = false;
   // Emergency faults go straight to SAFE
   if (msg->severity == FaultEvent::SEVERITY_EMERGENCY) {
     publish_state(SystemState::SAFE,
@@ -165,7 +185,6 @@ void SystemManager::on_fault_event(const FaultEvent::SharedPtr msg)
     return;
   }
 
-  // For non-emergency faults, let the normal evaluation handle it
   run_evaluation();
 }
 
@@ -174,12 +193,10 @@ void SystemManager::on_fault_event(const FaultEvent::SharedPtr msg)
 // ---------------------------------------------------------------------------
 uint8_t SystemManager::evaluate_system_state() const
 {
-  // If in SAFE mode, stay there (requires manual intervention)
   if (current_state_ == SystemState::SAFE) {
     return SystemState::SAFE;
   }
 
-  // No subsystems registered yet — still booting
   if (subsystems_.empty()) {
     return SystemState::INIT;
   }
@@ -190,7 +207,6 @@ uint8_t SystemManager::evaluate_system_state() const
   auto now = this->now();
 
   for (const auto & [name, record] : subsystems_) {
-    // Check for heartbeat timeout
     double elapsed = (now - record.last_heard).seconds();
     bool timed_out = elapsed > heartbeat_timeout_s_;
 
@@ -201,7 +217,7 @@ uint8_t SystemManager::evaluate_system_state() const
       all_active = false;
     }
 
-    if (!record.last_heartbeat.healthy || timed_out) {
+    if (!record.last_heartbeat.healthy || timed_out || record.has_active_fault) {
       all_healthy = false;
     }
   }

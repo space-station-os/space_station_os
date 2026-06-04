@@ -32,6 +32,8 @@ struct SubsystemRecord
   std::vector<std::string> subscribed_topics;
   std::string heartbeat_topic;
   SubsystemHeartbeat last_heartbeat;
+  bool has_active_fault{false};
+  std::string active_fault_desc;
   rclcpp::Subscription<SubsystemHeartbeat>::SharedPtr heartbeat_sub;
   rclcpp::Time last_heard;
   bool registered{false};
