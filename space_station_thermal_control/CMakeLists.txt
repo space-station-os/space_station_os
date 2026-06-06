@@ -24,34 +24,6 @@ find_package(ament_index_cpp REQUIRED)
 
 
 
-set(msg_files
-
-  "msg/TankStatus.msg"
-
-
-  "msg/ExternalLoopStatus.msg"
-  "srv/VentHeat.srv"
-  "msg/ThermalLinkFlows.msg"
-  "msg/ThermalLinkFlowsArray.msg"
-  "msg/ThermalNodeData.msg"
-  "msg/ThermalNodeDataArray.msg"
-  "srv/GetSubTopic.srv"
- 
-  "msg/SolarPanelsQ.msg"
-
-  "action/Coolant.action"
-
-)
-
-rosidl_generate_interfaces(${PROJECT_NAME}
-  ${msg_files} 
-  DEPENDENCIES  std_msgs sensor_msgs 
-)
-
-ament_export_dependencies(rosidl_default_runtime)
-
-rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
-
 add_executable(radiator src/radiators.cpp)
 ament_target_dependencies(radiator rosidl_default_generators rclcpp sensor_msgs space_station_interfaces)
 target_link_libraries(radiator ${cpp_typesupport_target})
