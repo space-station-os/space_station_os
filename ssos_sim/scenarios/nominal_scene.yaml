@@ -1,0 +1,19 @@
+scenario:
+  name: nominal_operations
+  duration_s: 300
+  sim_rate_hz: 10
+
+  initial_conditions:
+    altitude_km: 408.0
+    orbital_velocity_mps: 7660.0
+    atmospheric_o2_pct: 20.9
+    atmospheric_co2_ppm: 400.0
+    cabin_pressure_kpa: 101.3
+    cabin_temp_celsius: 22.0
+    solar_flux_w_m2: 1361.0
+    in_eclipse: false
+
+  faults: []
+
+  expected_outcomes:
+    - all_subsystems_nominal_at_s: 30
