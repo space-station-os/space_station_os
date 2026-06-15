@@ -7,11 +7,29 @@
 using namespace ssos_eclss;
 using namespace ssos_eclss::sabatier;
 
-TEST(SabatierKinetics, ConversionRisesWithTemperature)
+TEST(SabatierKinetics, KineticLimitedAtLowTemperature)
 {
+  // Below ~375 C (648 K) kinetics are slow, so conversion is well below the
+  // equilibrium ceiling.
   ReactorKinetics k(default_kinetics_params());
-  EXPECT_LT(k.conversion(400.0), k.conversion(650.0));
-  EXPECT_LE(k.conversion(700.0), default_kinetics_params().max_conversion + 1.0e-9);
+  EXPECT_LT(k.conversion(500.0), 0.7);
+  EXPECT_LT(k.conversion(500.0), k.conversion(648.0));
+}
+
+TEST(SabatierKinetics, ISSOperatingConversionAbout95Percent)
+{
+  // ICES-2018-155 / ISS Sabatier: ~95% CO2 conversion at the operating point.
+  ReactorKinetics k(default_kinetics_params());
+  EXPECT_NEAR(k.conversion(648.0), 0.95, 0.03);
+}
+
+TEST(SabatierKinetics, EquilibriumLimitedAtHighTemperature)
+{
+  // The exothermic equilibrium conversion declines at high temperature, so
+  // conversion peaks at an intermediate T rather than rising monotonically.
+  ReactorKinetics k(default_kinetics_params());
+  EXPECT_LT(k.conversion(800.0), k.conversion(648.0));
+  EXPECT_LE(k.conversion(900.0), default_kinetics_params().max_conversion + 1.0e-9);
 }
 
 TEST(SabatierSystem, StoichiometryAndProducts)

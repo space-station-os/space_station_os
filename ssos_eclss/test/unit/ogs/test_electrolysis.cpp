@@ -36,8 +36,9 @@ TEST(Electrolysis, FaradayStoichiometry)
   const CellState s = cell.solve(20.0, 330.0, units::STD_PRESSURE_PA);
   // H2 should be twice O2 (2 H2 + O2 from 2 H2O).
   EXPECT_NEAR(s.h2_production_mol_s, 2.0 * s.o2_production_mol_s, 1.0e-12);
-  // Per cell, O2 = I/(4F).
-  EXPECT_NEAR(s.o2_production_mol_s, 20.0 / (4.0 * units::FARADAY), 1.0e-12);
+  // Per cell, O2 = Faradaic_efficiency * I/(4F).
+  const double fe = default_cell_params().faradaic_efficiency;
+  EXPECT_NEAR(s.o2_production_mol_s, fe * 20.0 / (4.0 * units::FARADAY), 1.0e-12);
 }
 
 TEST(Electrolysis, SystemProducesOxygen)
@@ -49,12 +50,33 @@ TEST(Electrolysis, SystemProducesOxygen)
     r = ogs.step_nominal(1.0);
   }
   EXPECT_GT(r.o2_production_kg_day, 0.0);
-  // OGA-class production a few kg/day.
+  // OGA-class production a few kg/day at the nominal 27 A.
   EXPECT_GT(r.o2_production_kg_day, 2.0);
   EXPECT_LT(r.o2_production_kg_day, 12.0);
   // 2 H2O consumed per O2.
-  EXPECT_NEAR(r.water_consumed_mol_s, 2.0 * r.o2_production_mol_s / 0.98, 1.0e-6 +
-              0.05 * r.water_consumed_mol_s);
+  EXPECT_NEAR(r.water_consumed_mol_s, 2.0 * r.o2_production_mol_s, 1.0e-12);
+}
+
+TEST(Electrolysis, MaxRateMatchesAOGA)
+{
+  // ICES-2023-311: 28-cell OGA delivers 9.25 kg O2/day at 46.9 A.
+  OgsParameters p = default_ogs_parameters();
+  OxygenGeneratorSystem ogs(p);
+  ogs.reset(330.0);
+  OgsResult r{};
+  for (int i = 0; i < 50; ++i) {
+    r = ogs.step(1.0, 46.9, 1.0e9);
+  }
+  EXPECT_NEAR(r.o2_production_kg_day, 9.25, 0.3);
+}
+
+TEST(Electrolysis, CellVoltageNearAOGAOperatingPoint)
+{
+  // Nominal cell voltage ~1.7 V at the 46.9 A operating point (AOGA endurance
+  // test). Evaluate a single cell at the stack temperature and loop pressure.
+  ElectrolysisCellModel cell(default_cell_params());
+  const CellState s = cell.solve(46.9, 330.0, 165474.0);
+  EXPECT_NEAR(s.voltage, 1.7, 0.15);
 }
 
 TEST(Electrolysis, FeedwaterLimiting)

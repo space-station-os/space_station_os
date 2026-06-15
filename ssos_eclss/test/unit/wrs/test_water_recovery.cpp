@@ -9,14 +9,36 @@
 using namespace ssos_eclss;
 using namespace ssos_eclss::wrs;
 
-TEST(Distillation, RecoversConfiguredFraction)
+TEST(Distillation, UPARecoversConfiguredFraction)
 {
+  // ICES-2023-097: UPA recovers ~87% of urine water (US pretreatment).
   DistillationModel d(default_distillation_params());
   const double feed = 5.0 / 86400.0;  // 5 kg/day
   const DistillationResult r = d.process(feed);
-  EXPECT_NEAR(r.distillate_kg_s, feed * 0.87, 1.0e-12);
-  EXPECT_NEAR(r.distillate_kg_s + r.brine_kg_s, feed, 1.0e-12);
+  EXPECT_NEAR(r.upa_distillate_kg_s, feed * 0.87, 1.0e-12);
+  EXPECT_NEAR(r.distillate_kg_s + r.brine_kg_s, feed, 1.0e-15);
   EXPECT_GT(r.energy_w, 0.0);
+}
+
+TEST(Distillation, BPARaisesTotalRecoveryToAbout98Percent)
+{
+  // With the Brine Processor Assembly, total urine water recovery ~= 98%.
+  DistillationModel d(default_distillation_params());
+  const double feed = 5.0 / 86400.0;
+  const DistillationResult r = d.process(feed);
+  EXPECT_GT(r.bpa_water_kg_s, 0.0);
+  EXPECT_NEAR(r.recovery_fraction, 0.98, 0.01);
+}
+
+TEST(Distillation, BPADisabledGivesUPAOnly)
+{
+  DistillationParams p = default_distillation_params();
+  p.brine_processor_enabled = false;
+  DistillationModel d(p);
+  const double feed = 5.0 / 86400.0;
+  const DistillationResult r = d.process(feed);
+  EXPECT_NEAR(r.bpa_water_kg_s, 0.0, 1.0e-15);
+  EXPECT_NEAR(r.recovery_fraction, 0.87, 1.0e-9);
 }
 
 TEST(Multifiltration, ReducesConductivity)

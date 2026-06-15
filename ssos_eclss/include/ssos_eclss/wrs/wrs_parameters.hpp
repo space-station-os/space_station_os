@@ -10,12 +10,17 @@ namespace wrs
 {
 
 /// Vapor Compression Distillation (Urine Processor Assembly) parameters.
+/// The UPA recovers ~85-87% of water from US-pretreated urine (target 90%).
+/// The optional Brine Processor Assembly (BPA) further dewaters the UPA brine,
+/// raising the total urine water recovery to ~98% (ICES-2023-097).
 struct DistillationParams
 {
-  double recovery_fraction;     // water recovered from urine [-]
-  double specific_energy_j_kg;  // electrical energy per kg distillate [J/kg]
-  double max_throughput_kg_s;   // maximum processing rate [kg/s]
-  double brine_solids_fraction; // dissolved solids that stay in brine [-]
+  double recovery_fraction;       // UPA water recovered from urine [-]
+  double specific_energy_j_kg;    // electrical energy per kg distillate [J/kg]
+  double max_throughput_kg_s;     // maximum processing rate [kg/s]
+  double brine_solids_fraction;   // dissolved solids that stay in brine [-]
+  bool brine_processor_enabled;   // BPA installed and processing brine
+  double brine_recovery_fraction; // BPA water recovered from UPA brine [-]
 };
 
 /// Multifiltration (Water Processor Assembly) parameters.

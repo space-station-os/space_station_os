@@ -14,10 +14,12 @@ namespace wrs
 /// Distillation outputs over a step.
 struct DistillationResult
 {
-  double distillate_kg_s;   // recovered water [kg/s]
-  double brine_kg_s;        // concentrated brine reject [kg/s]
-  double energy_w;          // electrical power consumed [W]
-  double recovery_fraction; // achieved recovery [-]
+  double distillate_kg_s;     // total recovered water (UPA + BPA) [kg/s]
+  double upa_distillate_kg_s; // UPA distillate alone [kg/s]
+  double bpa_water_kg_s;      // water recovered from brine by the BPA [kg/s]
+  double brine_kg_s;          // final concentrated brine reject [kg/s]
+  double energy_w;            // electrical power consumed [W]
+  double recovery_fraction;   // achieved overall recovery [-]
 };
 
 /// Vapor Compression Distillation (Urine Processor Assembly).

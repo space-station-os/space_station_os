@@ -29,7 +29,7 @@ The CO2-removal design point is verified by the integration test
 `test_four_bed_system.DesignRemovalMatchesPaper` and by the `ars_validation`
 standalone.
 
-## Notes on transient fidelity
+## Notes on ARS transient fidelity
 
 The breakthrough onset produced by the cell-resolved bed is earlier than the
 paper's ~140-145 min because the model uses a simplified adsorption-heat /
@@ -38,6 +38,31 @@ steady-state CO2-removal design point — the primary validation requirement —
 matches the paper band and is independent of this transient detail. Isotherm
 affinity, LDF rates, bed geometry and the system efficiency are all ROS-tunable
 for further calibration without rebuilding the physics.
+
+## OGS — ISS OGA / AOGA (ICES-2023-311)
+
+| Quantity | Paper | Model | Test |
+|----------|-------|-------|------|
+| Max O2 @ 46.9 A, 28 cells | 9.25 kg/day | ~9.25 kg/day | `MaxRateMatchesAOGA` |
+| Nominal cell voltage | ~1.7 V | ~1.7 V | `CellVoltageNearAOGAOperatingPoint` |
+| Stoichiometry | H2 = 2·O2 | exact | `FaradayStoichiometry` |
+
+## Sabatier — ISS reactor (ICES-2018-155)
+
+| Quantity | Paper | Model | Test |
+|----------|-------|-------|------|
+| Heat of reaction | −165.4 kJ/mol | 165.4 kJ/mol | (param) |
+| ISS conversion | ~95% | ~95% at 648 K | `ISSOperatingConversionAbout95Percent` |
+| Kinetic limit < 375 °C | yes | yes | `KineticLimitedAtLowTemperature` |
+| Equilibrium limit at high T | yes (peaks intermediate) | yes | `EquilibriumLimitedAtHighTemperature` |
+
+## WRS — ISS WRM (ICES-2023-097)
+
+| Quantity | Paper | Model | Test |
+|----------|-------|-------|------|
+| UPA recovery (US) | 85–87% | 0.87 | `UPARecoversConfiguredFraction` |
+| Total urine recovery w/ BPA | ~97–98% | ~98% | `BPARaisesTotalRecoveryToAbout98Percent` |
+| Nominal load | 9 kg/day (6-crew) | 9 kg/day | (param) |
 
 ## Conservation
 

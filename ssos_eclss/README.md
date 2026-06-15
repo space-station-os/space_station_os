@@ -71,6 +71,12 @@ what-if) are live-tunable and validated before they reach the physics. See
 
 ## References
 
-- Peters, Cmarik, Knox, "4BCO2 EDU Performance", ICES-2021-313 (2021).
-- Knox, Cmarik, "CO2 Removal for the ISS — 4-Bed Molecular Sieve Material
+- **ARS:** Peters, Cmarik, Knox, "4BCO2 EDU Performance", ICES-2021-313 (2021);
+  Knox, Cmarik, "CO2 Removal for the ISS — 4-Bed Molecular Sieve Material
   Selection and System Design" (2019).
+- **OGS:** Takada et al., "Status of the Advanced Oxygen Generation Assembly",
+  ICES-2023-311 (2023).
+- **Sabatier:** Hintze, Meier, Shah, DeVor, "Sabatier System Design Study for a
+  Mars ISRU Propellant Production Plant", ICES-2018-155 (2018).
+- **WRS:** Williamson, Wilson, Robinson, Luong, "Status of ISS Water Management
+  and Recovery", ICES-2023-097 (2023).

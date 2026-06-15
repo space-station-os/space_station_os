@@ -3,6 +3,17 @@
 Inputs: urine (wastewater) and humidity condensate. Output: potable water, with
 conductivity tracked as the quality metric.
 
+Calibrated to the ISS Water Recovery System (Williamson et al., "Status of ISS
+Water Management and Recovery", ICES-2023-097):
+
+| Stage | Paper | Model |
+|-------|-------|-------|
+| UPA recovery (US pretreatment) | 85–87% (target 90%) | 0.87 |
+| Nominal wastewater load | 9 kg/day (6-crew) | 9 kg/day max throughput |
+| BPA total urine recovery | ~97–98% | ~98% (BPA enabled) |
+| WPA chain | MLS degas → particulate filter → single MF bed → catalytic oxidation → ion exchange (adds iodine) | multifiltration + catalytic |
+| Potable bus pressure | 230–280 kPa | (boundary, not modelled) |
+
 ## Urine Processor Assembly — Vapor Compression Distillation
 
 Evaporation, vapour compression and condensation produce distillate and a

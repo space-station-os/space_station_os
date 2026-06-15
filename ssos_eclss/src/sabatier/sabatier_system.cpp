@@ -64,21 +64,28 @@ SabatierResult SabatierSystem::step(double dt, double co2_in_mol_s, double h2_in
 
 KineticsParams default_kinetics_params()
 {
+  // Calibrated to the ISS Sabatier reactor behaviour (ICES-2018-155): kinetics
+  // become fast enough to reach equilibrium above ~375 C (648 K), and the
+  // exothermic equilibrium conversion declines at higher temperature. At the
+  // ~648 K operating point the achievable conversion is ~0.95, matching the
+  // ISS reactor's ~95% (90% hot front + 5% cooled section).
   KineticsParams p{};
-  p.pre_exponential = 5.0e3;      // 1/s
-  p.activation_energy = 4.0e4;    // J/mol
-  p.max_conversion = 0.95;        // equilibrium-limited
-  p.residence_time_s = 2.0;       // s
-  p.heat_of_reaction = 165000.0;  // J/mol CO2 (exothermic)
+  p.pre_exponential = 7.67e5;       // 1/s
+  p.activation_energy = 7.0e4;      // J/mol (steep kinetic onset near 375 C)
+  p.max_conversion = 0.99;          // equilibrium ceiling at low temperature
+  p.residence_time_s = 2.0;         // s
+  p.heat_of_reaction = 165400.0;    // J/mol CO2 (dH = -165.4 kJ/mol)
+  p.equilibrium_knee_temp_k = 600.0;       // equilibrium declines above ~327 C
+  p.equilibrium_decline_per_k = 8.0e-4;    // conversion lost per K above knee
   return p;
 }
 
 ReactorParams default_reactor_params()
 {
   ReactorParams p{};
-  p.operating_temp_k = 600.0;     // ~327 C
+  p.operating_temp_k = 648.0;     // ~375 C — kinetic/thermodynamic sweet spot
   p.thermal_mass_j_k = 2000.0;
-  // Well-insulated small reactor: the exotherm (~150 W at flight CO2 rates)
+  // Well-insulated small reactor: the exotherm (~165 W at flight CO2 rates)
   // sustains the operating temperature against this loss.
   p.heat_loss_coeff_w_k = 0.5;
   p.ambient_temp_k = 295.0;

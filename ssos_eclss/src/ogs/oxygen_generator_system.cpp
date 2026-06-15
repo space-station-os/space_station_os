@@ -78,20 +78,26 @@ OgsResult OxygenGeneratorSystem::step_nominal(double dt)
 
 CellParams default_cell_params()
 {
+  // Calibrated to the ISS OGA / AOGA (ICES-2023-311): a 28-cell stack delivers
+  // 9.25 kg O2/day at 46.9 A with a nominal cell voltage of ~1.7 V. The active
+  // area / resistance / exchange-current values reproduce ~1.7 V at the 46.9 A
+  // operating point, and the Faradaic efficiency (0.983) matches the measured
+  // 9.25 kg/day vs the 9.41 kg/day Faradaic ideal.
   CellParams c{};
-  c.active_area_m2 = 0.093;          // ~0.093 m^2 (1 ft^2)
-  c.exchange_current_density = 1.0e-3;  // A/m^2 (sluggish OER)
+  c.active_area_m2 = 0.023;          // ~230 cm^2 (=> ~0.20 A/cm^2 at 46.9 A)
+  c.exchange_current_density = 1.0;  // A/m^2
   c.limiting_current_density = 2.0e4;   // A/m^2
-  c.membrane_resistance = 1.5e-5;    // ohm*m^2
+  c.membrane_resistance = 1.3e-4;    // ohm*m^2
   c.charge_transfer_coeff = 0.5;
   c.reference_temp_k = 298.15;
+  c.faradaic_efficiency = 0.983;
   return c;
 }
 
 StackParams default_stack_params()
 {
   StackParams s{};
-  s.n_cells = 28;
+  s.n_cells = 28;                    // ISS OGA / flight AOGA 28-cell stack
   s.thermal_mass_j_k = 5.0e4;
   s.heat_loss_coeff_w_k = 40.0;
   return s;
@@ -107,11 +113,13 @@ SeparatorParams default_separator_params()
 
 OgsOperating default_ogs_operating()
 {
+  // ISS OGA PSM current is selectable 10-46.9 A (Process). 46.9 A => 9.25 kg/day
+  // (supports 10.88 crew at 0.85 kg O2/day). Default to a ~6-crew nominal.
   OgsOperating o{};
-  o.stack_current_a = 27.0;          // ~5.4 kg O2/day for 28 cells (OGA-class)
+  o.stack_current_a = 27.0;          // ~5.3 kg O2/day (28 cells)
   o.feedwater_temp_k = units::celsius_to_kelvin(25.0);
   o.coolant_temp_k = units::celsius_to_kelvin(18.0);
-  o.cell_pressure_pa = units::STD_PRESSURE_PA;
+  o.cell_pressure_pa = 165474.0;     // ~24 psia recirculation-loop pressure
   return o;
 }
 

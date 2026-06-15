@@ -2,6 +2,20 @@
 
 `2 H2O → 2 H2 + O2`. Oxygen to the cabin, hydrogen to the Sabatier reactor.
 
+Calibrated to the ISS Oxygen Generation Assembly / Advanced OGA
+(Takada et al., "Status of the Advanced Oxygen Generation Assembly",
+ICES-2023-311):
+
+| Quantity | Paper | Model |
+|----------|-------|-------|
+| Cell stack | 28 cells | 28 cells |
+| Max O2 production | 9.25 kg/day at 46.9 A | ~9.25 kg/day at 46.9 A |
+| Nominal cell voltage | ~1.7 V | ~1.7 V at 46.9 A |
+| Per-crew O2 | 0.85 kg/day (supports 10.88 crew) | matched |
+| PSM current range | 10–46.9 A (Process) | tunable |
+| Recirc-loop pressure | ~24 psia (165 kPa) | operating pressure |
+| Faradaic efficiency | (9.25 vs 9.41 ideal) | 0.983 |
+
 ## Cell voltage
 
 ```

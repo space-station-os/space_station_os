@@ -68,11 +68,17 @@ WrsResult WaterRecoverySystem::step(double dt, double urine_kg_s,
 
 DistillationParams default_distillation_params()
 {
+  // ICES-2023-097: UPA recovers ~85-87% of water from US-pretreated urine
+  // (target 90%); nominal load 9 kg/day wastewater (6-crew). The BPA dewaters
+  // the UPA brine to bring total urine recovery to ~98%.
   DistillationParams p{};
-  p.recovery_fraction = 0.87;            // UPA ~85-87%
+  p.recovery_fraction = 0.87;            // UPA, US phosphoric-acid pretreatment
   p.specific_energy_j_kg = 1.1e5 * 3.6;  // ~110 Wh/kg -> J/kg
-  p.max_throughput_kg_s = 9.0 / 86400.0; // ~9 kg/day
+  p.max_throughput_kg_s = 9.0 / 86400.0; // ~9 kg/day (6-crew nominal)
   p.brine_solids_fraction = 0.05;
+  p.brine_processor_enabled = true;
+  // 0.87 + 0.13*0.846 ~= 0.98 total urine water recovery.
+  p.brine_recovery_fraction = 0.846;
   return p;
 }
 

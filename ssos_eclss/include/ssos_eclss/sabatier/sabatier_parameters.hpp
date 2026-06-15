@@ -11,13 +11,23 @@ namespace sabatier
 {
 
 /// Reaction kinetics / equilibrium parameters.
+///
+/// The Sabatier reaction is kinetically limited at low temperature (slow rate
+/// below ~375 C) and thermodynamically (equilibrium) limited at high
+/// temperature (the exothermic reaction is favoured at low T). The achievable
+/// conversion is therefore the MINIMUM of a kinetic limit (rising with T) and an
+/// equilibrium limit (falling with T), peaking at an intermediate temperature.
+/// Ref: Hintze et al., "Sabatier System Design Study for a Mars ISRU Propellant
+/// Production Plant", ICES-2018-155.
 struct KineticsParams
 {
-  double pre_exponential;     // Arrhenius pre-exponential [1/s]
-  double activation_energy;   // Arrhenius activation energy [J/mol]
-  double max_conversion;      // equilibrium-limited maximum CO2 conversion [-]
-  double residence_time_s;    // gas residence time in the catalyst bed [s]
-  double heat_of_reaction;    // exothermic heat released [J/mol CO2] (positive)
+  double pre_exponential;       // Arrhenius pre-exponential [1/s]
+  double activation_energy;     // Arrhenius activation energy [J/mol]
+  double max_conversion;        // equilibrium ceiling at low T [-]
+  double residence_time_s;      // gas residence time in the catalyst bed [s]
+  double heat_of_reaction;      // exothermic heat released [J/mol CO2] (positive)
+  double equilibrium_knee_temp_k;   // T above which equilibrium conversion declines [K]
+  double equilibrium_decline_per_k; // equilibrium conversion lost per K above knee [1/K]
 };
 
 /// Reactor thermal / operating parameters.

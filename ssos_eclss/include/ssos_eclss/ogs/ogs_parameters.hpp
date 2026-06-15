@@ -18,6 +18,7 @@ struct CellParams
   double membrane_resistance;  // area-specific resistance [ohm*m^2]
   double charge_transfer_coeff;  // alpha [-]
   double reference_temp_k;     // reference temperature [K]
+  double faradaic_efficiency;  // fraction of current producing gas [-]
 };
 
 /// Electrolysis stack.

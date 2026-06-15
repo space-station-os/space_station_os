@@ -62,9 +62,11 @@ CellState ElectrolysisCellModel::solve(double current_a, double temperature_k,
   s.voltage = s.reversible_voltage + s.activation_overpotential +
               s.ohmic_overpotential + s.concentration_overpotential;
 
-  // Faraday's law: per cell H2 = I/(2F), O2 = I/(4F).
-  s.h2_production_mol_s = current_a / (2.0 * units::FARADAY);
-  s.o2_production_mol_s = current_a / (4.0 * units::FARADAY);
+  // Faraday's law: per cell H2 = I/(2F), O2 = I/(4F), scaled by the Faradaic
+  // (current) efficiency to match measured production.
+  const double fe = params_.faradaic_efficiency;
+  s.h2_production_mol_s = fe * current_a / (2.0 * units::FARADAY);
+  s.o2_production_mol_s = fe * current_a / (4.0 * units::FARADAY);
 
   s.power_w = s.voltage * current_a;
   s.efficiency = (s.voltage > 0.0) ? kThermoneutral / s.voltage : 0.0;
