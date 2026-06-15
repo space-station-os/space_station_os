@@ -110,7 +110,9 @@ TothParams default_co2_on_13x()
   TothParams p;
   p.q_m0 = 4.30;       // mol/kg
   p.chi = 2.20;        // -
-  p.b0 = 9.0e-5;       // 1/Pa
+  // Affinity calibrated so equilibrium loading at ISS ppCO2 (~2-3 torr, 22 C)
+  // is ~2 mol/kg, giving the ~140 min breakthrough onset reported in the paper.
+  p.b0 = 1.4e-3;       // 1/Pa
   p.dH = 38000.0;      // J/mol
   p.t0 = 0.42;         // -
   p.alpha = 0.18;      // -

@@ -55,9 +55,21 @@ add_library(eclss_physics
 target_include_directories(eclss_physics PUBLIC include)
 # NOTE: eclss_physics links NOTHING from ROS
 
+# ---- Standalone validation executables (NO ROS) ----
+add_executable(ars_validation standalone/ars_validation.cpp)
+target_link_libraries(ars_validation eclss_physics)
+
+add_executable(parameter_sweep standalone/parameter_sweep.cpp)
+target_link_libraries(parameter_sweep eclss_physics)
+
+add_executable(breakthrough_curve_gen standalone/breakthrough_curve_gen.cpp)
+target_link_libraries(breakthrough_curve_gen eclss_physics)
+
 # ---- Install ----
 install(TARGETS eclss_physics
   ARCHIVE DESTINATION lib LIBRARY DESTINATION lib RUNTIME DESTINATION bin)
+install(TARGETS ars_validation parameter_sweep breakthrough_curve_gen
+  RUNTIME DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY include/ DESTINATION include)
 
 # ---- Tests ----
