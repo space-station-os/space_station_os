@@ -92,6 +92,21 @@ double BedModel::max_solid_temperature() const
   return *std::max_element(ts_.begin(), ts_.end());
 }
 
+double BedModel::loading_fraction() const
+{
+  const double qm = is_desiccant_ ? h2o_iso_.params().q_m0 : co2_iso_.params().q_m0;
+  if (qm <= 0.0) {
+    return 0.0;
+  }
+  const std::vector<double> & q = is_desiccant_ ? q_h2o_ : q_co2_;
+  double sum = 0.0;
+  for (double v : q) {
+    sum += v;
+  }
+  const double mean = sum / static_cast<double>(n_);
+  return std::clamp(mean / qm, 0.0, 1.0);
+}
+
 double BedModel::bed_pressure_drop(const BedInlet & inlet) const
 {
   const double rho = gas::gas_density(inlet.pressure_pa, inlet.temperature_k,

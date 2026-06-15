@@ -96,6 +96,15 @@ public:
   double mean_solid_temperature() const;
   double max_solid_temperature() const;
 
+  /// Mean sorbent loading as a fraction of saturation [0,1]. Uses the CO2
+  /// loading for adsorbent beds and the H2O loading for desiccant beds,
+  /// normalised by the respective Toth saturation capacity q_m0. Intended for
+  /// telemetry / fill-bar displays.
+  double loading_fraction() const;
+
+  /// True if this is a desiccant (water-only) bed.
+  bool is_desiccant() const { return is_desiccant_; }
+
 private:
   // Advance all state fields by one stable substep of size h. Mass, solid energy
   // and sorption are integrated explicitly; the (stiff) gas-energy gas-solid and

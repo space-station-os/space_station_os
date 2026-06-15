@@ -10,6 +10,7 @@
 
 #include "diagnostic_msgs/msg/diagnostic_array.hpp"
 #include "std_msgs/msg/float64.hpp"
+#include "std_msgs/msg/float64_multi_array.hpp"
 #include "space_station_interfaces/msg/fault_event.hpp"
 #include "space_station_interfaces/msg/subsystem_heartbeat.hpp"
 #include "space_station_interfaces/msg/world_state.hpp"
@@ -65,6 +66,10 @@ private:
   rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float64>::SharedPtr co2_removal_pub_;
   rclcpp_lifecycle::LifecyclePublisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr
     telemetry_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float64MultiArray>::SharedPtr
+    bed_states_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float64MultiArray>::SharedPtr
+    cycle_phase_pub_;
   rclcpp_lifecycle::LifecyclePublisher<SubsystemHeartbeat>::SharedPtr heartbeat_pub_;
   rclcpp_lifecycle::LifecyclePublisher<FaultEvent>::SharedPtr fault_pub_;
 

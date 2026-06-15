@@ -48,6 +48,10 @@ CallbackReturn ArsNode::on_configure(const rclcpp_lifecycle::State &)
     this->create_publisher<std_msgs::msg::Float64>("/ssos/ars/co2_removal_kg_day", 10);
   telemetry_pub_ = this->create_publisher<diagnostic_msgs::msg::DiagnosticArray>(
     "/ssos/ars/diagnostics", 10);
+  bed_states_pub_ = this->create_publisher<std_msgs::msg::Float64MultiArray>(
+    "/ssos/ars/bed_states", 10);
+  cycle_phase_pub_ = this->create_publisher<std_msgs::msg::Float64MultiArray>(
+    "/ssos/ars/cycle_phase", 10);
   heartbeat_pub_ =
     this->create_publisher<SubsystemHeartbeat>("/ssos/ars/heartbeat", 10);
   fault_pub_ = this->create_publisher<FaultEvent>("/ssos/fault_event", 10);
@@ -73,6 +77,8 @@ CallbackReturn ArsNode::on_activate(const rclcpp_lifecycle::State &)
 {
   co2_removal_pub_->on_activate();
   telemetry_pub_->on_activate();
+  bed_states_pub_->on_activate();
+  cycle_phase_pub_->on_activate();
   heartbeat_pub_->on_activate();
   fault_pub_->on_activate();
 
@@ -95,6 +101,8 @@ CallbackReturn ArsNode::on_deactivate(const rclcpp_lifecycle::State &)
   }
   co2_removal_pub_->on_deactivate();
   telemetry_pub_->on_deactivate();
+  bed_states_pub_->on_deactivate();
+  cycle_phase_pub_->on_deactivate();
   heartbeat_pub_->on_deactivate();
   fault_pub_->on_deactivate();
   return CallbackReturn::SUCCESS;
@@ -105,6 +113,8 @@ CallbackReturn ArsNode::on_cleanup(const rclcpp_lifecycle::State &)
   step_timer_.reset();
   co2_removal_pub_.reset();
   telemetry_pub_.reset();
+  bed_states_pub_.reset();
+  cycle_phase_pub_.reset();
   heartbeat_pub_.reset();
   fault_pub_.reset();
   world_state_sub_.reset();
@@ -176,6 +186,53 @@ void ArsNode::step()
   diag.status.push_back(status);
   telemetry_pub_->publish(diag);
 
+  // ---- Per-bed states (drives the GUI bed bars) ----
+  // /ssos/ars/bed_states  std_msgs/Float64MultiArray, 12 elements, bed order
+  // [ADS train0, ADS train1, DES train0, DES train1]:
+  //   [0..3]  loading fraction (0-1)
+  //   [4..7]  solid temperature [K]
+  //   [8..11] mode code (0=ADSORBING, 1=DESORBING, 2=AIR_SAVE, 3=VACUUM, 4=other)
+  {
+    const ars::CycleStateMachine & cyc = ars_->cycle();
+    auto mode_code = [](ars::BedMode m) -> double {
+      switch (m) {
+        case ars::BedMode::ADSORBING: return 0.0;
+        case ars::BedMode::DESORBING: return 1.0;
+        case ars::BedMode::AIR_SAVE: return 2.0;
+        case ars::BedMode::VACUUM: return 3.0;
+        default: return 4.0;
+      }
+    };
+    std_msgs::msg::Float64MultiArray beds;
+    beds.data.resize(12);
+    // Loading fractions.
+    beds.data[0] = ars_->adsorbent_bed(0).loading_fraction();
+    beds.data[1] = ars_->adsorbent_bed(1).loading_fraction();
+    beds.data[2] = ars_->desiccant_bed(0).loading_fraction();
+    beds.data[3] = ars_->desiccant_bed(1).loading_fraction();
+    // Temperatures [K].
+    beds.data[4] = ars_->adsorbent_bed(0).mean_solid_temperature();
+    beds.data[5] = ars_->adsorbent_bed(1).mean_solid_temperature();
+    beds.data[6] = ars_->desiccant_bed(0).mean_solid_temperature();
+    beds.data[7] = ars_->desiccant_bed(1).mean_solid_temperature();
+    // Mode codes per train (adsorbent + desiccant share the train's command).
+    beds.data[8] = mode_code(cyc.command_for_train(0).adsorbent_mode);
+    beds.data[9] = mode_code(cyc.command_for_train(1).adsorbent_mode);
+    beds.data[10] = mode_code(cyc.command_for_train(0).desiccant_mode);
+    beds.data[11] = mode_code(cyc.command_for_train(1).desiccant_mode);
+    bed_states_pub_->publish(beds);
+
+    // ---- Cycle phase (drives the GUI 10-60-10 cycle bar) ----
+    // /ssos/ars/cycle_phase  std_msgs/Float64MultiArray, 3 elements:
+    //   [0] elapsed time in the current half-cycle [s]
+    //   [1] half-cycle duration [s]
+    //   [2] index of the adsorbing train (0/1)
+    std_msgs::msg::Float64MultiArray phase;
+    phase.data = {cyc.time_in_half_cycle(), cyc.timing().half_cycle_s(),
+                  static_cast<double>(cyc.adsorbing_train())};
+    cycle_phase_pub_->publish(phase);
+  }
+
   // Fault detection.
   bool healthy = true;
   std::string health_msg = "nominal";
@@ -202,7 +259,8 @@ void ArsNode::register_with_manager()
   }
   auto req = std::make_shared<RegisterSubsystem::Request>();
   req->subsystem_name = "ars";
-  req->published_topics = {"/ssos/ars/co2_removal_kg_day", "/ssos/ars/diagnostics"};
+  req->published_topics = {"/ssos/ars/co2_removal_kg_day", "/ssos/ars/diagnostics",
+                           "/ssos/ars/bed_states", "/ssos/ars/cycle_phase"};
   req->subscribed_topics = {"/sim/world_state"};
   req->heartbeat_topic = "/ssos/ars/heartbeat";
   register_client_->async_send_request(req);
