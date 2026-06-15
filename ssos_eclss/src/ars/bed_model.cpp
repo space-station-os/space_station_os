@@ -18,7 +18,6 @@ namespace
 {
 constexpr double kGasCp = 1010.0;        // process-gas cp [J/(kg*K)] (~air)
 constexpr double kAxialDispersion = 1.0e-4;  // mass axial dispersion [m^2/s]
-constexpr double kPumpRate = 0.20;       // vacuum pumping relaxation rate [1/s]
 constexpr double kHeaterMaxTempK = 533.0;  // heater cutoff (~500 F) [K]
 constexpr std::size_t kMaxSubsteps = 4000;
 }  // namespace
@@ -166,10 +165,6 @@ void BedModel::integrate_substep(double h, const BedInlet & inlet, BedMode mode,
                    rho_bulk_ * dqco2;
     double dch2o = upwind(c_h2o_old, inlet.c_h2o) + diffuse(c_h2o_old) -
                    rho_bulk_ * dqh2o;
-    if (pumping) {
-      dcco2 += -kPumpRate * (c_co2_old[i] - c_vac) * eps;
-      dch2o += -kPumpRate * (c_h2o_old[i] - c_vac) * eps;
-    }
 
     // ---- Solid energy balance (explicit; large heat capacity) ----
     const double heat_ads = rho_bulk_ *
@@ -203,8 +198,15 @@ void BedModel::integrate_substep(double h, const BedInlet & inlet, BedMode mode,
     const double tg_new = rhs / denom;
 
     // ---- Commit ----
-    c_co2_[i] = std::max(0.0, c_co2_old[i] + h * dcco2 / eps);
-    c_h2o_[i] = std::max(0.0, c_h2o_old[i] + h * dch2o / eps);
+    if (pumping) {
+      // The vacuum holds the void gas at the vacuum partial pressure; desorbed
+      // gas is swept out by the pump rather than accumulating and re-adsorbing.
+      c_co2_[i] = c_vac;
+      c_h2o_[i] = c_vac;
+    } else {
+      c_co2_[i] = std::max(0.0, c_co2_old[i] + h * dcco2 / eps);
+      c_h2o_[i] = std::max(0.0, c_h2o_old[i] + h * dch2o / eps);
+    }
     q_co2_[i] = std::max(0.0, q_co2_[i] + h * dqco2);
     q_h2o_[i] = std::max(0.0, q_h2o_[i] + h * dqh2o);
     ts_[i] = ts_new;
