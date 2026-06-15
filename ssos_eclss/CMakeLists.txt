@@ -55,6 +55,38 @@ add_library(eclss_physics
 target_include_directories(eclss_physics PUBLIC include)
 # NOTE: eclss_physics links NOTHING from ROS
 
+# ---- ROS node library ----
+add_library(eclss_ros
+  src/nodes/eclss_parameter_bridge.cpp
+  src/nodes/eclss_diagnostics.cpp
+  src/nodes/ars_node.cpp
+  src/nodes/ogs_node.cpp
+  src/nodes/wrs_node.cpp
+  src/nodes/cabin_node.cpp
+)
+target_link_libraries(eclss_ros eclss_physics)
+ament_target_dependencies(eclss_ros
+  rclcpp rclcpp_lifecycle space_station_interfaces
+  std_msgs sensor_msgs diagnostic_msgs lifecycle_msgs
+)
+
+# ---- Node executables ----
+add_executable(ars_node src/main/ars_main.cpp)
+target_link_libraries(ars_node eclss_ros)
+ament_target_dependencies(ars_node rclcpp rclcpp_lifecycle)
+
+add_executable(ogs_node src/main/ogs_main.cpp)
+target_link_libraries(ogs_node eclss_ros)
+ament_target_dependencies(ogs_node rclcpp rclcpp_lifecycle)
+
+add_executable(wrs_node src/main/wrs_main.cpp)
+target_link_libraries(wrs_node eclss_ros)
+ament_target_dependencies(wrs_node rclcpp rclcpp_lifecycle)
+
+add_executable(cabin_node src/main/cabin_main.cpp)
+target_link_libraries(cabin_node eclss_ros)
+ament_target_dependencies(cabin_node rclcpp rclcpp_lifecycle)
+
 # ---- Standalone validation executables (NO ROS) ----
 add_executable(ars_validation standalone/ars_validation.cpp)
 target_link_libraries(ars_validation eclss_physics)
@@ -66,11 +98,15 @@ add_executable(breakthrough_curve_gen standalone/breakthrough_curve_gen.cpp)
 target_link_libraries(breakthrough_curve_gen eclss_physics)
 
 # ---- Install ----
-install(TARGETS eclss_physics
+install(TARGETS eclss_physics eclss_ros
   ARCHIVE DESTINATION lib LIBRARY DESTINATION lib RUNTIME DESTINATION bin)
+install(TARGETS ars_node ogs_node wrs_node cabin_node
+  RUNTIME DESTINATION lib/${PROJECT_NAME})
 install(TARGETS ars_validation parameter_sweep breakthrough_curve_gen
   RUNTIME DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY include/ DESTINATION include)
+install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch)
+install(DIRECTORY config/ DESTINATION share/${PROJECT_NAME}/config)
 
 # ---- Tests ----
 if(BUILD_TESTING)
@@ -135,6 +171,17 @@ if(BUILD_TESTING)
 
   ament_add_gtest(test_sabatier test/unit/wrs/test_sabatier.cpp)
   target_link_libraries(test_sabatier eclss_physics)
+
+  # ---- ROS lifecycle / parameter tests ----
+  ament_add_gtest(test_ars_node test/ros/test_ars_node.cpp)
+  target_link_libraries(test_ars_node eclss_ros)
+  ament_target_dependencies(test_ars_node rclcpp rclcpp_lifecycle
+    space_station_interfaces std_msgs diagnostic_msgs lifecycle_msgs)
+
+  ament_add_gtest(test_parameter_bridge test/ros/test_parameter_bridge.cpp)
+  target_link_libraries(test_parameter_bridge eclss_ros)
+  ament_target_dependencies(test_parameter_bridge rclcpp rclcpp_lifecycle
+    space_station_interfaces std_msgs diagnostic_msgs lifecycle_msgs)
 endif()
 
 ament_package()
