@@ -6,6 +6,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import EmitEvent, RegisterEventHandler, LogInfo
 from launch.event_handlers import OnProcessStart
+from launch.events import matches_action
 from launch_ros.event_handlers import OnStateTransition
 from launch_ros.actions import LifecycleNode
 from launch_ros.events.lifecycle import ChangeState
@@ -20,11 +21,13 @@ def _lifecycle(pkg_share, executable, name, config_file):
 
 
 def _auto_manage(node, label):
+    # Scope each transition to THIS node only (matches_action), otherwise every
+    # node's event would fire on all nodes and spam redundant-transition errors.
     configure = EmitEvent(event=ChangeState(
-        lifecycle_node_matcher=lambda n: True,
+        lifecycle_node_matcher=matches_action(node),
         transition_id=lifecycle_msgs.msg.Transition.TRANSITION_CONFIGURE))
     activate = EmitEvent(event=ChangeState(
-        lifecycle_node_matcher=lambda n: True,
+        lifecycle_node_matcher=matches_action(node),
         transition_id=lifecycle_msgs.msg.Transition.TRANSITION_ACTIVATE))
     return [
         RegisterEventHandler(OnProcessStart(

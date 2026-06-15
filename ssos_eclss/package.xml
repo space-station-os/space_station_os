@@ -16,6 +16,10 @@
   <depend>diagnostic_msgs</depend>
   <depend>lifecycle_msgs</depend>
 
+  <!-- Runtime-only: used by eclss_system.launch.py for full-system bringup -->
+  <exec_depend>ssos_core</exec_depend>
+  <exec_depend>ssos_sim</exec_depend>
+
   <test_depend>ament_cmake_gtest</test_depend>
 
   <export>
