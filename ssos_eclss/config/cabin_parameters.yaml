@@ -1,0 +1,9 @@
+# Cabin atmosphere parameters for ssos_eclss/cabin_node.
+cabin_node:
+  ros__parameters:
+    use_sim_time: true
+    step_rate_hz: 1.0
+    crew_size: 4
+    cabin_volume_m3: 100.0
+    cabin_temp_c: 22.0
+    co2_alarm_ppm: 7000.0

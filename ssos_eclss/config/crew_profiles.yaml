@@ -1,0 +1,22 @@
+# Crew metabolic profiles (per crew member, NASA BVAD averages).
+# Consumed by the cabin model / crew metabolic model. Activity factor scales
+# all rates (1.0 = nominal, >1 for exercise periods).
+crew_profiles:
+  nominal:
+    co2_kg_day: 1.04
+    o2_kg_day: 0.84
+    water_kg_day: 2.28
+    heat_w: 117.0
+    activity_factor: 1.0
+  exercise:
+    co2_kg_day: 1.04
+    o2_kg_day: 0.84
+    water_kg_day: 2.28
+    heat_w: 117.0
+    activity_factor: 4.0
+  sleep:
+    co2_kg_day: 1.04
+    o2_kg_day: 0.84
+    water_kg_day: 2.28
+    heat_w: 117.0
+    activity_factor: 0.7
