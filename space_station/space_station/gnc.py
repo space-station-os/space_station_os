@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QImage
 
+import pyqtgraph as pg
 import pyqtgraph.opengl as gl
 from pyqtgraph.opengl import (
     MeshData, GLMeshItem, GLLinePlotItem, GLGridItem, GLScatterPlotItem,
@@ -35,6 +36,7 @@ class GncWidget(QWidget):
         self.eci_x, self.eci_y, self.eci_z = [], [], []
         self.earth_radius = 6371e3  # meters
         self.station_item = None
+        self._station_scale = 6.0e5
         self._setup_ui()
         self._setup_gl_scene()
         self._setup_ros_subs()
@@ -146,9 +148,11 @@ class GncWidget(QWidget):
         # ISS marker — a bright point that revolves along the orbit as
         # /gnc/pos_eci updates (run gnc + orbit_dynamics to drive it).
         a = theme.qcolor("accent")
+        # Small locator dot (visible when zoomed out where the mesh is tiny);
+        # the detailed ISS structure mesh is the primary marker when zoomed in.
         self.iss_marker = GLScatterPlotItem(
             pos=np.zeros((1, 3)),
-            size=16.0,
+            size=9.0,
             color=(a.redF(), a.greenF(), a.blueF(), 1.0),
             pxMode=True,
         )
@@ -204,32 +208,38 @@ class GncWidget(QWidget):
         md.setVertexColors(colors)
 
     def _load_station_model(self):
-        """Optional ISS .stl or .obj mesh"""
+        """Load the bundled ISS structure (decimated from the space_data.urdf
+        SD_SpaceStation_Ver05 mesh) and render it at the orbit position. Falls
+        back silently to the scatter marker if the mesh can't be loaded."""
         try:
             import trimesh
-            from stl import mesh
             base_dir = os.path.dirname(os.path.abspath(__file__))
-            path = os.path.join(base_dir, "assets", "iss.obj")
+            path = os.path.join(base_dir, "assets", "iss", "iss_decimated.ply")
             if not os.path.exists(path):
+                self.node.get_logger().info(
+                    "[gnc] ISS mesh not bundled; using marker only")
                 return
 
-            obj = trimesh.load(path)
-            verts = np.array(obj.vertices)
-            faces = np.array(obj.faces)
+            obj = trimesh.load(path, force='mesh')
+            verts = np.asarray(obj.vertices, dtype=float)
+            faces = np.asarray(obj.faces)
             md = MeshData(vertexes=verts, faces=faces)
             station_item = GLMeshItem(
                 meshdata=md,
-                color=(0.9, 0.9, 0.9, 1),
+                color=(0.82, 0.84, 0.88, 1.0),   # light spacecraft grey
                 shader='shaded',
                 smooth=True,
-                glOptions='opaque'
+                glOptions='opaque',
             )
-            station_item.scale(50000, 50000, 50000)
+            station_item.setDepthValue(15)
             self.view3d.addItem(station_item)
             self.station_item = station_item
-            print("✅ ISS model loaded.")
+            # The model spans ~1.5 units; exaggerate so it's visible at the
+            # orbital camera distance (~6e5 m/unit => ~900 km apparent span).
+            self._station_scale = 6.0e5
+            self.node.get_logger().info("[gnc] ISS structure loaded")
         except Exception as e:
-            print(f"⚠️ Could not load ISS model: {e}")
+            self.node.get_logger().warn(f"[gnc] could not load ISS model: {e}")
 
     # ------------------------ ROS SUBS ------------------------
     def _setup_ros_subs(self):
@@ -256,10 +266,14 @@ class GncWidget(QWidget):
         # positions stream in from the orbit dynamics).
         self.iss_marker.setData(pos=np.array([[x, y, z]], dtype=float))
         if self.station_item is not None:
-            # resetTransform first so translate is absolute, not cumulative.
-            self.station_item.resetTransform()
-            self.station_item.scale(50000, 50000, 50000)
-            self.station_item.translate(x, y, z)
+            # Build an absolute transform each update: rotate (URDF yaw), scale to
+            # the visible size, then translate to the ECI position.
+            s = self._station_scale
+            tr = pg.Transform3D()
+            tr.translate(x, y, z)
+            tr.scale(s, s, s)
+            tr.rotate(180, 0, 0, 1)
+            self.station_item.setTransform(tr)
 
     def _att_cb(self, q: Quaternion):
         self.attitude_label.setText(

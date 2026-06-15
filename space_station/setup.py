@@ -20,10 +20,11 @@ setup(
         package_name: [
             'assets/*',
             'assets/fonts/*',
+            'assets/iss/*',
         ],
     },
     include_package_data=True,
-    install_requires=['setuptools', 'pyqtgraph'],
+    install_requires=['setuptools', 'pyqtgraph', 'trimesh'],
     zip_safe=True,
     maintainer='siddarth',
     maintainer_email='siddarth.dayasagar@gmail.com',
