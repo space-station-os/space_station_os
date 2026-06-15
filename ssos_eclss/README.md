@@ -62,11 +62,11 @@ what-if) are live-tunable and validated before they reach the physics. See
 ## Documentation
 
 - [docs/architecture.md](docs/architecture.md) — layering and data flow
-- [docs/ars_model.md](docs/ars_model.md) — 4BMS governing equations
-- [docs/ogs_model.md](docs/ogs_model.md) — electrolysis model
-- [docs/wrs_model.md](docs/wrs_model.md) — water recovery model
+- [docs/ARS.md](docs/ARS.md) — Air Revitalization System: physics + ROS 2 (ICES-2021-313)
+- [docs/OGS.md](docs/OGS.md) — Oxygen Generation System: physics + ROS 2 (ICES-2023-311)
+- [docs/WRS.md](docs/WRS.md) — Water Recovery System: physics + ROS 2 (ICES-2023-097)
 - [docs/parameters.md](docs/parameters.md) — parameter reference
-- [docs/validation.md](docs/validation.md) — validation against ICES-2021-313
+- [docs/validation.md](docs/validation.md) — validation against the ISS papers
 - [docs/fault_catalog.md](docs/fault_catalog.md) — fault taxonomy
 
 ## References
