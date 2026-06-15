@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import (
     QGraphicsScene, QDialog, QTableWidget, QTableWidgetItem, 
     QGridLayout, QSplitter, QSizePolicy, QGroupBox, QFormLayout
 )
+from PyQt5.QtWidgets import QFrame
 from PyQt5.QtGui import QPixmap, QColor
 from PyQt5.QtCore import Qt, QTimer
 
@@ -21,7 +22,10 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float64, String
 from sensor_msgs.msg import BatteryState
-from space_station_interfaces.msg import BCDUStatus   
+from space_station_interfaces.msg import BCDUStatus
+
+from space_station import theme
+from space_station.widgets import page_header
 
 
 class EPSWidget(QWidget):
@@ -59,8 +63,12 @@ class EPSWidget(QWidget):
 
     
     def _build_ui(self):
-        root_splitter = QSplitter(Qt.Vertical)
         self.setLayout(QVBoxLayout())
+        self.layout().addWidget(
+            page_header("Electrical Power", "Battery / BCDU / MBSU / DDCU", "EPS")
+        )
+
+        root_splitter = QSplitter(Qt.Vertical)
         self.layout().addWidget(root_splitter)
 
         # Top half splitter (Plots + Battery Health)
@@ -72,9 +80,11 @@ class EPSWidget(QWidget):
         root_splitter.addWidget(bottom_splitter)
 
         # --- Quadrant 1: Plots ---
-        plots_frame = QWidget()
+        plots_frame = QFrame()
+        plots_frame.setProperty("class", "card")
         plots_layout = QVBoxLayout(plots_frame)
         fig, self.ax = plt.subplots(2, 1, figsize=(4, 4), dpi=100)
+        self._style_figure(fig)
         self.canvas = FigureCanvas(fig)
         plots_layout.addWidget(self.canvas)
         top_splitter.addWidget(plots_frame)
@@ -86,7 +96,8 @@ class EPSWidget(QWidget):
         for i in range(24):
             lbl = QLabel(f"B{i}: -- %")
             lbl.setAlignment(Qt.AlignCenter)
-            lbl.setStyleSheet("background: gray; color:white; padding:4px;")
+            lbl.setFont(theme.mono_font(9))
+            lbl.setStyleSheet(self._cell_style(theme.color("panel2"), theme.color("txt2")))
             lbl.mousePressEvent = lambda e, idx=i: self._show_battery_popup(idx)
             self.battery_labels.append(lbl)
             self.battery_grid.addWidget(lbl, i // 6, i % 6)
@@ -97,7 +108,7 @@ class EPSWidget(QWidget):
         status_layout = QFormLayout()
 
         self.lbl_bcdu = QLabel("SAFE")
-        self.lbl_bcdu.setStyleSheet("color: green; font-weight: bold;")
+        self.lbl_bcdu.setStyleSheet(f"color: {theme.color('green')}; font-weight: bold;")
 
         self.lbl_ddcu_in = QLabel("-- V")
         self.lbl_ddcu_out = QLabel("-- V")
@@ -181,21 +192,21 @@ class EPSWidget(QWidget):
        
         if self.bcdu_mode == "SAFE":
             self.lbl_bcdu.setText("SAFE")
-            self.lbl_bcdu.setStyleSheet("color: green; font-weight: bold;")
+            self.lbl_bcdu.setStyleSheet(f"color: {theme.color('green')}; font-weight: bold;")
         else:
             self.lbl_bcdu.setText(self.bcdu_mode)
-            self.lbl_bcdu.setStyleSheet("color: red; font-weight: bold;")
+            self.lbl_bcdu.setStyleSheet(f"color: {theme.color('red')}; font-weight: bold;")
 
         # Update DDCU
         self.lbl_ddcu_in.setText(f"{self.ddcu['vin']:.1f} V")
         self.lbl_ddcu_out.setText(f"{self.ddcu['vout']:.1f} V")
         self.lbl_ddcu_temp.setText(f"{self.ddcu['temp']:.1f} °C")
 
-       
+
         if not (120.0 <= self.ddcu['vin'] <= 180.0):
-            self.lbl_ddcu_in.setStyleSheet("color: orange; font-weight: bold;")
+            self.lbl_ddcu_in.setStyleSheet(f"color: {theme.color('amber')}; font-weight: bold;")
         else:
-            self.lbl_ddcu_in.setStyleSheet("color: white;")
+            self.lbl_ddcu_in.setStyleSheet(f"color: {theme.color('txt')};")
 
 
         # Update plots
@@ -206,12 +217,16 @@ class EPSWidget(QWidget):
         self.hist_soc.append(avg_soc)
 
         self.ax[0].cla()
-        self.ax[0].plot(self.hist_time, self.hist_bus_voltage, color="blue")
+        self.ax[0].plot(self.hist_time, self.hist_bus_voltage, color=theme.color("accent"))
         self.ax[0].set_title("Bus Voltage (DDCU Vin)")
 
         self.ax[1].cla()
-        self.ax[1].plot(self.hist_time, self.hist_soc, color="green")
+        self.ax[1].plot(self.hist_time, self.hist_soc, color=theme.color("green"))
         self.ax[1].set_title("Avg Battery SOC")
+
+        for a in self.ax:
+            self._style_axes(a)
+        self.canvas.figure.tight_layout()
         self.canvas.draw()
 
         # Update battery labels
@@ -224,7 +239,7 @@ class EPSWidget(QWidget):
             )
             style = self._battery_style(b)
             if b["soc"] < 15 and self._blink_state:
-                style = "background:red; color:white; padding:4px;"
+                style = self._cell_style(theme.color("red"), theme.color("txt"))
             lbl.setStyleSheet(style)
 
         # Update MBSU
@@ -232,22 +247,44 @@ class EPSWidget(QWidget):
             val = f"{self.mbsu_channels[i]:.1f}"
             item = QTableWidgetItem(val)
             if not (120.0 <= self.mbsu_channels[i] <= 180.0):
-                item.setBackground(QColor("red"))
+                item.setBackground(theme.qcolor("red"))
             elif self.mbsu_channels[i] > 120.0:
-                item.setBackground(QColor("lightgreen"))
+                item.setBackground(theme.qcolor("green"))
             self.mbsu_table.setItem(i, 1, item)
 
 
+    def _cell_style(self, bg, fg):
+        return f"background:{bg}; color:{fg}; padding:4px;"
+
+    def _style_figure(self, fig):
+        fig.patch.set_facecolor(theme.color("bg"))
+        for a in self.ax:
+            self._style_axes(a)
+
+    def _style_axes(self, a):
+        a.set_facecolor(theme.color("panel"))
+        a.title.set_color(theme.color("txt2"))
+        a.xaxis.label.set_color(theme.color("txt3"))
+        a.yaxis.label.set_color(theme.color("txt3"))
+        a.tick_params(colors=theme.color("txt3"), labelsize=8)
+        for spine in a.spines.values():
+            spine.set_color(theme.color("line2"))
+        a.grid(True, color=theme.color("line"), linewidth=0.5)
+
     def _battery_style(self, b):
         if b["mode"] == "charging":
-            color = "green"
+            bg = theme.color("green")
+            fg = theme.color("txt")
         elif b["mode"] == "discharging":
-            color = "orange"
+            bg = theme.color("amber")
+            fg = theme.color("txt")
         else:
-            color = "gray"
+            bg = theme.color("panel2")
+            fg = theme.color("txt2")
         if b["soc"] < 15:
-            color = "red"
-        return f"background:{color}; color:white; padding:4px;"
+            bg = theme.color("red")
+            fg = theme.color("txt")
+        return self._cell_style(bg, fg)
 
     def _show_battery_popup(self, idx):
         b = self.batteries[idx]

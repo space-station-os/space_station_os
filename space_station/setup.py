@@ -13,10 +13,17 @@ setup(
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name, ['space_station/.env']),
         ('share/' + package_name + '/launch', glob('launch/*.launch.py')),
-        
-        
     ],
-    install_requires=['setuptools'],
+    # Bundle runtime assets (images, videos, fonts) inside the python package
+    # so non-symlink installs still find them via importlib.resources.
+    package_data={
+        package_name: [
+            'assets/*',
+            'assets/fonts/*',
+        ],
+    },
+    include_package_data=True,
+    install_requires=['setuptools', 'pyqtgraph'],
     zip_safe=True,
     maintainer='siddarth',
     maintainer_email='siddarth.dayasagar@gmail.com',

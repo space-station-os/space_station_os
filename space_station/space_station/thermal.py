@@ -1,11 +1,10 @@
 from PyQt5.QtWidgets import (
-    QWidget, QLabel, QVBoxLayout, QHBoxLayout, QGroupBox, QFormLayout,
+    QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
     QSplitter, QTableWidget, QTableWidgetItem
 )
 from PyQt5.QtCore import Qt, QTimer
 from collections import deque
 import threading
-import pyqtgraph as pg
 
 import rclpy
 from rclpy.node import Node
@@ -13,6 +12,9 @@ from rclpy.action import ActionClient
 
 from space_station_interfaces.msg import ThermalNodeDataArray, ThermalLinkFlowsArray
 from space_station_interfaces.action import Coolant
+
+from space_station import theme
+from space_station.widgets import page_header, MetricCard, SpecRow, TelemetryPlot
 
 
 class ThermalWidget(QWidget):
@@ -49,8 +51,22 @@ class ThermalWidget(QWidget):
 
     # ------------------- UI -------------------
     def _build_ui(self):
-        root_splitter = QSplitter(Qt.Vertical)
         layout = QVBoxLayout(self)
+
+        # Page header (Vast Space design system)
+        layout.addWidget(page_header(
+            "Thermal Control",
+            "Internal/External Loops · Node Network",
+            "TCS",
+        ))
+
+        # Coolant status as a SpecRow of MetricCards
+        self.card_internal = MetricCard("Internal Temp", "—", "°C", "NO DATA", "muted")
+        self.card_ammonia = MetricCard("Ammonia Temp", "—", "°C", "NO DATA", "muted")
+        self.card_vented = MetricCard("Vented Heat", "—", "kJ", "NO DATA", "muted")
+        layout.addWidget(SpecRow([self.card_internal, self.card_ammonia, self.card_vented]))
+
+        root_splitter = QSplitter(Qt.Vertical)
         layout.addWidget(root_splitter)
 
         # --- Top half: Nodes + Links ---
@@ -75,36 +91,14 @@ class ThermalWidget(QWidget):
         links_group.setLayout(links_layout)
         top_splitter.addWidget(links_group)
 
-        # --- Bottom half: Coolant + Plot ---
-        bottom_splitter = QSplitter(Qt.Horizontal)
-        root_splitter.addWidget(bottom_splitter)
-
-        # Quadrant 3: Coolant Status
-        coolant_group = QGroupBox("Coolant Status (Feedback)")
-        coolant_layout = QFormLayout()
-        self.coolant_internal_temp = QLabel("--")
-        self.coolant_ammonia_temp = QLabel("--")
-        self.coolant_vented_heat = QLabel("--")
-        coolant_layout.addRow("Internal Temp (°C):", self.coolant_internal_temp)
-        coolant_layout.addRow("Ammonia Temp (°C):", self.coolant_ammonia_temp)
-        coolant_layout.addRow("Vented Heat (kJ):", self.coolant_vented_heat)
-        coolant_group.setLayout(coolant_layout)
-        bottom_splitter.addWidget(coolant_group)
-
-        # Quadrant 4: Avg Temp Plot (PyQtGraph)
+        # --- Bottom half: Avg Temp Plot ---
         plot_group = QGroupBox("Avg Node Temperature (°C)")
         plot_layout = QVBoxLayout()
 
-        self.temp_plot = pg.PlotWidget(title="Average Node Temperature (°C)")
-        self.temp_plot.addLegend()
-        self.temp_plot.showGrid(x=True, y=True)
-        self.temp_curve = self.temp_plot.plot(pen=pg.mkPen('r', width=2), name="Avg Temp")
-        self.temp_plot.setLabel('left', "Temperature (°C)")
-        self.temp_plot.setLabel('bottom', "Time (s)")
-
+        self.temp_plot = TelemetryPlot(max_points=300, y_label="°C")
         plot_layout.addWidget(self.temp_plot)
         plot_group.setLayout(plot_layout)
-        bottom_splitter.addWidget(plot_group)
+        root_splitter.addWidget(plot_group)
 
     # ------------------- ROS -------------------
     def _init_ros_interfaces(self):
@@ -124,11 +118,16 @@ class ThermalWidget(QWidget):
         goal_msg.component_id = "thermal_gui"
         goal_msg.input_temperature_c = 30.0  # arbitrary test value
 
-        self.coolant_client.wait_for_server()
-        self.coolant_client.send_goal_async(
-            goal_msg,
-            feedback_callback=self._coolant_feedback_cb
-        )
+        # timeout_sec keeps the GUI from blocking forever when no server is up
+        if self.coolant_client.wait_for_server(timeout_sec=2.0):
+            self.coolant_client.send_goal_async(
+                goal_msg,
+                feedback_callback=self._coolant_feedback_cb
+            )
+        else:
+            self.node.get_logger().warn(
+                "[ThermalWidget] Coolant action server unavailable; skipping goal"
+            )
 
     # ------------------- Callbacks -------------------
     def _node_cb(self, msg: ThermalNodeDataArray):
@@ -169,11 +168,14 @@ class ThermalWidget(QWidget):
 
         # Update coolant info
         if coolant["internal_temp_c"] is not None:
-            self.coolant_internal_temp.setText(f"{coolant['internal_temp_c']:.1f} °C")
+            self.card_internal.set_value(f"{coolant['internal_temp_c']:.1f}")
+            self.card_internal.set_footer("LIVE", "green")
         if coolant["ammonia_temp_c"] is not None:
-            self.coolant_ammonia_temp.setText(f"{coolant['ammonia_temp_c']:.1f} °C")
+            self.card_ammonia.set_value(f"{coolant['ammonia_temp_c']:.1f}")
+            self.card_ammonia.set_footer("LIVE", "green")
         if coolant["vented_heat_kj"] is not None:
-            self.coolant_vented_heat.setText(f"{coolant['vented_heat_kj']:.1f} kJ")
+            self.card_vented.set_value(f"{coolant['vented_heat_kj']:.1f}")
+            self.card_vented.set_footer("LIVE", "green")
 
         # Update avg temp plot
         if nodes:
@@ -182,8 +184,4 @@ class ThermalWidget(QWidget):
             self.temp_time.append(self._time_counter)
             self.avg_temp_history.append(avg_temp_c)
 
-            self.temp_curve.setData(self.temp_time, self.avg_temp_history)
-            self.temp_plot.setYRange(
-                min(self.avg_temp_history) - 2,
-                max(self.avg_temp_history) + 2
-            )
+            self.temp_plot.add_point(self._time_counter, avg_temp_c)

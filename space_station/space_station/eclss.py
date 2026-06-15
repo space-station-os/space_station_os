@@ -1,456 +1,494 @@
 """
-EclssWidget: Crew Environmental Simulation & Visualization
+EclssWidget — Air Revitalization (Four-Bed Molecular Sieve) console.
 
-- Simulates ISS crew quarters environment with 1 sec = 1 simulated minute.
-- Tracks CO₂, O₂, and H₂O storage using ROS 2 topics (/co2_storage, /o2_storage, /wrs/product_water_reserve).
-- Models astronaut physiology:
-    * CO₂ rises during day, reduced at night (21:30–06:00 GMT).
-    * Daily exercise (19:00–20:00 GMT) increases CO₂/O₂ usage.
-    * Automatic ARS vent triggered when CO₂ exceeds threshold.
-- Periodically requests O₂ (3360 g/day for 4 crew) and H₂O (3.8 L/day for 4 crew) via ROS services.
-- Accumulates waste water (urine, greywater, etc.) and sends WRS goals for recovery.
-- Provides GUI:
-    * Tank bars for CO₂, O₂, H₂O.
-    * Production/consumption graphs over time.
-    * Crew health monitor (HR, SpO₂, BP, Temp).
-    * Manual emergency buttons (Vent CO₂, Request O₂, Request H₂O).
-- Designed to mimic ISS schedule (GMT) with sleep and exercise cycles.
+Rebuilt for the ssos_eclss high-fidelity physics package. Pure telemetry
+display: subscribes to the real ssos topics, degrades gracefully (shows "—" /
+"NO DATA") when a publisher is absent, and never crashes on missing data.
+
+============================================================================
+TOPIC CONTRACT  (matched against ssos_eclss as of feature/ssos-eclss)
+============================================================================
+Subscribed (all best-effort; panel works with any subset present):
+
+  /ssos/cabin/co2_ppm          std_msgs/Float64
+        Cabin CO2 concentration in ppm. Converted to a partial pressure in
+        torr using the cabin total pressure (below) for the "CO₂ Partial"
+        metric and the trend plot.
+
+  /ssos/cabin/diagnostics      diagnostic_msgs/DiagnosticArray  (name="cabin")
+        KeyValues consumed:
+          o2_fraction         -> O₂ Level (%)
+          total_pressure_kpa  -> Cabin Pressure (kPa) + torr conversion base
+          (relative_humidity, co2_ppm also published; co2 used as fallback)
+
+  /ssos/ars/co2_removal_kg_day std_msgs/Float64
+        CO2 removal rate. Compared against the 4.16 kg/day ISS requirement.
+
+  /ssos/ars/diagnostics        diagnostic_msgs/DiagnosticArray  (name="ars")
+        KeyValues consumed:
+          precooler_exit_k    -> Precooler exit temp
+          system_dp_in_h2o    -> Blower / system pressure drop
+          blower_flow_scfm    -> Air flow
+          max_bed_temp_k      -> desorbing-bed temperature readout
+          adsorbing_train     -> which train (0/1) is adsorbing vs desorbing
+          co2_removal_kg_day, scrubbed_co2_torr (also published)
+
+  /ssos/ars/bed_states         std_msgs/Float64MultiArray  (12 elements)
+        Per-bed [ADS A1, ADS A2, DES D1, DES D2]:
+          [0..3]  loading fraction (0-1)        -> bed fill bars
+          [4..7]  solid temperature [K]         -> bed temp readouts
+          [8..11] mode code (0=ADSORBING,1=DESORBING,2=AIR_SAVE,3=VACUUM)
+                                                -> bed ADS/DES tags + hot colour
+
+  /ssos/ars/cycle_phase        std_msgs/Float64MultiArray  (3 elements)
+          [0] elapsed time in the half-cycle [s]
+          [1] half-cycle duration [s]           -> 10-60-10 cycle-bar marker
+          [2] adsorbing train index (0/1)
+
+FALLBACK MODEL:
+  * If /ssos/ars/bed_states or /ssos/ars/cycle_phase have no publisher, the
+    bed bars and cycle marker fall back to a local 80-minute half-cycle clock
+    estimate so the panel still animates; real telemetry overrides it.
+============================================================================
 """
 
-
 from PyQt5.QtWidgets import (
-    QWidget, QLabel, QVBoxLayout, QGroupBox, QGridLayout, QProgressBar,
-    QComboBox, QHBoxLayout, QPushButton, QInputDialog
+    QWidget, QLabel, QVBoxLayout, QHBoxLayout, QFrame
 )
-from PyQt5.QtWidgets import QCheckBox
 from PyQt5.QtCore import Qt, QTimer
-import pyqtgraph as pg
-import random
-import datetime
 
-from rclpy.action import ActionClient
-from rclpy.node import Node
-from std_msgs.msg import Float64
-from space_station_interfaces.action import AirRevitalisation, WaterRecovery, OxygenGeneration
-from space_station_interfaces.srv import O2Request, RequestProductWater
-from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
+from std_msgs.msg import Float64, Float64MultiArray
+try:
+    from diagnostic_msgs.msg import DiagnosticArray
+    _HAVE_DIAG = True
+except Exception:
+    DiagnosticArray = None
+    _HAVE_DIAG = False
 
-from space_station_interfaces.msg import AstronautHealth
-
-# ---------------- Constants ---------------- #
-MAX_O2_STORAGE = 60000.0    # grams (large tank)
-MAX_WATER_STORAGE = 2000.0  # liters
-MAX_CO2_STORAGE = 7000.0    # mmHg
-
-STATE_QOS = QoSProfile(
-    history=HistoryPolicy.KEEP_LAST,
-    depth=1,
-    reliability=ReliabilityPolicy.BEST_EFFORT,
-    durability=DurabilityPolicy.TRANSIENT_LOCAL
+from space_station import theme
+from space_station.widgets import (
+    MetricCard, SpecRow, TelemetryPlot, BedLoadBar, CyclePhaseBar, page_header
 )
+
+# --- Unit helpers / constants ---
+_PA_PER_TORR = 133.322
+_DEFAULT_TOTAL_PA = 101325.0
+CO2_SETPOINT_TORR = 2.0
+CO2_REMOVAL_REQ = 4.16  # kg/day (ISS 4-crew requirement)
+HALF_CYCLE_MIN = 80.0   # 10 air-save + 60 adsorb/desorb + 10 vacuum
+
+
+def k_to_c(k):
+    return k - 273.15
+
+
+def k_to_f(k):
+    return (k - 273.15) * 9.0 / 5.0 + 32.0
+
+
+def _stat_line(label, unit):
+    """A label/value/unit line for the precooler/blower stat block."""
+    row = QHBoxLayout()
+    row.setContentsMargins(0, 0, 0, 0)
+    lab = QLabel(label.upper())
+    lab.setProperty("class", "label")
+    lab.setFont(theme.label_font(8, tracking=1.5))
+    row.addWidget(lab)
+    row.addStretch()
+    val = QLabel("—")
+    val.setProperty("class", "value")
+    val.setFont(theme.mono_font(13))
+    row.addWidget(val)
+    u = QLabel(unit)
+    u.setProperty("class", "label")
+    u.setFont(theme.label_font(8))
+    row.addWidget(u)
+    return row, val
+
+
+class _Bed(QFrame):
+    """One sieve bed cell: name + mode tag, a BedLoadBar, load% + temp."""
+
+    def __init__(self, name, mode="ADS", parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("QFrame { border: none; background: transparent; }")
+        v = QVBoxLayout(self)
+        v.setContentsMargins(16, 12, 16, 12)
+        v.setSpacing(8)
+
+        top = QHBoxLayout()
+        top.setContentsMargins(0, 0, 0, 0)
+        self.name = QLabel(name)
+        self.name.setFont(theme.label_font(9, tracking=2.0, bold=True))
+        self.name.setStyleSheet(f"color: {theme.color('txt')};")
+        top.addWidget(self.name)
+        top.addStretch()
+        self.tag = QLabel(mode)
+        self.tag.setFont(theme.mono_font(8))
+        top.addWidget(self.tag)
+        v.addLayout(top)
+
+        self.bar = BedLoadBar(0.0, mode)
+        v.addWidget(self.bar)
+
+        readout = QHBoxLayout()
+        readout.setContentsMargins(0, 0, 0, 0)
+        self.load = QLabel("—")
+        self.load.setFont(theme.mono_font(11))
+        self.load.setStyleSheet(f"color: {theme.color('txt2')};")
+        readout.addWidget(self.load)
+        readout.addStretch()
+        self.temp = QLabel("—")
+        self.temp.setFont(theme.mono_font(11))
+        self.temp.setStyleSheet(f"color: {theme.color('txt3')};")
+        readout.addWidget(self.temp)
+        v.addLayout(readout)
+
+        self.set_mode(mode)
+
+    def set_mode(self, mode):
+        mode = (mode or "ADS").upper()
+        self._mode = mode
+        self.tag.setText(mode)
+        is_des = mode == "DES"
+        color = theme.color("amber") if is_des else theme.color("txt3")
+        self.tag.setStyleSheet(
+            f"color: {color}; border: 1px solid {theme.color('line')};"
+            f" border-radius: 3px; padding: 1px 5px;"
+        )
+        self.bar.set_mode(mode)
+
+    def set_loading(self, fraction):
+        self.bar.set_loading(fraction)
+        self.load.setText(f"{fraction * 100:.0f}%")
+
+    def set_temp_f(self, temp_f, hot=False):
+        if temp_f is None:
+            self.temp.setText("—")
+            return
+        self.temp.setText(f"{temp_f:.0f}°F")
+        self.temp.setStyleSheet(
+            f"color: {theme.color('amber') if hot else theme.color('txt3')};")
 
 
 class EclssWidget(QWidget):
-    def __init__(self, node: Node, parent=None):
+    def __init__(self, node, parent=None):
         super().__init__(parent)
         self.node = node
-        self.init_ui()
-        self.init_ros_interfaces()
 
-        # Simulation state
-        self.sim_minutes = 0
-        self.crew_size = 4
-        self.total_days = 180
+        # latched telemetry (None == no data yet)
+        self._co2_ppm = None
+        self._o2_frac = None
+        self._cabin_pa = _DEFAULT_TOTAL_PA
+        self._removal = None
+        self._precooler_k = None
+        self._system_dp = None
+        self._flow_scfm = None
+        self._max_bed_k = None
+        self._adsorbing_train = 0
+        self._have_cabin_press = False
 
-        # Metabolic constants
-        self.O2_CONS_G_PER_DAY = 840.0
-        self.CO2_GEN_G_PER_DAY = 1000.0
-        self.H2O_CONS_L_PER_DAY = 3.8  # updated as per requirement
-        self.MIN_PER_DAY = 1440.0
+        # Real ARS bed states + cycle phase (from ssos_eclss). None == fall back
+        # to the local GUI estimate so the panel still animates without them.
+        self._bed_states = None     # 12 floats: 4 load, 4 tempK, 4 mode codes
+        self._cycle_real = None     # (elapsed_s, half_cycle_s, adsorbing_train)
 
-        # Buffers
-        self.latest_co2 = 400.0
-        self.latest_o2 = 0.0
-        self.latest_h2o = 0.0
-        self.o2_used = 0.0
-        self.h2o_used = 0.0
-        # Urine accumulation
-        self.urine_accum = 0.0
-        self.URINE_FRACTION_OF_INTAKE = 0.7
+        # GUI-side cycle model (fallback when /ssos/ars/cycle_phase is absent)
+        self._cycle_min = 0.0
+        self._plot_t = 0.0
 
-        # Graph data
-        self.co2_x, self.co2_data = [], []
-        self.o2_x, self.o2_data = [], []
-        self.h2o_x, self.h2o_data = [], []
-        self.co2_cons_x, self.co2_cons_data = [], []
-        self.o2_cons_x, self.o2_cons_data = [], []
-        self.h2o_cons_x, self.h2o_cons_data = [], []
+        self._build_ui()
+        self._init_ros()
 
-        # Simulation tick (1 Hz = 1 min sim)
-        self.sim_timer = QTimer()
-        self.sim_timer.timeout.connect(self.simulate_event)
-        self.sim_timer.start(1000)
-        self.vent_rate = 0.15   # 15% per simulated minute until target is reached
-        self.vent_target = 350.0
-        # GUI refresh (5 Hz)
-        self.gui_update_timer = QTimer()
-        self.gui_update_timer.timeout.connect(self.refresh_gui)
-        self.gui_update_timer.start(200)
-        self.venting = False 
-        self.send_initial_goals()
+        self._refresh_timer = QTimer(self)
+        self._refresh_timer.timeout.connect(self._refresh)
+        self._refresh_timer.start(1000)  # 1 Hz
 
-    # ---------------- UI ---------------- #
-    def init_ui(self):
-        layout = QGridLayout()
-        layout.setSpacing(10)
+    # ----------------------------- UI -----------------------------
+    def _build_ui(self):
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(16)
 
-        # Quadrant 1: Tanks
-        tanks_group = QGroupBox("Storage Tanks")
-        tanks_layout = QHBoxLayout()
+        root.addWidget(page_header(
+            "Air Revitalization", "Four-Bed Molecular Sieve", "ARS · 4BMS"))
 
-        self.co2_bar = self._create_horizontal_tank("CO₂", "#19da69")
-        self.o2_bar = self._create_horizontal_tank("O₂", "#55c3df")
-        self.water_bar = self._create_horizontal_tank("H₂O", "#ae3bd1")
+        # --- Spec row ---
+        self.card_co2 = MetricCard("CO₂ Partial", "—", "torr", "NO DATA", "muted")
+        self.card_o2 = MetricCard("O₂ Level", "—", "%", "NO DATA", "muted")
+        self.card_removal = MetricCard("CO₂ Removal", "—", "kg/day", "NO DATA", "muted")
+        self.card_press = MetricCard("Cabin Pressure", "—", "kPa", "NO DATA", "muted")
+        root.addWidget(SpecRow([self.card_co2, self.card_o2,
+                                self.card_removal, self.card_press]))
 
-        tanks_layout.addWidget(self.co2_bar["box"])
-        tanks_layout.addWidget(self.o2_bar["box"])
-        tanks_layout.addWidget(self.water_bar["box"])
-        tanks_group.setLayout(tanks_layout)
-        layout.addWidget(tanks_group, 0, 0)
+        # --- Two-column row: plot (wide) + precooler/blower stats ---
+        cols = QHBoxLayout()
+        cols.setSpacing(16)
 
-        # Quadrant 2: Production Graphs
-        prod_group = QGroupBox("Production (CO₂, O₂, H₂O)")
-        prod_layout = QVBoxLayout()
-        self.prod_plot = pg.PlotWidget(title="Production Over Time")
-        self.prod_plot.addLegend()
-        self.prod_plot.showGrid(x=True, y=True)
-        self.co2_curve = self.prod_plot.plot(pen='g', name="CO₂")
-        self.o2_curve = self.prod_plot.plot(pen='b', name="O₂")
-        self.h2o_curve = self.prod_plot.plot(pen='m', name="H₂O")
-        prod_layout.addWidget(self.prod_plot)
+        plot_card = QFrame()
+        plot_card.setProperty("class", "card")
+        pcl = QVBoxLayout(plot_card)
+        pcl.setContentsMargins(16, 14, 16, 14)
+        plot_hdr = QLabel("CO₂ PARTIAL PRESSURE · 80 MIN")
+        plot_hdr.setProperty("class", "label")
+        plot_hdr.setFont(theme.label_font(8, tracking=2.0))
+        pcl.addWidget(plot_hdr)
+        self.plot = TelemetryPlot(
+            max_points=240, y_range=(0, 4.0), setpoint=CO2_SETPOINT_TORR,
+            y_label="torr")
+        pcl.addWidget(self.plot)
+        cols.addWidget(plot_card, 3)
 
-        # --- Production toggles ---
-        self.cb_co2_prod = QCheckBox("Show CO₂")
-        self.cb_co2_prod.setChecked(True)
-        self.cb_o2_prod = QCheckBox("Show O₂")
-        self.cb_o2_prod.setChecked(True)
-        self.cb_h2o_prod = QCheckBox("Show H₂O")
-        self.cb_h2o_prod.setChecked(True)
+        stat_card = QFrame()
+        stat_card.setProperty("class", "card")
+        scl = QVBoxLayout(stat_card)
+        scl.setContentsMargins(16, 14, 16, 14)
+        scl.setSpacing(12)
+        stat_hdr = QLabel("PRECOOLER / BLOWER")
+        stat_hdr.setProperty("class", "label")
+        stat_hdr.setFont(theme.label_font(8, tracking=2.0))
+        scl.addWidget(stat_hdr)
+        r1, self.val_precooler = _stat_line("Precooler Exit", "°C")
+        r2, self.val_dp = _stat_line("System ΔP", "in·H₂O")
+        r3, self.val_flow = _stat_line("Air Flow", "SCFM")
+        r4, self.val_ltl = _stat_line("LTL Temp", "°C")
+        for r in (r1, r2, r3, r4):
+            scl.addLayout(r)
+        scl.addStretch()
+        cols.addWidget(stat_card, 2)
+        root.addLayout(cols)
 
-        self.cb_co2_prod.toggled.connect(lambda state: self.co2_curve.setVisible(state))
-        self.cb_o2_prod.toggled.connect(lambda state: self.o2_curve.setVisible(state))
-        self.cb_h2o_prod.toggled.connect(lambda state: self.h2o_curve.setVisible(state))
+        # --- Cycle phase block ---
+        cycle_card = QFrame()
+        cycle_card.setProperty("class", "card")
+        ccl = QVBoxLayout(cycle_card)
+        ccl.setContentsMargins(16, 14, 16, 14)
+        ccl.setSpacing(8)
+        cyc_hdr = QLabel("HALF-CYCLE PHASE")
+        cyc_hdr.setProperty("class", "label")
+        cyc_hdr.setFont(theme.label_font(8, tracking=2.0))
+        ccl.addWidget(cyc_hdr)
+        self.cycle_bar = CyclePhaseBar()
+        ccl.addWidget(self.cycle_bar)
+        marks = QHBoxLayout()
+        marks.setContentsMargins(0, 0, 0, 0)
+        for i, m in enumerate(["0", "10", "70", "80 MIN"]):
+            lab = QLabel(m)
+            lab.setFont(theme.mono_font(8))
+            lab.setStyleSheet(f"color: {theme.color('txt3')};")
+            if i == 0:
+                lab.setAlignment(Qt.AlignLeft)
+            elif i == 3:
+                lab.setAlignment(Qt.AlignRight)
+            else:
+                lab.setAlignment(Qt.AlignCenter)
+            marks.addWidget(lab, 1)
+        ccl.addLayout(marks)
+        root.addWidget(cycle_card)
 
-        prod_layout.addWidget(self.cb_co2_prod)
-        prod_layout.addWidget(self.cb_o2_prod)
-        prod_layout.addWidget(self.cb_h2o_prod)
+        # --- Bed row ---
+        bed_card = QFrame()
+        bed_card.setProperty("class", "flush")
+        bed_row = QHBoxLayout(bed_card)
+        bed_row.setContentsMargins(0, 0, 0, 0)
+        bed_row.setSpacing(0)
+        self.beds = [
+            _Bed("BED A1", "ADS"),
+            _Bed("BED A2", "ADS"),
+            _Bed("BED D1", "DES"),
+            _Bed("BED D2", "DES"),
+        ]
+        for i, bed in enumerate(self.beds):
+            bed_row.addWidget(bed, 1)
+            if i < len(self.beds) - 1:
+                d = QFrame()
+                d.setProperty("class", "vline")
+                d.setFixedWidth(1)
+                bed_row.addWidget(d)
+        root.addWidget(bed_card)
+        root.addStretch()
 
-        prod_group.setLayout(prod_layout)
-        layout.addWidget(prod_group, 0, 1)
+    # ----------------------------- ROS -----------------------------
+    def _init_ros(self):
+        try:
+            self.node.create_subscription(
+                Float64, "/ssos/cabin/co2_ppm", self._on_co2_ppm, 10)
+            self.node.create_subscription(
+                Float64, "/ssos/ars/co2_removal_kg_day", self._on_removal, 10)
+            if _HAVE_DIAG:
+                self.node.create_subscription(
+                    DiagnosticArray, "/ssos/cabin/diagnostics",
+                    self._on_cabin_diag, 10)
+                self.node.create_subscription(
+                    DiagnosticArray, "/ssos/ars/diagnostics",
+                    self._on_ars_diag, 10)
+            # High-fidelity per-bed + cycle telemetry (ssos_eclss ArsNode).
+            self.node.create_subscription(
+                Float64MultiArray, "/ssos/ars/bed_states", self._on_bed_states, 10)
+            self.node.create_subscription(
+                Float64MultiArray, "/ssos/ars/cycle_phase", self._on_cycle_phase, 10)
+        except Exception as e:
+            self.node.get_logger().warn(f"[eclss] subscription setup failed: {e}")
 
-        # Quadrant 3: Consumption Graphs
-        cons_group = QGroupBox("Consumption vs Reserves")
-        cons_layout = QVBoxLayout()
-        self.cons_plot = pg.PlotWidget(title="Consumption Over Time")
-        self.cons_plot.addLegend()
-        self.cons_plot.showGrid(x=True, y=True)
-        self.co2_cons_curve = self.cons_plot.plot(pen='r', name="CO₂ Exhaled")
-        self.o2_cons_curve = self.cons_plot.plot(pen='c', name="O₂ Consumed")
-        self.h2o_cons_curve = self.cons_plot.plot(pen='y', name="H₂O Consumed")
-        cons_layout.addWidget(self.cons_plot)
+    def _on_bed_states(self, msg):
+        if len(msg.data) >= 12:
+            self._bed_states = list(msg.data)
 
-        # --- Consumption toggles ---
-        self.cb_co2_cons = QCheckBox("Show CO₂ Exhaled")
-        self.cb_co2_cons.setChecked(True)
-        self.cb_o2_cons = QCheckBox("Show O₂ Consumed")
-        self.cb_o2_cons.setChecked(True)
-        self.cb_h2o_cons = QCheckBox("Show H₂O Consumed")
-        self.cb_h2o_cons.setChecked(True)
+    def _on_cycle_phase(self, msg):
+        if len(msg.data) >= 2:
+            self._cycle_real = (msg.data[0], msg.data[1],
+                                int(round(msg.data[2])) if len(msg.data) >= 3 else 0)
 
-        self.cb_co2_cons.toggled.connect(lambda state: self.co2_cons_curve.setVisible(state))
-        self.cb_o2_cons.toggled.connect(lambda state: self.o2_cons_curve.setVisible(state))
-        self.cb_h2o_cons.toggled.connect(lambda state: self.h2o_cons_curve.setVisible(state))
+    def _on_co2_ppm(self, msg):
+        self._co2_ppm = msg.data
 
-        cons_layout.addWidget(self.cb_co2_cons)
-        cons_layout.addWidget(self.cb_o2_cons)
-        cons_layout.addWidget(self.cb_h2o_cons)
+    def _on_removal(self, msg):
+        self._removal = msg.data
 
-        cons_group.setLayout(cons_layout)
-        layout.addWidget(cons_group, 1, 0)
+    def _on_cabin_diag(self, msg):
+        for status in msg.status:
+            for kv in status.values:
+                try:
+                    val = float(kv.value)
+                except (TypeError, ValueError):
+                    continue
+                if kv.key == "o2_fraction":
+                    self._o2_frac = val
+                elif kv.key == "total_pressure_kpa":
+                    self._cabin_pa = val * 1000.0
+                    self._have_cabin_press = True
+                elif kv.key == "co2_ppm" and self._co2_ppm is None:
+                    self._co2_ppm = val
 
-        # Quadrant 4: Crew Health Monitor + Buttons
-        health_group = QGroupBox("Crew Health Monitor")
-        health_layout = QVBoxLayout()
+    def _on_ars_diag(self, msg):
+        for status in msg.status:
+            for kv in status.values:
+                try:
+                    val = float(kv.value)
+                except (TypeError, ValueError):
+                    continue
+                if kv.key == "precooler_exit_k":
+                    self._precooler_k = val
+                elif kv.key == "system_dp_in_h2o":
+                    self._system_dp = val
+                elif kv.key == "blower_flow_scfm":
+                    self._flow_scfm = val
+                elif kv.key == "max_bed_temp_k":
+                    self._max_bed_k = val
+                elif kv.key == "adsorbing_train":
+                    self._adsorbing_train = int(round(val))
+                elif kv.key == "co2_removal_kg_day" and self._removal is None:
+                    self._removal = val
 
-        self.crew_dropdown = QComboBox()
-        self.crew_dropdown.addItems([f"Astronaut {i+1}" for i in range(4)])
-        health_layout.addWidget(self.crew_dropdown)
+    # --------------------------- helpers ---------------------------
+    def _co2_torr(self):
+        if self._co2_ppm is None:
+            return None
+        return (self._co2_ppm * 1e-6) * self._cabin_pa / _PA_PER_TORR
 
-        self.hr_label = QLabel("Heart Rate: --- bpm")
-        self.spo2_label = QLabel("SpO₂: --- %")
-        self.bp_label = QLabel("Blood Pressure: ---/--- mmHg")
-        self.temp_label = QLabel("Temp: --- °C")
+    # --------------------------- refresh ---------------------------
+    def _refresh(self):
+        # advance GUI cycle clock (1 sim-min per second, wraps at 80)
+        self._cycle_min = (self._cycle_min + 1.0) % HALF_CYCLE_MIN
+        self._plot_t += 1.0
 
-        for lbl in [self.hr_label, self.spo2_label, self.bp_label, self.temp_label]:
-            lbl.setStyleSheet("color: lightgray;")
-            health_layout.addWidget(lbl)
+        # ---- Spec cards ----
+        co2 = self._co2_torr()
+        if co2 is not None:
+            ok = co2 <= CO2_SETPOINT_TORR + 0.5
+            self.card_co2.set_value(f"{co2:.2f}")
+            self.card_co2.set_footer(
+                f"SETPOINT {CO2_SETPOINT_TORR:.1f}", "green" if ok else "amber")
+            self.plot.add_point(self._plot_t, co2)
 
-        # Emergency buttons
-        btn_layout = QHBoxLayout()
-        self.btn_vent = QPushButton("Vent CO₂")
-        self.btn_o2 = QPushButton("Request O₂")
-        self.btn_h2o = QPushButton("Request H₂O")
-        self.btn_vent.clicked.connect(self.manual_vent)
-        self.btn_o2.clicked.connect(self.manual_o2)
-        self.btn_h2o.clicked.connect(self.manual_h2o)
-        btn_layout.addWidget(self.btn_vent)
-        btn_layout.addWidget(self.btn_o2)
-        btn_layout.addWidget(self.btn_h2o)
-        health_layout.addLayout(btn_layout)
+        if self._o2_frac is not None:
+            pct = self._o2_frac * 100.0
+            ok = 19.5 <= pct <= 23.5
+            self.card_o2.set_value(f"{pct:.1f}")
+            self.card_o2.set_footer(
+                "NOMINAL" if ok else "OUT OF RANGE", "green" if ok else "amber")
 
-        health_group.setLayout(health_layout)
-        layout.addWidget(health_group, 1, 1)
+        if self._removal is not None:
+            ok = self._removal >= CO2_REMOVAL_REQ
+            self.card_removal.set_value(f"{self._removal:.2f}")
+            self.card_removal.set_footer(
+                f"REQ {CO2_REMOVAL_REQ:.2f} KG/DAY", "green" if ok else "amber")
 
-        # Final layout
-        self.setLayout(layout)
+        if self._have_cabin_press:
+            kpa = self._cabin_pa / 1000.0
+            ok = 95.0 <= kpa <= 104.0
+            self.card_press.set_value(f"{kpa:.1f}")
+            self.card_press.set_footer(
+                "NOMINAL" if ok else "CHECK", "green" if ok else "amber")
 
-    def _create_horizontal_tank(self, name, color):
-        box = QGroupBox(name)
-        vbox = QVBoxLayout()
-        label = QLabel(f"{name}: ---")
-        bar = QProgressBar()
-        bar.setOrientation(Qt.Horizontal)
-        bar.setRange(0, 100)
-        bar.setStyleSheet(f"QProgressBar::chunk {{ background-color: {color}; }}")
-        vbox.addWidget(label)
-        vbox.addWidget(bar)
-        box.setLayout(vbox)
-        return {"box": box, "label": label, "bar": bar}
+        # ---- Precooler / blower stats ----
+        if self._precooler_k is not None:
+            self.val_precooler.setText(f"{k_to_c(self._precooler_k):.1f}")
+        if self._system_dp is not None:
+            self.val_dp.setText(f"{self._system_dp:.2f}")
+        if self._flow_scfm is not None:
+            self.val_flow.setText(f"{self._flow_scfm:.0f}")
+        # LTL (low-temp loop) not published by ssos_eclss -> stays "—"
 
-    # ---------------- ROS ---------------- #
-    def init_ros_interfaces(self):
-        self.ars_client = ActionClient(self.node, AirRevitalisation, '/air_revitalisation')
-        self.wrs_client = ActionClient(self.node, WaterRecovery, '/water_recovery_systems')
-        self.o2_client = self.node.create_client(O2Request, '/ogs/request_o2')
-        self.water_client = self.node.create_client(RequestProductWater, '/wrs/product_water_request')
-        
-        # Subscriptions
-        self.node.create_subscription(Float64, '/co2_storage', lambda m: setattr(self, "latest_co2", m.data), 10)
-        self.node.create_subscription(Float64, '/o2_storage', lambda m: setattr(self, "latest_o2", m.data), 10)
-        self.node.create_subscription(Float64, '/wrs/product_water_reserve', lambda m: setattr(self, "latest_h2o", m.data), 10)
+        # ---- Cycle phase ---- (real telemetry if present, else local clock)
+        if self._cycle_real is not None:
+            elapsed_min = self._cycle_real[0] / 60.0
+            total_min = self._cycle_real[1] / 60.0 if self._cycle_real[1] > 0 else HALF_CYCLE_MIN
+            self.cycle_bar.set_phase(elapsed_min, total_min)
+        else:
+            self.cycle_bar.set_phase(self._cycle_min, HALF_CYCLE_MIN)
 
-        self.bms_pub = self.node.create_publisher(AstronautHealth, "/crew/vitals", 10)
+        # ---- Beds ----
+        if self._bed_states is not None:
+            self._update_beds_real()
+        else:
+            self._update_beds()
 
-    # ---------------- Simulation ---------------- #
-    def simulate_event(self):
-        self.sim_minutes += 1
-        sim_hour = (self.sim_minutes / 60.0) % 24.0
+    def _update_beds(self):
+        """Trains: A (beds 0,1), D (beds 2,3). adsorbing_train picks which
+        train is adsorbing; the other desorbs. Loading is a GUI-side estimate
+        from the half-cycle clock; desorbing-bed temp uses max_bed_temp_k."""
+        # adsorb-phase progress within the 10..70 min window (0..1)
+        if self._cycle_min <= 10.0:
+            adsorb_frac = 0.0
+        elif self._cycle_min >= 70.0:
+            adsorb_frac = 1.0
+        else:
+            adsorb_frac = (self._cycle_min - 10.0) / 60.0
 
-        # Normal metabolism
-        o2_cons = self.O2_CONS_G_PER_DAY / self.MIN_PER_DAY
-        co2_gen = self.CO2_GEN_G_PER_DAY / self.MIN_PER_DAY
-        h2o_cons = self.H2O_CONS_L_PER_DAY / self.MIN_PER_DAY
+        a_adsorbing = (self._adsorbing_train == 0)
+        des_temp_f = k_to_f(self._max_bed_k) if self._max_bed_k is not None else None
+        cabin_temp_f = 70.0  # nominal cabin air temp for adsorbing beds
 
-        # Sleep reduces metabolism
-        if 21.5 <= sim_hour or sim_hour < 6.0:
-            co2_gen *= 0.5
-            o2_cons *= 0.5
-            h2o_cons *= 0.7
+        for idx in (0, 1):  # train A beds
+            if a_adsorbing:
+                self.beds[idx].set_mode("ADS")
+                self.beds[idx].set_loading(adsorb_frac)
+                self.beds[idx].set_temp_f(cabin_temp_f, hot=False)
+            else:
+                self.beds[idx].set_mode("DES")
+                self.beds[idx].set_loading(1.0 - adsorb_frac)
+                self.beds[idx].set_temp_f(des_temp_f, hot=True)
+        for idx in (2, 3):  # train D beds
+            if a_adsorbing:
+                self.beds[idx].set_mode("DES")
+                self.beds[idx].set_loading(1.0 - adsorb_frac)
+                self.beds[idx].set_temp_f(des_temp_f, hot=True)
+            else:
+                self.beds[idx].set_mode("ADS")
+                self.beds[idx].set_loading(adsorb_frac)
+                self.beds[idx].set_temp_f(cabin_temp_f, hot=False)
 
-        # Exercise spike
-        if 19.0 <= sim_hour < 20.0:
-            co2_gen *= 1.5
-            o2_cons *= 1.5
-
-        # Apply generation
-        self.latest_co2 += co2_gen * self.crew_size
-        self.o2_used = o2_cons * self.crew_size
-        self.h2o_used = h2o_cons * self.crew_size
-
-        # ---------------- CO₂ Venting ----------------
-        if not self.venting and self.latest_co2 >= 1500.0 or self.sim_minutes % 100 == 0:
-            self.node.get_logger().info(
-                f"[Sim] Vent triggered at {self.latest_co2:.2f} mmHg"
-            )
-            self.send_ars_goal(self.latest_co2)   
-            self.venting = True
-
-        if self.venting:
-            # Reduce CO₂ gradually (smooth drop)
-            
-            drop = self.latest_co2 * self.vent_rate
-            self.latest_co2 = max(self.latest_co2 - drop, 0.0)
-           
-            self.node.get_logger().debug(
-                f"[Sim] Venting... CO₂ reduced by {drop:.2f}, now {self.latest_co2:.2f} mmHg"
-            )
-
-            # Stop venting once we are back in safe zone
-            if self.latest_co2 <= self.vent_target:
-                self.venting = False
-                self.node.get_logger().debug(
-                    f"[Sim] Venting complete, CO₂ stabilized at {self.latest_co2:.2f} mmHg"
-                )
-
-        # O2 request hourly
-        if self.sim_minutes % 60 == 0:
-            if self.o2_client.service_is_ready():
-                req = O2Request.Request()
-                req.o2_req = (self.O2_CONS_G_PER_DAY * self.crew_size) / 24.0
-                self.node.get_logger().info(f"[Sim] Requesting O₂: {req.o2_req:.2f} g")
-                self.o2_client.call_async(req)
-
-        # Water request hourly
-        if self.sim_minutes % 60 == 0:
-            if self.water_client.service_is_ready():
-                req = RequestProductWater.Request()
-                req.amount = (self.H2O_CONS_L_PER_DAY * self.crew_size) / 24.0
-                self.node.get_logger().info(f"[Sim] Requesting H₂O: {req.amount:.2f} L")
-                self.water_client.call_async(req)
-                
-        self.latest_co2 += co2_gen * self.crew_size
-        self.o2_used = o2_cons * self.crew_size
-        self.h2o_used = h2o_cons * self.crew_size
-
-        # ---------------- Consumption tracking ----------------
-        self.co2_cons_x.append(self.sim_minutes)
-        self.co2_cons_data.append(co2_gen * self.crew_size)
-
-        self.o2_cons_x.append(self.sim_minutes)
-        self.o2_cons_data.append(self.o2_used)
-
-        self.h2o_cons_x.append(self.sim_minutes)
-        self.h2o_cons_data.append(self.h2o_used)
-
-    # ---------------- GUI Refresh ---------------- #
-    def refresh_gui(self):
-        # Update CO₂
-        percent = round((self.latest_co2 / MAX_CO2_STORAGE) * 100.0, 1)
-        self.co2_bar["label"].setText(f"CO₂: {round(self.latest_co2, 2)} mmHg")
-        self.co2_bar["bar"].setValue(int(percent))
-        self.co2_x.append(self.sim_minutes)
-        self.co2_data.append(self.latest_co2)
-        self.co2_curve.setData(self.co2_x, self.co2_data)
-
-        # Update O₂
-        percent = round((self.latest_o2 / MAX_O2_STORAGE) * 100.0, 1)
-        self.o2_bar["label"].setText(f"O₂: {round(self.latest_o2, 2)} g")
-        self.o2_bar["bar"].setValue(int(percent))
-        self.o2_x.append(self.sim_minutes)
-        self.o2_data.append(self.latest_o2)
-        self.o2_curve.setData(self.o2_x, self.o2_data)
-
-        # Update H₂O
-        percent = round((self.latest_h2o / MAX_WATER_STORAGE) * 100.0, 1)
-        self.water_bar["label"].setText(f"H₂O: {round(self.latest_h2o, 2)} L")
-        self.water_bar["bar"].setValue(int(percent))
-        self.h2o_x.append(self.sim_minutes)
-        self.h2o_data.append(self.latest_h2o)
-        self.h2o_curve.setData(self.h2o_x, self.h2o_data)
-        
-
-        # Update consumption plots  
-        self.co2_cons_curve.setData(self.co2_cons_x, self.co2_cons_data)
-        self.o2_cons_curve.setData(self.o2_cons_x, self.o2_cons_data)
-        self.h2o_cons_curve.setData(self.h2o_cons_x, self.h2o_cons_data)
-        
-        
-
-        # Update astronaut health
-        self.update_health_from_environment(self.o2_used, self.latest_co2)
-
-    # ---------------- Health ---------------- #
-    def update_health_from_environment(self, o2_used, co2_level):
-        o2_ratio = max(0.0, 1.0 - (o2_used / MAX_O2_STORAGE))
-        co2_ratio = min(1.0, co2_level / MAX_CO2_STORAGE)
-
-        hr = 70 + int(40 * co2_ratio)
-        spo2 = 99 - int(10 * (1 - o2_ratio))
-        bp_sys = 120 - int(15 * (1 - o2_ratio))
-        bp_dia = 80 - int(10 * (1 - o2_ratio))
-        temp = 37.0 + round(0.3 * co2_ratio, 1)
-
-        self.hr_label.setText(f"Heart Rate: {hr} bpm")
-        self.spo2_label.setText(f"SpO₂: {spo2} %")
-        self.bp_label.setText(f"Blood Pressure: {bp_sys}/{bp_dia} mmHg")
-        self.temp_label.setText(f"Temp: {temp} °C")
-
-        msg = AstronautHealth()
-        msg.astronautname = self.crew_dropdown.currentText()
-        msg.heartrate = float(hr)
-        msg.spo2 = float(spo2)
-        msg.bp = float(bp_sys + bp_dia/100.0)
-        self.bms_pub.publish(msg)
-
-    # ---------------- Actions ---------------- #
-    def send_ars_goal(self, co2_mass=2800.0):
-        if not self.ars_client.wait_for_server(timeout_sec=2.0):
-            return
-        goal = AirRevitalisation.Goal()
-        goal.initial_co2_mass = co2_mass
-        goal.initial_moisture_content = 0.8 * 2.5 * self.crew_size
-        goal.initial_contaminants = 25.0
-        self.node.get_logger().info("Sending ARS goal...")
-        self.ars_client.send_goal_async(goal)
-
-    def send_wrs_goal(self, urine_volume=28.0):
-        if not self.wrs_client.wait_for_server(timeout_sec=2.0):
-            return
-        goal = WaterRecovery.Goal()
-        goal.urine_volume = urine_volume
-        self.node.get_logger().info("Sending WRS goal...")
-        self.wrs_client.send_goal_async(goal)
-
-    # ---------------- Manual Buttons ---------------- #
-    def manual_vent(self):
-        amount, ok = QInputDialog.getDouble(self, "Vent CO₂", "Enter CO₂ to vent (mmHg):", 500.0, 0.0, 10000.0, 2)
-        if ok:
-            self.send_ars_goal(amount)
-
-    def manual_o2(self):
-        amount, ok = QInputDialog.getDouble(self, "Request O₂", "Enter O₂ amount (grams):", 1000.0, 0.0, 60000.0, 2)
-        if ok and self.o2_client.service_is_ready():
-            req = O2Request.Request()
-            req.o2_req = amount
-            self.o2_client.call_async(req)
-
-    def manual_h2o(self):
-        amount, ok = QInputDialog.getDouble(self, "Request H₂O", "Enter H₂O amount (liters):", 1.0, 0.0, 2000.0, 2)
-        if ok and self.water_client.service_is_ready():
-            req = RequestProductWater.Request()
-            req.amount = amount
-            self.water_client.call_async(req)
-
-    # ---------------- Startup ---------------- #
-    def send_initial_goals(self):
-        self.node.get_logger().info("[Startup] Initializing ECLSS...")
-
-        # --- Initial CO₂ vent (ARS) ---
-        if self.ars_client.wait_for_server(timeout_sec=2.0):
-            goal = AirRevitalisation.Goal()
-            goal.initial_co2_mass = self.latest_co2
-            goal.initial_moisture_content = 0.8 * 2.5 * self.crew_size
-            goal.initial_contaminants = 25.0
-            self.node.get_logger().info("[Startup] Sending initial ARS goal...")
-            self.ars_client.send_goal_async(goal)
-
-        # --- Initial O₂ request ---
-        if self.o2_client.service_is_ready():
-            req = O2Request.Request()
-            req.o2_req = (self.O2_CONS_G_PER_DAY * self.crew_size) / 24.0  # one hour’s worth
-            self.node.get_logger().info(f"[Startup] Initial O₂ request: {req.o2_req:.2f} g")
-            self.o2_client.call_async(req)
-
-        # --- Initial hydration request (WRS water service) ---
-        if self.water_client.service_is_ready():
-            req = RequestProductWater.Request()
-            req.amount = (self.H2O_CONS_L_PER_DAY * self.crew_size) / 24.0  # one hour’s worth
-            self.node.get_logger().info(f"[Startup] Initial H₂O request: {req.amount:.2f} L")
-            self.water_client.call_async(req)
-
-        # --- Initial urine flush (WRS action) ---
-        if self.wrs_client.wait_for_server(timeout_sec=2.0):
-            goal = WaterRecovery.Goal()
-            goal.urine_volume = 5.0
-            self.node.get_logger().info("[Startup] Sending initial WRS goal...")
-            self.wrs_client.send_goal_async(goal)
+    def _update_beds_real(self):
+        """Drive the four bed cells directly from /ssos/ars/bed_states.
+        Layout (12 floats): [load x4][tempK x4][mode x4], bed order
+        [ADS A1, ADS A2, DES D1, DES D2]. mode 0=ADSORBING else regenerating."""
+        d = self._bed_states
+        for i in range(4):
+            loading = d[i]
+            temp_k = d[4 + i]
+            mode_code = int(round(d[8 + i]))
+            adsorbing = (mode_code == 0)
+            self.beds[i].set_mode("ADS" if adsorbing else "DES")
+            self.beds[i].set_loading(max(0.0, min(1.0, loading)))
+            self.beds[i].set_temp_f(k_to_f(temp_k), hot=not adsorbing)

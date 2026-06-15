@@ -1,30 +1,40 @@
 import os
 import sys
 from PyQt5.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QTabWidget, QLabel, QApplication, QFormLayout
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget,
+    QFrame, QApplication, QScrollArea
 )
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtCore import QTimer
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
-
 from rclpy.node import Node
+
 from space_station.video_player import VideoPlayer
-from space_station.theme import load_dark_theme, load_light_theme
+from space_station import theme
 
-# Subsystem tabs
+# Subsystem panels (existing ROS wiring preserved inside each)
+from space_station.overview import OverviewWidget
 from space_station.eclss import EclssWidget
-from space_station.thermal import ThermalWidget
 from space_station.gnc import GncWidget
+from space_station.eps import EPSWidget
+from space_station.thermal import ThermalWidget
 from space_station.comms import CommsWidget
-from space_station.system_status import SystemStatusWidget
-from space_station.eps import EPSWidget   
 
+# Mission-control shell widgets
+from space_station.widgets import StatusBar, NavBar, EventFeed, SubsystemRoster
 
 from space_station.left_panel import LeftPanel
-
 from space_station.agent import SsosAIAgent
+
+# Global SSOS interfaces (optional — degrade gracefully if not built)
+try:
+    from space_station_interfaces.msg import (
+        SystemState, FaultEvent, SubsystemHeartbeat
+    )
+    _HAVE_SSOS_MSGS = True
+except Exception:
+    SystemState = FaultEvent = SubsystemHeartbeat = None
+    _HAVE_SSOS_MSGS = False
 
 # --- Resources API (Py 3.9+ files/as_file) ---
 try:
@@ -35,26 +45,47 @@ except ImportError:
     _USE_NEW_RESOURCES_API = False
 
 
+_STATE_NAMES = {0: "INIT", 1: "NOMINAL", 2: "DEGRADED", 3: "RECOVERY", 4: "SAFE"}
+_SEVERITY_NAMES = {0: "warning", 1: "critical", 2: "emergency"}
+
+# Map subsystem_name strings published by ssos nodes -> roster row names.
+_SUBSYS_ALIASES = {
+    "ars": "ECLSS", "ogs": "ECLSS", "wrs": "ECLSS", "cabin": "ECLSS",
+    "eclss": "ECLSS", "gnc": "GNC", "eps": "EPS",
+    "thermal": "Thermal", "comms": "Comms",
+}
+
+
 class MainWindow(QMainWindow):
     """
-    QMainWindow that owns its ROS 2 context, node and executor.
-    ROS callbacks are pumped via a GUI-thread QTimer (no Python threads).
+    Mission-control shell: StatusBar + NavBar + stacked subsystem content +
+    persistent right sidebar (EventFeed + SubsystemRoster + AI assist).
+
+    Owns its ROS 2 context/node/executor; callbacks pumped via a GUI-thread
+    QTimer (no Python threads).
     """
+
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Space Station Operations Dashboard")
-        self.resize(1200, 800)
+        self.setWindowTitle("SSOS Mission Control")
+        # Screen-adaptive sizing: never larger than the available screen, with a
+        # usable minimum so the layout stays coherent on small laptops.
+        self.setMinimumSize(960, 600)
+        screen = QApplication.primaryScreen()
+        if screen is not None:
+            avail = screen.availableGeometry()
+            self.resize(min(1440, avail.width()), min(900, avail.height()))
+        else:
+            self.resize(1280, 800)
 
         # ---- ROS init ----
         self._ros_ctx = rclpy.context.Context()
         rclpy.init(args=None, context=self._ros_ctx)
-        
-        self.node: Node = rclpy.create_node('space_station_gui_node', context=self._ros_ctx)
+        self.node: Node = rclpy.create_node('space_station_gui_node',
+                                            context=self._ros_ctx)
         self.executor = MultiThreadedExecutor(context=self._ros_ctx, num_threads=4)
-
         self.executor.add_node(self.node)
 
-        # Pump ROS callbacks
         self._ros_timer = QTimer(self)
         self._ros_timer.setInterval(20)
         self._ros_timer.timeout.connect(self._spin_ros_once)
@@ -63,15 +94,17 @@ class MainWindow(QMainWindow):
         # ---- UI init ----
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
-
-        self.dark_mode = True
         self._build_ui()
-        load_dark_theme(QApplication.instance())
+        theme.apply_theme(QApplication.instance())
 
-        # --- AI Agent wiring ---
+        # ---- Global mission-control telemetry (shell-level subscriptions) ----
+        self._init_global_subs()
+
+        # --- AI Agent wiring (preserved) ---
         self.ai_agent = SsosAIAgent(
             self.node,
-            base_url=os.environ.get("SSOS_LLM_BASE_URL", "https://integrate.api.nvidia.com/v1"),
+            base_url=os.environ.get("SSOS_LLM_BASE_URL",
+                                    "https://integrate.api.nvidia.com/v1"),
             model=os.environ.get("SSOS_LLM_MODEL", "openai/gpt-oss-20b"),
             api_key=os.environ.get("NVIDIA_API_KEY"),
             request_timeout_s=10.0,
@@ -92,84 +125,147 @@ class MainWindow(QMainWindow):
 
     # ---------------- UI ----------------
     def _build_ui(self):
-        main_layout = QVBoxLayout()
+        root = QVBoxLayout(self.central_widget)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
 
-        # Header
-        header = QHBoxLayout()
-        logo_label = QLabel()
-        pixmap = QPixmap()
-        try:
-            if _USE_NEW_RESOURCES_API:
-                logo_resource = files("space_station.assets") / "SSOSlogo.jpg"
-                with as_file(logo_resource) as path:
-                    pixmap = QPixmap(str(path))
-            else:
-                with pkg_resources.path("space_station.assets", "SSOSlogo.jpg") as path:
-                    pixmap = QPixmap(str(path))
-        except Exception:
-            pixmap = QPixmap()
+        # --- Status bar ---
+        self.status_bar = StatusBar()
+        root.addWidget(self.status_bar)
 
-        if not pixmap.isNull():
-            pixmap = pixmap.scaledToHeight(50, Qt.SmoothTransformation)
-            logo_label.setPixmap(pixmap)
-            logo_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        # --- Nav bar ---
+        self._nav_labels = ["Overview", "ECLSS", "GNC", "EPS", "Thermal", "Comms"]
+        self.nav_bar = NavBar(self._nav_labels)
+        self.nav_bar.tab_changed.connect(self._on_tab_changed)
+        root.addWidget(self.nav_bar)
 
-        self.toggle_button = QPushButton("Light Mode")
-        self.toggle_button.clicked.connect(self._toggle_theme)
+        # --- Body: content stack + right sidebar ---
+        body = QHBoxLayout()
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(0)
 
-        header.addWidget(logo_label)
-        header.addStretch()
-        header.addWidget(self.toggle_button)
+        # Content stack (order MUST match nav labels)
+        self.stack = QStackedWidget()
+        self.eclss_panel = EclssWidget(self.node)
+        self.gnc_panel = GncWidget(self.node)
+        self.eps_panel = EPSWidget(self.node)
+        self.thermal_panel = ThermalWidget(self.node)
+        self.comms_panel = CommsWidget(self.node)
+        self.overview_panel = OverviewWidget(self.node)
 
-        # Tabs
-        self.tabs = QTabWidget()
-        self.tabs.addTab(GncWidget(self.node), "GNC")
-        self.tabs.addTab(EclssWidget(self.node), "ECLSS")
-        self.tabs.addTab(ThermalWidget(self.node), "THERMAL")
-        self.tabs.addTab(EPSWidget(self.node), "EPS")  
-        self.tabs.addTab(CommsWidget(self.node), "COMMS")
-        self.tabs.addTab(SystemStatusWidget(self.node), "SYSTEM STATUS")
-      
+        self.stack.addWidget(self.overview_panel)  # 0
+        self.stack.addWidget(self.eclss_panel)     # 1
+        self.stack.addWidget(self.gnc_panel)        # 2
+        self.stack.addWidget(self.eps_panel)        # 3
+        self.stack.addWidget(self.thermal_panel)    # 4
+        self.stack.addWidget(self.comms_panel)      # 5
 
-        # Split with LeftPanel
-        split_layout = QHBoxLayout()
+        content = QWidget()
+        cl = QVBoxLayout(content)
+        cl.setContentsMargins(20, 18, 20, 18)
+        cl.addWidget(self.stack)
+        # Wrap content in a resizable scroll area: panels expand to fill on large
+        # screens and scroll instead of clipping on small ones.
+        content_scroll = QScrollArea()
+        content_scroll.setWidgetResizable(True)
+        content_scroll.setFrameShape(QFrame.NoFrame)
+        content_scroll.setWidget(content)
+        body.addWidget(content_scroll, 1)
+
+        # Vertical divider
+        vdiv = QFrame()
+        vdiv.setProperty("class", "vline")
+        vdiv.setFixedWidth(1)
+        body.addWidget(vdiv)
+
+        # Right sidebar
+        body.addWidget(self._build_sidebar())
+
+        root.addLayout(body, 1)
+
+        # Default landing = Overview
+        self.stack.setCurrentIndex(0)
+        self.nav_bar.set_active(0)
+
+    def _build_sidebar(self):
+        sidebar = QWidget()
+        # Responsive sidebar: scales modestly with window width instead of a hard
+        # fixed size, so the console adapts to different desktop resolutions.
+        sidebar.setMinimumWidth(240)
+        sidebar.setMaximumWidth(360)
+        sidebar.setStyleSheet(f"background-color: {theme.color('bg2')};")
+        v = QVBoxLayout(sidebar)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(0)
+
+        self.roster = SubsystemRoster(["ECLSS", "GNC", "EPS", "Thermal", "Comms"])
+        v.addWidget(self.roster)
+
+        hdiv = QFrame()
+        hdiv.setProperty("class", "hline")
+        v.addWidget(hdiv)
+
+        self.event_feed = EventFeed(max_events=20)
+        v.addWidget(self.event_feed, 1)
+
+        hdiv2 = QFrame()
+        hdiv2.setProperty("class", "hline")
+        v.addWidget(hdiv2)
+
+        # AI assist (preserved feature)
         self.left_panel = LeftPanel()
-        
-        split_layout.addWidget(self.left_panel)
-        split_layout.addWidget(self.tabs)
-        split_layout.setStretch(0, 0)
-        split_layout.setStretch(1, 1)
+        self.left_panel.setMaximumHeight(300)
+        v.addWidget(self.left_panel)
 
-        # Footer
-        footer = QHBoxLayout()
-        self.crew_label = QLabel("Crew: 4")
-        self.crew_label.setStyleSheet("color: white;")
-        self.day_label = QLabel("Mission Day: 125")
-        self.day_label.setStyleSheet("color: white;")
-        self.shutdown_button = QPushButton("Shutdown GUI")
-        self.diagnose_button = QPushButton("Run Diagnose")
-        self.shutdown_button.clicked.connect(self._play_shutdown_video)
+        return sidebar
 
-        footer.addWidget(self.crew_label)
-        footer.addWidget(self.day_label)
-        footer.addStretch()
-        footer.addWidget(self.diagnose_button)
-        footer.addWidget(self.shutdown_button)
+    def _on_tab_changed(self, idx):
+        self.stack.setCurrentIndex(idx)
 
-        # Assemble
-        main_layout.addLayout(header)
-        main_layout.addLayout(split_layout)
-        main_layout.addLayout(footer)
-        self.central_widget.setLayout(main_layout)
+    # ---------------- Global telemetry subscriptions ----------------
+    def _init_global_subs(self):
+        if not _HAVE_SSOS_MSGS:
+            self.event_feed.add_event(
+                "SHELL", "ssos interfaces not found — telemetry shell idle", "warning"
+            )
+            return
+        try:
+            self.node.create_subscription(
+                SystemState, "/ssos/system_state", self._on_system_state, 10)
+            self.node.create_subscription(
+                FaultEvent, "/ssos/fault_event", self._on_fault_event, 10)
+            for sub in ("ars", "ogs", "wrs", "cabin"):
+                self.node.create_subscription(
+                    SubsystemHeartbeat, f"/ssos/{sub}/heartbeat",
+                    self._on_heartbeat, 10)
+        except Exception as e:
+            self.node.get_logger().warn(f"[shell] global subs failed: {e}")
 
-    def _toggle_theme(self):
-        if self.dark_mode:
-            load_light_theme(QApplication.instance())
-            self.toggle_button.setText("Dark Mode")
-        else:
-            load_dark_theme(QApplication.instance())
-            self.toggle_button.setText("Light Mode")
-        self.dark_mode = not self.dark_mode
+    def _on_system_state(self, msg):
+        state = _STATE_NAMES.get(int(msg.state), "INIT")
+        degraded = list(msg.degraded_subsystems)
+        QTimer.singleShot(0, lambda: self._apply_system_state(state, degraded))
+
+    def _apply_system_state(self, state, degraded):
+        self.status_bar.set_state(state)
+        degraded_up = {d.upper() for d in degraded}
+        for name in ["ECLSS", "GNC", "EPS", "Thermal", "Comms"]:
+            self.roster.set_status(
+                name, "degraded" if name.upper() in degraded_up else "nominal")
+        self.overview_panel.set_state(state, degraded)
+
+    def _on_fault_event(self, msg):
+        sev = _SEVERITY_NAMES.get(int(msg.severity), "warning")
+        sub = msg.subsystem_name or "SYSTEM"
+        desc = msg.description or msg.fault_type or "fault"
+        QTimer.singleShot(0, lambda: self.event_feed.add_event(sub, desc, sev))
+
+    def _on_heartbeat(self, msg):
+        row = _SUBSYS_ALIASES.get((msg.subsystem_name or "").lower(), None)
+        if row is None:
+            return
+        status = "nominal" if msg.healthy else "fault"
+        QTimer.singleShot(0, lambda: self.roster.set_status(row, status))
 
     # ---------------- Videos ----------------
     def _play_startup_video(self):
@@ -185,22 +281,6 @@ class MainWindow(QMainWindow):
                     VideoPlayer(str(path), on_finished_callback=after_video).play()
         except Exception:
             pass
-
-    def _play_shutdown_video(self):
-        def after_video():
-            self._shutdown_ros()
-            QApplication.quit()
-        try:
-            if _USE_NEW_RESOURCES_API:
-                video_resource = files("space_station.assets") / "exit_vid.mp4"
-                with as_file(video_resource) as path:
-                    VideoPlayer(str(path), on_finished_callback=after_video).play()
-            else:
-                with pkg_resources.path("space_station.assets", "exit_vid.mp4") as path:
-                    VideoPlayer(str(path), on_finished_callback=after_video).play()
-        except Exception:
-            self._shutdown_ros()
-            QApplication.quit()
 
     # ---------------- ROS shutdown ----------------
     def _shutdown_ros(self):
@@ -229,8 +309,10 @@ class MainWindow(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
+    theme.apply_theme(app)
     w = MainWindow()
-    w.show()
+    # Maximized by default so the console fills whatever screen it runs on.
+    w.showMaximized()
     sys.exit(app.exec_())
 
 
