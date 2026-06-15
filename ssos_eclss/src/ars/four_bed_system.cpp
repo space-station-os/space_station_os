@@ -109,8 +109,14 @@ void FourBedSystem::reset(double temperature_k)
 
 void FourBedSystem::set_parameters(const ArsParameters & params)
 {
+  // Preserve geometry/isotherm fields that require a rebuild; apply the rest.
+  const BedGeometry des_geom = params_.desiccant_bed;
+  const BedGeometry ads_geom = params_.adsorbent_bed;
   params_ = params;
-  // Tunable (non-geometry) updates that don't require a rebuild.
+  params_.desiccant_bed = des_geom;
+  params_.adsorbent_bed = ads_geom;
+  // Tunable (non-geometry) updates that don't require a rebuild: cycle, heater,
+  // operating set-points and the net-capture efficiency are used directly.
   if (cycle_) {
     cycle_->set_timing(params_.cycle);
     cycle_->set_heater(params_.heater);
