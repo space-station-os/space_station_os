@@ -33,6 +33,16 @@ add_library(eclss_physics
   src/ars/valve_model.cpp
   src/ars/cycle_state_machine.cpp
   src/ars/four_bed_system.cpp
+  src/ogs/electrolysis_cell_model.cpp
+  src/ogs/electrolysis_stack_model.cpp
+  src/ogs/gas_separator_model.cpp
+  src/ogs/oxygen_generator_system.cpp
+  src/wrs/distillation_model.cpp
+  src/wrs/multifiltration_model.cpp
+  src/wrs/catalytic_reactor_model.cpp
+  src/wrs/water_recovery_system.cpp
+  src/sabatier/reactor_kinetics.cpp
+  src/sabatier/sabatier_system.cpp
   src/cabin/cabin_atmosphere.cpp
   src/cabin/crew_metabolic_model.cpp
   src/cabin/leak_model.cpp
@@ -103,6 +113,16 @@ if(BUILD_TESTING)
 
   ament_add_gtest(test_ars_closed_loop test/integration/test_ars_closed_loop.cpp)
   target_link_libraries(test_ars_closed_loop eclss_physics)
+
+  # ---- OGS / WRS tests ----
+  ament_add_gtest(test_electrolysis test/unit/ogs/test_electrolysis.cpp)
+  target_link_libraries(test_electrolysis eclss_physics)
+
+  ament_add_gtest(test_water_recovery test/unit/wrs/test_water_recovery.cpp)
+  target_link_libraries(test_water_recovery eclss_physics)
+
+  ament_add_gtest(test_sabatier test/unit/wrs/test_sabatier.cpp)
+  target_link_libraries(test_sabatier eclss_physics)
 endif()
 
 ament_package()
