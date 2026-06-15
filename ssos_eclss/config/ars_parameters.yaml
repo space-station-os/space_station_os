@@ -1,0 +1,52 @@
+# ARS (4-Bed Molecular Sieve) parameters for ssos_eclss/ars_node.
+# Defaults follow the 4BCO2 EDU configuration (ICES-2021-313).
+# Nested keys map to the dotted parameter names declared by the parameter bridge.
+ars_node:
+  ros__parameters:
+    use_sim_time: true
+    step_rate_hz: 1.0
+    co2_required_kg_day: 4.16
+
+    ars:
+      bed:
+        desiccant:
+          length: 0.165
+          diameter: 0.1778
+          voidage: 0.36
+          particle_diameter: 0.002
+          n_cells: 50
+        adsorbent:
+          length: 0.2667
+          diameter: 0.1778
+          voidage: 0.36
+          particle_diameter: 0.002
+          n_cells: 50
+      isotherm:
+        co2_13x:
+          q_m0: 4.30
+          b0: 0.0014
+          dH: 38000.0
+          t0: 0.42
+      ldf:
+        adsorbent:
+          k_co2: 0.015
+          k_h2o: 0.003
+      heater:
+        total_power_w: 700.0
+        central_power_w: 257.9
+        max_temp_k: 477.6
+      cycle:
+        air_save_s: 600.0
+        adsorb_s: 3600.0
+        vacuum_s: 600.0
+      operating:
+        inlet_flow_scfm: 26.0
+        inlet_ppco2_torr: 2.0
+        ltl_inlet_temp_k: 280.15
+        ltl_flow_gpm: 0.42
+        cabin_temp_k: 295.15
+        cabin_pressure_pa: 101325.0
+        vacuum_pressure_pa: 266.64
+      efficiency:
+        capture_efficiency: 0.84
+        holdup_loss: 0.10
