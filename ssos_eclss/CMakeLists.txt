@@ -33,6 +33,14 @@ add_library(eclss_physics
   src/ars/valve_model.cpp
   src/ars/cycle_state_machine.cpp
   src/ars/four_bed_system.cpp
+  src/cabin/cabin_atmosphere.cpp
+  src/cabin/crew_metabolic_model.cpp
+  src/cabin/leak_model.cpp
+  src/faults/fault_types.cpp
+  src/faults/sensor_fault.cpp
+  src/faults/actuator_fault.cpp
+  src/faults/thermal_fault.cpp
+  src/faults/fault_injector.cpp
 )
 target_include_directories(eclss_physics PUBLIC include)
 # NOTE: eclss_physics links NOTHING from ROS
@@ -77,6 +85,24 @@ if(BUILD_TESTING)
   # ---- ARS integration test ----
   ament_add_gtest(test_four_bed_system test/integration/test_four_bed_system.cpp)
   target_link_libraries(test_four_bed_system eclss_physics)
+
+  # ---- Cabin tests ----
+  ament_add_gtest(test_cabin_atmosphere test/unit/cabin/test_cabin_atmosphere.cpp)
+  target_link_libraries(test_cabin_atmosphere eclss_physics)
+
+  ament_add_gtest(test_crew_metabolic test/unit/cabin/test_crew_metabolic.cpp)
+  target_link_libraries(test_crew_metabolic eclss_physics)
+
+  # ---- Faults tests ----
+  ament_add_gtest(test_fault_injector test/unit/faults/test_fault_injector.cpp)
+  target_link_libraries(test_fault_injector eclss_physics)
+
+  # ---- ECLSS mass-balance integration test ----
+  ament_add_gtest(test_eclss_mass_balance test/integration/test_eclss_mass_balance.cpp)
+  target_link_libraries(test_eclss_mass_balance eclss_physics)
+
+  ament_add_gtest(test_ars_closed_loop test/integration/test_ars_closed_loop.cpp)
+  target_link_libraries(test_ars_closed_loop eclss_physics)
 endif()
 
 ament_package()
