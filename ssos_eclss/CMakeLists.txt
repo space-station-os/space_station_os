@@ -25,6 +25,14 @@ add_library(eclss_physics
   src/common/thermodynamics.cpp
   src/common/fluid_dynamics.cpp
   src/common/heat_transfer.cpp
+  src/ars/adsorption_isotherm.cpp
+  src/ars/bed_model.cpp
+  src/ars/precooler_model.cpp
+  src/ars/blower_model.cpp
+  src/ars/air_save_pump_model.cpp
+  src/ars/valve_model.cpp
+  src/ars/cycle_state_machine.cpp
+  src/ars/four_bed_system.cpp
 )
 target_include_directories(eclss_physics PUBLIC include)
 # NOTE: eclss_physics links NOTHING from ROS
@@ -46,6 +54,29 @@ if(BUILD_TESTING)
 
   ament_add_gtest(test_heat_transfer test/unit/common/test_heat_transfer.cpp)
   target_link_libraries(test_heat_transfer eclss_physics)
+
+  # ---- ARS unit tests ----
+  ament_add_gtest(test_isotherm test/unit/ars/test_isotherm.cpp)
+  target_link_libraries(test_isotherm eclss_physics)
+
+  ament_add_gtest(test_bed_model test/unit/ars/test_bed_model.cpp)
+  target_link_libraries(test_bed_model eclss_physics)
+
+  ament_add_gtest(test_precooler test/unit/ars/test_precooler.cpp)
+  target_link_libraries(test_precooler eclss_physics)
+
+  ament_add_gtest(test_blower test/unit/ars/test_blower.cpp)
+  target_link_libraries(test_blower eclss_physics)
+
+  ament_add_gtest(test_valve test/unit/ars/test_valve.cpp)
+  target_link_libraries(test_valve eclss_physics)
+
+  ament_add_gtest(test_cycle_state_machine test/unit/ars/test_cycle_state_machine.cpp)
+  target_link_libraries(test_cycle_state_machine eclss_physics)
+
+  # ---- ARS integration test ----
+  ament_add_gtest(test_four_bed_system test/integration/test_four_bed_system.cpp)
+  target_link_libraries(test_four_bed_system eclss_physics)
 endif()
 
 ament_package()
