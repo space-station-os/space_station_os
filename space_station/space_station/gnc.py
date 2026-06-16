@@ -1,6 +1,17 @@
 #!/usr/bin/env python3
 import os
+import warnings
+
 import numpy as np
+
+# pyqtgraph computes mesh normals lazily during paint; degenerate triangles
+# (sphere pole fans, zero-area faces in the decimated ISS mesh) yield a
+# zero-length normal -> a harmless "invalid value encountered in divide"
+# RuntimeWarning from MeshData. Silence just that one.
+warnings.filterwarnings(
+    "ignore", message="invalid value encountered in divide",
+    category=RuntimeWarning)
+
 from PyQt5.QtWidgets import (
     QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QFrame, QSizePolicy
 )
@@ -221,6 +232,13 @@ class GncWidget(QWidget):
                 return
 
             obj = trimesh.load(path, force='mesh')
+            # Drop zero-area / degenerate faces left by decimation so normal
+            # computation doesn't hit divide-by-zero on those triangles.
+            try:
+                obj.update_faces(obj.nondegenerate_faces())
+                obj.remove_unreferenced_vertices()
+            except Exception:
+                pass
             verts = np.asarray(obj.vertices, dtype=float)
             faces = np.asarray(obj.faces)
             md = MeshData(vertexes=verts, faces=faces)
