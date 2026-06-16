@@ -9,6 +9,11 @@ from PyQt5.QtWidgets import QFrame
 from PyQt5.QtGui import QPixmap, QColor
 from PyQt5.QtCore import Qt, QTimer
 
+import warnings
+# Two matplotlib installs (apt + pip) can be present; the EPS panel only uses
+# 2D plots, so silence the cosmetic "Unable to import Axes3D" warning.
+warnings.filterwarnings("ignore", message="Unable to import Axes3D")
+
 import matplotlib
 matplotlib.use("Qt5Agg")  # <<< REQUIRED FIX
 

@@ -76,6 +76,8 @@ _DEFAULT_TOTAL_PA = 101325.0
 CO2_SETPOINT_TORR = 2.0
 CO2_REMOVAL_REQ = 4.16  # kg/day (ISS 4-crew requirement)
 HALF_CYCLE_MIN = 80.0   # 10 air-save + 60 adsorb/desorb + 10 vacuum
+O2_REQUIRED_KG_DAY = 2.3   # OGS O2 production requirement
+POTABLE_LIMIT_US = 100.0   # WRS potable-water conductivity limit [µS/cm]
 
 
 def k_to_c(k):
@@ -193,6 +195,17 @@ class EclssWidget(QWidget):
         self._bed_states = None     # 12 floats: 4 load, 4 tempK, 4 mode codes
         self._cycle_real = None     # (elapsed_s, half_cycle_s, adsorbing_train)
 
+        # OGS (oxygen generation) telemetry
+        self._o2_prod = None
+        self._stack_v = None
+        self._stack_p = None
+        self._stack_t_k = None
+        # WRS (water recovery) telemetry
+        self._potable = None
+        self._conduct_us = None
+        self._recovery = None
+        self._voc_conv = None
+
         # GUI-side cycle model (fallback when /ssos/ars/cycle_phase is absent)
         self._cycle_min = 0.0
         self._plot_t = 0.0
@@ -211,7 +224,14 @@ class EclssWidget(QWidget):
         root.setSpacing(16)
 
         root.addWidget(page_header(
-            "Air Revitalization", "Four-Bed Molecular Sieve", "ARS · 4BMS"))
+            "Environmental Control & Life Support",
+            "Air · Oxygen · Water Recovery", "ECLSS"))
+
+        # --- Air Revitalization (ARS / 4BMS) section ---
+        ars_hdr = QLabel("AIR REVITALIZATION · ARS · 4BMS")
+        ars_hdr.setProperty("class", "label")
+        ars_hdr.setFont(theme.label_font(10, tracking=2.0))
+        root.addWidget(ars_hdr)
 
         # --- Spec row ---
         self.card_co2 = MetricCard("CO₂ Partial", "—", "torr", "NO DATA", "muted")
@@ -306,6 +326,31 @@ class EclssWidget(QWidget):
                 d.setFixedWidth(1)
                 bed_row.addWidget(d)
         root.addWidget(bed_card)
+
+        # --- Oxygen Generation (OGS) section ---
+        ogs_hdr = QLabel("OXYGEN GENERATION · OGS · PEM ELECTROLYSIS")
+        ogs_hdr.setProperty("class", "label")
+        ogs_hdr.setFont(theme.label_font(10, tracking=2.0))
+        root.addWidget(ogs_hdr)
+        self.card_o2_prod = MetricCard("O₂ Production", "—", "kg/day", "NO DATA", "muted")
+        self.card_stack_v = MetricCard("Stack Voltage", "—", "V", "NO DATA", "muted")
+        self.card_stack_p = MetricCard("Stack Power", "—", "W", "NO DATA", "muted")
+        self.card_stack_t = MetricCard("Stack Temp", "—", "°C", "NO DATA", "muted")
+        root.addWidget(SpecRow([self.card_o2_prod, self.card_stack_v,
+                                self.card_stack_p, self.card_stack_t]))
+
+        # --- Water Recovery (WRS) section ---
+        wrs_hdr = QLabel("WATER RECOVERY · WRS · UPA + WPA")
+        wrs_hdr.setProperty("class", "label")
+        wrs_hdr.setFont(theme.label_font(10, tracking=2.0))
+        root.addWidget(wrs_hdr)
+        self.card_potable = MetricCard("Potable Water", "—", "kg/day", "NO DATA", "muted")
+        self.card_conduct = MetricCard("Conductivity", "—", "µS/cm", "NO DATA", "muted")
+        self.card_recovery = MetricCard("Water Recovery", "—", "%", "NO DATA", "muted")
+        self.card_voc = MetricCard("VOC Conversion", "—", "%", "NO DATA", "muted")
+        root.addWidget(SpecRow([self.card_potable, self.card_conduct,
+                                self.card_recovery, self.card_voc]))
+
         root.addStretch()
 
     # ----------------------------- ROS -----------------------------
@@ -327,8 +372,56 @@ class EclssWidget(QWidget):
                 Float64MultiArray, "/ssos/ars/bed_states", self._on_bed_states, 10)
             self.node.create_subscription(
                 Float64MultiArray, "/ssos/ars/cycle_phase", self._on_cycle_phase, 10)
+            # OGS + WRS telemetry (ssos_eclss OxygenGeneratorSystem / WaterRecovery).
+            self.node.create_subscription(
+                Float64, "/ssos/ogs/o2_kg_day", self._on_ogs_o2, 10)
+            self.node.create_subscription(
+                Float64, "/ssos/wrs/potable_kg_day", self._on_wrs_water, 10)
+            if _HAVE_DIAG:
+                self.node.create_subscription(
+                    DiagnosticArray, "/ssos/ogs/diagnostics", self._on_ogs_diag, 10)
+                self.node.create_subscription(
+                    DiagnosticArray, "/ssos/wrs/diagnostics", self._on_wrs_diag, 10)
         except Exception as e:
             self.node.get_logger().warn(f"[eclss] subscription setup failed: {e}")
+
+    def _on_ogs_o2(self, msg):
+        self._o2_prod = msg.data
+
+    def _on_wrs_water(self, msg):
+        self._potable = msg.data
+
+    def _on_ogs_diag(self, msg):
+        for status in msg.status:
+            for kv in status.values:
+                try:
+                    val = float(kv.value)
+                except (TypeError, ValueError):
+                    continue
+                if kv.key == "o2_kg_day" and self._o2_prod is None:
+                    self._o2_prod = val
+                elif kv.key == "stack_voltage":
+                    self._stack_v = val
+                elif kv.key == "stack_power_w":
+                    self._stack_p = val
+                elif kv.key == "stack_temp_k":
+                    self._stack_t_k = val
+
+    def _on_wrs_diag(self, msg):
+        for status in msg.status:
+            for kv in status.values:
+                try:
+                    val = float(kv.value)
+                except (TypeError, ValueError):
+                    continue
+                if kv.key == "potable_kg_day" and self._potable is None:
+                    self._potable = val
+                elif kv.key == "conductivity_us":
+                    self._conduct_us = val
+                elif kv.key == "overall_recovery":
+                    self._recovery = val
+                elif kv.key == "voc_conversion":
+                    self._voc_conv = val
 
     def _on_bed_states(self, msg):
         if len(msg.data) >= 12:
@@ -443,6 +536,38 @@ class EclssWidget(QWidget):
             self._update_beds_real()
         else:
             self._update_beds()
+
+        # ---- OGS ----
+        if self._o2_prod is not None:
+            ok = self._o2_prod >= O2_REQUIRED_KG_DAY
+            self.card_o2_prod.set_value(f"{self._o2_prod:.2f}")
+            self.card_o2_prod.set_footer(
+                f"REQ {O2_REQUIRED_KG_DAY:.1f} KG/DAY", "green" if ok else "amber")
+        if self._stack_v is not None:
+            self.card_stack_v.set_value(f"{self._stack_v:.1f}")
+            self.card_stack_v.set_footer("STACK", "green")
+        if self._stack_p is not None:
+            self.card_stack_p.set_value(f"{self._stack_p:.0f}")
+            self.card_stack_p.set_footer("ELECTRICAL", "green")
+        if self._stack_t_k is not None:
+            self.card_stack_t.set_value(f"{k_to_c(self._stack_t_k):.1f}")
+            self.card_stack_t.set_footer("CELL STACK", "green")
+
+        # ---- WRS ----
+        if self._potable is not None:
+            self.card_potable.set_value(f"{self._potable:.2f}")
+            self.card_potable.set_footer("TO POTABLE BUS", "green")
+        if self._conduct_us is not None:
+            ok = self._conduct_us <= POTABLE_LIMIT_US
+            self.card_conduct.set_value(f"{self._conduct_us:.0f}")
+            self.card_conduct.set_footer(
+                f"LIMIT {POTABLE_LIMIT_US:.0f} µS/CM", "green" if ok else "red")
+        if self._recovery is not None:
+            self.card_recovery.set_value(f"{self._recovery * 100.0:.1f}")
+            self.card_recovery.set_footer("OVERALL", "green")
+        if self._voc_conv is not None:
+            self.card_voc.set_value(f"{self._voc_conv * 100.0:.1f}")
+            self.card_voc.set_footer("CATALYTIC", "green")
 
     def _update_beds(self):
         """Trains: A (beds 0,1), D (beds 2,3). adsorbing_train picks which

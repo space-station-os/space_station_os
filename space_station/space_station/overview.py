@@ -85,8 +85,10 @@ class OverviewWidget(QWidget):
         root.addWidget(SpecRow([self.card_co2, self.card_o2, self.card_removal,
                                 self.card_o2gen, self.card_press]))
 
-        # Roster (expanded) + events handled in the shell sidebar; here show roster
+        # Roster (expanded) + ECLSS lifecycle roster side by side.
         body = QHBoxLayout()
+        body.setSpacing(16)
+
         roster_card = QFrame()
         roster_card.setProperty("class", "card")
         rl = QVBoxLayout(roster_card)
@@ -94,8 +96,39 @@ class OverviewWidget(QWidget):
         self.roster = SubsystemRoster(["ECLSS", "GNC", "EPS", "Thermal", "Comms"])
         rl.addWidget(self.roster)
         body.addWidget(roster_card)
+
+        # ECLSS lifecycle states (only ECLSS has managed lifecycle nodes; this
+        # shows each node's transition mode: UNCONFIGURED/INACTIVE/ACTIVE).
+        life_card = QFrame()
+        life_card.setProperty("class", "card")
+        ll = QVBoxLayout(life_card)
+        ll.setContentsMargins(0, 4, 0, 4)
+        life_hdr = QLabel("ECLSS LIFECYCLE")
+        life_hdr.setProperty("class", "label")
+        life_hdr.setFont(theme.label_font(9, tracking=2.0))
+        life_hdr.setContentsMargins(14, 12, 14, 8)
+        ll.addWidget(life_hdr)
+        self.lifecycle_roster = SubsystemRoster(["ARS", "OGS", "WRS", "Cabin"])
+        # Hide the inner "SUBSYSTEMS" header of the nested roster.
+        self.lifecycle_roster.layout().itemAt(0).widget().hide()
+        ll.addWidget(self.lifecycle_roster)
+        for name in ("ARS", "OGS", "WRS", "Cabin"):
+            self.lifecycle_roster.set_status(name, "unconfigured")
+        body.addWidget(life_card)
+
         root.addLayout(body)
         root.addStretch()
+
+    # ---- lifecycle hook (called by the shell on each heartbeat) ----
+    def set_lifecycle(self, name, lifecycle_word, healthy):
+        """Update one ECLSS node's lifecycle/transition state on the overview."""
+        label = {"ars": "ARS", "ogs": "OGS", "wrs": "WRS",
+                 "cabin": "Cabin"}.get(str(name).lower())
+        if label is None:
+            return
+        # An active-but-unhealthy node reads as FAULT; otherwise show the state.
+        status = "fault" if (lifecycle_word == "ACTIVE" and not healthy) else lifecycle_word
+        self.lifecycle_roster.set_status(label, status)
 
     def _init_ros(self):
         try:

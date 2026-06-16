@@ -47,6 +47,9 @@ except ImportError:
 
 _STATE_NAMES = {0: "INIT", 1: "NOMINAL", 2: "DEGRADED", 3: "RECOVERY", 4: "SAFE"}
 _SEVERITY_NAMES = {0: "warning", 1: "critical", 2: "emergency"}
+# SubsystemHeartbeat.LIFECYCLE_* -> transition-mode word.
+_LIFECYCLE_NAMES = {0: "UNCONFIGURED", 1: "INACTIVE", 2: "ACTIVE", 3: "FINALIZED"}
+_ECLSS_NODES = ("ars", "ogs", "wrs", "cabin")
 
 # Map subsystem_name strings published by ssos nodes -> roster row names.
 _SUBSYS_ALIASES = {
@@ -90,6 +93,9 @@ class MainWindow(QMainWindow):
         self._ros_timer.setInterval(20)
         self._ros_timer.timeout.connect(self._spin_ros_once)
         self._ros_timer.start()
+
+        # Per-node ECLSS lifecycle state cache (name -> (state_word, healthy)).
+        self._eclss_states = {}
 
         # ---- UI init ----
         self.central_widget = QWidget()
@@ -261,11 +267,30 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(0, lambda: self.event_feed.add_event(sub, desc, sev))
 
     def _on_heartbeat(self, msg):
-        row = _SUBSYS_ALIASES.get((msg.subsystem_name or "").lower(), None)
+        name = (msg.subsystem_name or "").lower()
+        row = _SUBSYS_ALIASES.get(name, None)
         if row is None:
             return
-        status = "nominal" if msg.healthy else "fault"
-        QTimer.singleShot(0, lambda: self.roster.set_status(row, status))
+        lifecycle = _LIFECYCLE_NAMES.get(int(msg.lifecycle_state), "UNKNOWN")
+        healthy = bool(msg.healthy)
+        QTimer.singleShot(0, lambda: self._apply_heartbeat(name, row, lifecycle, healthy))
+
+    def _apply_heartbeat(self, name, row, lifecycle, healthy):
+        if name in _ECLSS_NODES:
+            # Per-node lifecycle/transition state for the overview.
+            self._eclss_states[name] = (lifecycle, healthy)
+            self.overview_panel.set_lifecycle(name, lifecycle, healthy)
+            # Aggregate the single ECLSS sidebar-roster row.
+            states = self._eclss_states
+            if any(not h for (_, h) in states.values()):
+                self.roster.set_status("ECLSS", "fault")
+            elif len(states) >= len(_ECLSS_NODES) and all(
+                    lc == "ACTIVE" for (lc, _) in states.values()):
+                self.roster.set_status("ECLSS", "active")
+            else:
+                self.roster.set_status("ECLSS", "degraded")
+        else:
+            self.roster.set_status(row, "nominal" if healthy else "fault")
 
     # ---------------- Videos ----------------
     def _play_startup_video(self):
