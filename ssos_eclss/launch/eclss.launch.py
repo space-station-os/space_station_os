@@ -1,13 +1,17 @@
-"""Launch the full ECLSS suite (ARS, OGS, WRS, cabin) as lifecycle nodes,
-each auto-configured and activated from its config file."""
+"""Launch the full ECLSS suite (ARS, OGS, WRS, cabin) as lifecycle nodes.
+
+All nodes are configured a couple of seconds in and activated shortly after via
+TimerActions (scoped per node with matches_action). This deterministic, time-
+based sequencing avoids the OnProcessStart/OnStateTransition event races that
+could otherwise leave a node (e.g. wrs) stuck unconfigured when several
+lifecycle nodes start together under one launch.
+"""
 import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import EmitEvent, RegisterEventHandler, LogInfo
-from launch.event_handlers import OnProcessStart
+from launch.actions import EmitEvent, LogInfo, TimerAction
 from launch.events import matches_action
-from launch_ros.event_handlers import OnStateTransition
 from launch_ros.actions import LifecycleNode
 from launch_ros.events.lifecycle import ChangeState
 import lifecycle_msgs.msg
@@ -20,23 +24,16 @@ def _lifecycle(pkg_share, executable, name, config_file):
         namespace='', output='screen', parameters=[config])
 
 
-def _auto_manage(node, label):
-    # Scope each transition to THIS node only (matches_action), otherwise every
-    # node's event would fire on all nodes and spam redundant-transition errors.
-    configure = EmitEvent(event=ChangeState(
+def _configure(node):
+    return EmitEvent(event=ChangeState(
         lifecycle_node_matcher=matches_action(node),
         transition_id=lifecycle_msgs.msg.Transition.TRANSITION_CONFIGURE))
-    activate = EmitEvent(event=ChangeState(
+
+
+def _activate(node):
+    return EmitEvent(event=ChangeState(
         lifecycle_node_matcher=matches_action(node),
         transition_id=lifecycle_msgs.msg.Transition.TRANSITION_ACTIVATE))
-    return [
-        RegisterEventHandler(OnProcessStart(
-            target_action=node,
-            on_start=[LogInfo(msg=f'{label} started; configuring...'), configure])),
-        RegisterEventHandler(OnStateTransition(
-            target_lifecycle_node=node, goal_state='inactive',
-            entities=[LogInfo(msg=f'{label} configured; activating...'), activate])),
-    ]
 
 
 def generate_launch_description():
@@ -46,10 +43,15 @@ def generate_launch_description():
     ogs = _lifecycle(share, 'ogs_node', 'ogs_node', 'ogs_parameters.yaml')
     wrs = _lifecycle(share, 'wrs_node', 'wrs_node', 'wrs_parameters.yaml')
     cabin = _lifecycle(share, 'cabin_node', 'cabin_node', 'cabin_parameters.yaml')
+    nodes = [ars, ogs, wrs, cabin]
 
-    ld = LaunchDescription([ars, ogs, wrs, cabin])
-    for node, label in [(ars, 'ars_node'), (ogs, 'ogs_node'),
-                        (wrs, 'wrs_node'), (cabin, 'cabin_node')]:
-        for handler in _auto_manage(node, label):
-            ld.add_action(handler)
-    return ld
+    configure_all = TimerAction(
+        period=2.0,
+        actions=[LogInfo(msg='ECLSS: configuring ARS/OGS/WRS/cabin...')] +
+                [_configure(n) for n in nodes])
+    activate_all = TimerAction(
+        period=4.0,
+        actions=[LogInfo(msg='ECLSS: activating ARS/OGS/WRS/cabin...')] +
+                [_activate(n) for n in nodes])
+
+    return LaunchDescription([ars, ogs, wrs, cabin, configure_all, activate_all])
