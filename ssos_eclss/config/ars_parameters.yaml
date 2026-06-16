@@ -4,7 +4,9 @@
 ars_node:
   ros__parameters:
     use_sim_time: true
-    step_rate_hz: 1.0
+    # Stepped at 10 Hz: with sim time_scale up to ~30x this keeps each physics
+    # step small enough (a few sim-seconds) for a stable, CFL-respecting bed PDE.
+    step_rate_hz: 10.0
     co2_required_kg_day: 4.16
 
     ars:
@@ -14,13 +16,13 @@ ars_node:
           diameter: 0.1778
           voidage: 0.36
           particle_diameter: 0.002
-          n_cells: 50
+          n_cells: 24
         adsorbent:
           length: 0.2667
           diameter: 0.1778
           voidage: 0.36
           particle_diameter: 0.002
-          n_cells: 50
+          n_cells: 24
       isotherm:
         co2_13x:
           q_m0: 4.30
@@ -36,6 +38,8 @@ ars_node:
         central_power_w: 257.9
         max_temp_k: 477.6
       cycle:
+        # Real 4BMS 10-60-10 minute half-cycle. Use the simulator's time_scale to
+        # play it back faster than real time without distorting the physics.
         air_save_s: 600.0
         adsorb_s: 3600.0
         vacuum_s: 600.0

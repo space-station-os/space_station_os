@@ -31,6 +31,20 @@ BedModel::BedModel(const BedGeometry & geom, const BedThermal & thermal,
   n_ = std::max<std::size_t>(geom_.n_cells, 1);
   dz_ = geom_.length / static_cast<double>(n_);
   rho_bulk_ = (1.0 - geom_.voidage) * geom_.sorbent_density;
+
+  // Reference "full load" capacity used to normalise loading_fraction for
+  // telemetry: the equilibrium loading at representative operating conditions
+  // (ISS ppCO2 ~2 torr for adsorbent beds, a typical cabin water vapour partial
+  // pressure for desiccant beds), so a saturated bed reads ~100% rather than the
+  // tiny fraction it would against the infinite-pressure saturation q_m0.
+  const double t_ref = 295.0;
+  q_ref_ = is_desiccant_
+    ? h2o_iso_.loading(1200.0, t_ref)                         // ~cabin humidity
+    : co2_iso_.loading(2.0 * units::TORR_TO_PA, t_ref);       // ~2 torr ppCO2
+  if (q_ref_ <= 1.0e-9) {
+    q_ref_ = is_desiccant_ ? h2o_iso_.params().q_m0 : co2_iso_.params().q_m0;
+  }
+
   reset(295.0);
 }
 
@@ -94,8 +108,7 @@ double BedModel::max_solid_temperature() const
 
 double BedModel::loading_fraction() const
 {
-  const double qm = is_desiccant_ ? h2o_iso_.params().q_m0 : co2_iso_.params().q_m0;
-  if (qm <= 0.0) {
+  if (q_ref_ <= 0.0) {
     return 0.0;
   }
   const std::vector<double> & q = is_desiccant_ ? q_h2o_ : q_co2_;
@@ -104,7 +117,7 @@ double BedModel::loading_fraction() const
     sum += v;
   }
   const double mean = sum / static_cast<double>(n_);
-  return std::clamp(mean / qm, 0.0, 1.0);
+  return std::clamp(mean / q_ref_, 0.0, 1.0);
 }
 
 double BedModel::bed_pressure_drop(const BedInlet & inlet) const

@@ -124,6 +124,7 @@ private:
   std::size_t n_;
   double dz_;
   double rho_bulk_;  // (1-eps) * particle density [kg/m^3]
+  double q_ref_;     // reference "full load" capacity for loading_fraction [mol/kg]
 
   // State fields (size n_)
   std::vector<double> c_co2_;  // gas CO2 [mol/m^3]

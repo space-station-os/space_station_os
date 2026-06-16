@@ -1,5 +1,7 @@
 #include "ssos_eclss/nodes/ars_node.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <functional>
 #include <vector>
 
@@ -156,7 +158,15 @@ void ArsNode::step()
     params_dirty_ = false;
   }
 
-  last_result_ = ars_->step(dt, cabin_);
+  // Cap the physics step so accelerated sim time (large dt) stays stable: split
+  // dt into <=5 s chunks for the bed PDE (CFL-respecting) regardless of the
+  // simulator's time_scale.
+  constexpr double kMaxPhysicsDt = 5.0;
+  const int chunks = std::max(1, static_cast<int>(std::ceil(dt / kMaxPhysicsDt)));
+  const double h = dt / static_cast<double>(chunks);
+  for (int i = 0; i < chunks; ++i) {
+    last_result_ = ars_->step(h, cabin_);
+  }
 
   // CO2 removal rate.
   std_msgs::msg::Float64 removal;
