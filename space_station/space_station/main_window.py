@@ -15,8 +15,6 @@ from space_station import theme
 # Subsystem panels (existing ROS wiring preserved inside each)
 from space_station.overview import OverviewWidget
 from space_station.eclss import EclssWidget
-from space_station.ogs import OGSWidget
-from space_station.wrs import WRSWidget
 from space_station.gnc import GncWidget
 from space_station.eps import EPSWidget
 from space_station.thermal import ThermalWidget
@@ -33,6 +31,7 @@ from rcl_interfaces.msg import Parameter as RclParameter, ParameterValue, Parame
 
 from space_station.left_panel import LeftPanel
 from space_station.agent import SsosAIAgent
+from space_station.param_editor import ParameterEditorDialog
 
 # Global SSOS interfaces (optional — degrade gracefully if not built)
 try:
@@ -151,7 +150,8 @@ class MainWindow(QMainWindow):
         root.addWidget(self.status_bar)
 
         # --- Nav bar (tabs left, sim-speed control right) ---
-        self._nav_labels = ["Overview", "ECLSS", "OGS", "WRS", "GNC", "EPS",
+        # OGS + WRS live inside the ECLSS panel (one consolidated ECLSS console).
+        self._nav_labels = ["Overview", "ECLSS", "GNC", "EPS",
                             "Thermal", "Comms"]
         self.nav_bar = NavBar(self._nav_labels)
         self.nav_bar.tab_changed.connect(self._on_tab_changed)
@@ -166,6 +166,22 @@ class MainWindow(QMainWindow):
         self.sim_speed = SimSpeedControl()
         self.sim_speed.speed_changed.connect(self._on_sim_speed)
         nrl.addWidget(self.sim_speed)
+
+        # PARAMS: open the live parameter editor (discover + push params to the
+        # running sim/ECLSS nodes via the parameter services).
+        self.params_btn = QPushButton("PARAMS")
+        self.params_btn.setObjectName("params_button")
+        self.params_btn.setCursor(Qt.PointingHandCursor)
+        self.params_btn.setToolTip("View and edit live simulation parameters")
+        self.params_btn.setStyleSheet(
+            f"#params_button {{ color: {theme.color('accent')};"
+            f" background: transparent; border: 1px solid {theme.color('accent')};"
+            f" border-radius: 5px; padding: 6px 16px; font-size: 14px;"
+            f" font-weight: bold; letter-spacing: 2px; margin: 0 0 0 16px; }}"
+            f"#params_button:hover {{ background: {theme.color('accent')};"
+            f" color: {theme.color('bg')}; }}")
+        self.params_btn.clicked.connect(self._on_params_clicked)
+        nrl.addWidget(self.params_btn)
 
         # END: clean shutdown of the whole session (GUI exit -> launch Shutdown
         # tears down every ROS node, so nothing is left running).
@@ -192,8 +208,6 @@ class MainWindow(QMainWindow):
         # Content stack (order MUST match nav labels)
         self.stack = QStackedWidget()
         self.eclss_panel = EclssWidget(self.node)
-        self.ogs_panel = OGSWidget(self.node)
-        self.wrs_panel = WRSWidget(self.node)
         self.gnc_panel = GncWidget(self.node)
         self.eps_panel = EPSWidget(self.node)
         self.thermal_panel = ThermalWidget(self.node)
@@ -201,13 +215,11 @@ class MainWindow(QMainWindow):
         self.overview_panel = OverviewWidget(self.node)
 
         self.stack.addWidget(self.overview_panel)  # 0 Overview
-        self.stack.addWidget(self.eclss_panel)     # 1 ECLSS
-        self.stack.addWidget(self.ogs_panel)        # 2 OGS
-        self.stack.addWidget(self.wrs_panel)        # 3 WRS
-        self.stack.addWidget(self.gnc_panel)        # 4 GNC
-        self.stack.addWidget(self.eps_panel)        # 5 EPS
-        self.stack.addWidget(self.thermal_panel)    # 6 Thermal
-        self.stack.addWidget(self.comms_panel)      # 7 Comms
+        self.stack.addWidget(self.eclss_panel)     # 1 ECLSS (incl. OGS + WRS)
+        self.stack.addWidget(self.gnc_panel)        # 2 GNC
+        self.stack.addWidget(self.eps_panel)        # 3 EPS
+        self.stack.addWidget(self.thermal_panel)    # 4 Thermal
+        self.stack.addWidget(self.comms_panel)      # 5 Comms
 
         content = QWidget()
         cl = QVBoxLayout(content)
@@ -270,6 +282,11 @@ class MainWindow(QMainWindow):
 
     def _on_tab_changed(self, idx):
         self.stack.setCurrentIndex(idx)
+
+    # ---------------- Parameter editor ----------------
+    def _on_params_clicked(self):
+        dlg = ParameterEditorDialog(self.node, self.executor, self)
+        dlg.exec_()
 
     # ---------------- Session end ----------------
     def _on_end_clicked(self):
