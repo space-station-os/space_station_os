@@ -1,5 +1,8 @@
 #include "ssos_eclss/nodes/eclss_diagnostics.hpp"
 
+#include <chrono>
+#include <memory>
+
 namespace ssos_eclss
 {
 namespace nodes
@@ -45,6 +48,28 @@ bool EclssDiagnostics::ars_co2_removal_low(double removal_kg_day, double require
 bool EclssDiagnostics::bed_underheated(double max_bed_temp_k, double target_temp_k)
 {
   return max_bed_temp_k < target_temp_k;
+}
+
+rclcpp::TimerBase::SharedPtr EclssDiagnostics::maybe_autostart(
+  rclcpp_lifecycle::LifecycleNode * node, int delay_ms)
+{
+  if (!node->has_parameter("autostart")) {
+    node->declare_parameter("autostart", false);
+  }
+  if (!node->get_parameter("autostart").as_bool()) {
+    return nullptr;
+  }
+  // Self-cancelling one-shot: configure -> activate, no ChangeState events.
+  auto holder = std::make_shared<rclcpp::TimerBase::SharedPtr>();
+  *holder = node->create_wall_timer(
+    std::chrono::milliseconds(delay_ms),
+    [node, holder]() {
+      (*holder)->cancel();
+      RCLCPP_INFO(node->get_logger(), "autostart: configuring + activating");
+      node->configure();
+      node->activate();
+    });
+  return *holder;
 }
 
 }  // namespace nodes

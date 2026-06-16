@@ -15,6 +15,7 @@ OgsNode::OgsNode(const rclcpp::NodeOptions & options)
   this->declare_parameter("step_rate_hz", step_rate_hz_);
   this->declare_parameter("stack_current_a", stack_current_a_);
   this->declare_parameter("o2_required_kg_day", o2_required_kg_day_);
+  autostart_timer_ = EclssDiagnostics::maybe_autostart(this);
 }
 
 CallbackReturn OgsNode::on_configure(const rclcpp_lifecycle::State &)

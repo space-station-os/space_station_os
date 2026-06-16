@@ -24,6 +24,7 @@ ArsNode::ArsNode(const rclcpp::NodeOptions & options)
   if (!this->has_parameter("co2_required_kg_day")) {
     this->declare_parameter("co2_required_kg_day", co2_required_kg_day_);
   }
+  autostart_timer_ = EclssDiagnostics::maybe_autostart(this);
 }
 
 CallbackReturn ArsNode::on_configure(const rclcpp_lifecycle::State &)

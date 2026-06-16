@@ -17,6 +17,7 @@ WrsNode::WrsNode(const rclcpp::NodeOptions & options)
   this->declare_parameter("urine_kg_day", urine_kg_day_);
   this->declare_parameter("condensate_kg_day", condensate_kg_day_);
   this->declare_parameter("potable_limit_us", potable_limit_us_);
+  autostart_timer_ = EclssDiagnostics::maybe_autostart(this);
 }
 
 CallbackReturn WrsNode::on_configure(const rclcpp_lifecycle::State &)

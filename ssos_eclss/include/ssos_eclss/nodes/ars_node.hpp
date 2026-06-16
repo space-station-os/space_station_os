@@ -79,8 +79,9 @@ private:
   // Service client
   rclcpp::Client<RegisterSubsystem>::SharedPtr register_client_;
 
-  // Timer
+  // Timers
   rclcpp::TimerBase::SharedPtr step_timer_;
+  rclcpp::TimerBase::SharedPtr autostart_timer_;
 
   // Parameter callback handle
   OnSetParametersCallbackHandle::SharedPtr param_cb_handle_;

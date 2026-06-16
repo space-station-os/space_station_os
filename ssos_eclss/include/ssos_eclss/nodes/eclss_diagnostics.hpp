@@ -5,6 +5,8 @@
 #include <vector>
 
 #include "rclcpp/time.hpp"
+#include "rclcpp/timer.hpp"
+#include "rclcpp_lifecycle/lifecycle_node.hpp"
 #include "space_station_interfaces/msg/fault_event.hpp"
 #include "space_station_interfaces/msg/subsystem_heartbeat.hpp"
 
@@ -43,6 +45,15 @@ public:
 
   /// True if a regeneration bed failed to reach its target temperature.
   static bool bed_underheated(double max_bed_temp_k, double target_temp_k);
+
+  /// If the node has (or is given) an "autostart" parameter set true, return a
+  /// one-shot timer that configures then activates the node shortly after
+  /// startup. This lets a launch file bring the node fully up without emitting
+  /// any lifecycle ChangeState events (which are racy/redundant when several
+  /// managed nodes start together). Returns nullptr when autostart is false.
+  /// The caller must keep the returned timer alive (store it in a member).
+  static rclcpp::TimerBase::SharedPtr maybe_autostart(
+    rclcpp_lifecycle::LifecycleNode * node, int delay_ms = 300);
 };
 
 }  // namespace nodes

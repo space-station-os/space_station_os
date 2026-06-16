@@ -54,6 +54,7 @@ private:
   rclcpp_lifecycle::LifecyclePublisher<FaultEvent>::SharedPtr fault_pub_;
   rclcpp::Client<RegisterSubsystem>::SharedPtr register_client_;
   rclcpp::TimerBase::SharedPtr step_timer_;
+  rclcpp::TimerBase::SharedPtr autostart_timer_;
 
   double step_rate_hz_{1.0};
   double urine_kg_day_{6.0};

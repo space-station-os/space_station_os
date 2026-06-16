@@ -19,6 +19,7 @@ CabinNode::CabinNode(const rclcpp::NodeOptions & options)
   this->declare_parameter("cabin_volume_m3", cabin_volume_m3_);
   this->declare_parameter("cabin_temp_c", cabin_temp_c_);
   this->declare_parameter("co2_alarm_ppm", co2_alarm_ppm_);
+  autostart_timer_ = EclssDiagnostics::maybe_autostart(this);
 }
 
 CallbackReturn CabinNode::on_configure(const rclcpp_lifecycle::State &)
