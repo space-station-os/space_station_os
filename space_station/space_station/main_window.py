@@ -15,6 +15,8 @@ from space_station import theme
 # Subsystem panels (existing ROS wiring preserved inside each)
 from space_station.overview import OverviewWidget
 from space_station.eclss import EclssWidget
+from space_station.ogs import OGSWidget
+from space_station.wrs import WRSWidget
 from space_station.gnc import GncWidget
 from space_station.eps import EPSWidget
 from space_station.thermal import ThermalWidget
@@ -149,7 +151,8 @@ class MainWindow(QMainWindow):
         root.addWidget(self.status_bar)
 
         # --- Nav bar (tabs left, sim-speed control right) ---
-        self._nav_labels = ["Overview", "ECLSS", "GNC", "EPS", "Thermal", "Comms"]
+        self._nav_labels = ["Overview", "ECLSS", "OGS", "WRS", "GNC", "EPS",
+                            "Thermal", "Comms"]
         self.nav_bar = NavBar(self._nav_labels)
         self.nav_bar.tab_changed.connect(self._on_tab_changed)
 
@@ -189,18 +192,22 @@ class MainWindow(QMainWindow):
         # Content stack (order MUST match nav labels)
         self.stack = QStackedWidget()
         self.eclss_panel = EclssWidget(self.node)
+        self.ogs_panel = OGSWidget(self.node)
+        self.wrs_panel = WRSWidget(self.node)
         self.gnc_panel = GncWidget(self.node)
         self.eps_panel = EPSWidget(self.node)
         self.thermal_panel = ThermalWidget(self.node)
         self.comms_panel = CommsWidget(self.node)
         self.overview_panel = OverviewWidget(self.node)
 
-        self.stack.addWidget(self.overview_panel)  # 0
-        self.stack.addWidget(self.eclss_panel)     # 1
-        self.stack.addWidget(self.gnc_panel)        # 2
-        self.stack.addWidget(self.eps_panel)        # 3
-        self.stack.addWidget(self.thermal_panel)    # 4
-        self.stack.addWidget(self.comms_panel)      # 5
+        self.stack.addWidget(self.overview_panel)  # 0 Overview
+        self.stack.addWidget(self.eclss_panel)     # 1 ECLSS
+        self.stack.addWidget(self.ogs_panel)        # 2 OGS
+        self.stack.addWidget(self.wrs_panel)        # 3 WRS
+        self.stack.addWidget(self.gnc_panel)        # 4 GNC
+        self.stack.addWidget(self.eps_panel)        # 5 EPS
+        self.stack.addWidget(self.thermal_panel)    # 6 Thermal
+        self.stack.addWidget(self.comms_panel)      # 7 Comms
 
         content = QWidget()
         cl = QVBoxLayout(content)
