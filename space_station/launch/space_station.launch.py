@@ -17,7 +17,7 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (EmitEvent, IncludeLaunchDescription, LogInfo,
-                            RegisterEventHandler, TimerAction)
+                            RegisterEventHandler, Shutdown, TimerAction)
 from launch.event_handlers import OnProcessStart
 from launch.events import matches_action
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -42,11 +42,15 @@ def generate_launch_description():
     space_station_pkg = get_package_share_directory('space_station')
 
     # ---- Mission-control GUI ----
+    # on_exit=Shutdown(): when the GUI process exits (window closed or the END
+    # button), tear down the ENTIRE launch -- every node is terminated, so no
+    # zombie ars/ogs/wrs/cabin/sim/core processes are left behind.
     gui = Node(
         package='space_station',
         executable='space_station',
         name='space_station_gui_node',
         output='screen',
+        on_exit=Shutdown(),
     )
 
     # ---- ssos_core: system_manager (lifecycle) ----

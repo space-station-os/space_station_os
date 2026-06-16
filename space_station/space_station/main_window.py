@@ -2,9 +2,9 @@ import os
 import sys
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget,
-    QFrame, QApplication, QScrollArea
+    QFrame, QApplication, QScrollArea, QPushButton
 )
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import QTimer, Qt
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
@@ -163,6 +163,22 @@ class MainWindow(QMainWindow):
         self.sim_speed = SimSpeedControl()
         self.sim_speed.speed_changed.connect(self._on_sim_speed)
         nrl.addWidget(self.sim_speed)
+
+        # END: clean shutdown of the whole session (GUI exit -> launch Shutdown
+        # tears down every ROS node, so nothing is left running).
+        self.end_btn = QPushButton("END")
+        self.end_btn.setObjectName("end_button")
+        self.end_btn.setCursor(Qt.PointingHandCursor)
+        self.end_btn.setToolTip("Shut down all subsystems and exit")
+        self.end_btn.setStyleSheet(
+            f"#end_button {{ color: {theme.color('red')};"
+            f" background: transparent; border: 1px solid {theme.color('red')};"
+            f" border-radius: 5px; padding: 6px 16px; font-size: 14px;"
+            f" font-weight: bold; letter-spacing: 2px; margin: 0 16px; }}"
+            f"#end_button:hover {{ background: {theme.color('red')};"
+            f" color: {theme.color('bg')}; }}")
+        self.end_btn.clicked.connect(self._on_end_clicked)
+        nrl.addWidget(self.end_btn)
         root.addWidget(nav_row)
 
         # --- Body: content stack + right sidebar ---
@@ -247,6 +263,13 @@ class MainWindow(QMainWindow):
 
     def _on_tab_changed(self, idx):
         self.stack.setCurrentIndex(idx)
+
+    # ---------------- Session end ----------------
+    def _on_end_clicked(self):
+        """Close the window -> closeEvent stops ROS + plays the exit splash ->
+        the GUI process exits -> launch on_exit=Shutdown terminates every other
+        ROS node, so nothing is left running."""
+        self.close()
 
     # ---------------- Sim speed control ----------------
     def _on_sim_speed(self, speed):
