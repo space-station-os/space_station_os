@@ -148,6 +148,7 @@ void SabatierNode::step()
      units::kg_per_s_to_kg_per_day(last_result_.ch4_produced_mol_s * units::M_CH4));
   kv("conversion", last_result_.conversion);
   kv("reactor_temp_k", last_result_.reactor_temp_k);
+  kv("heater_power_w", last_result_.heater_power_w);
   kv("hydrogen_limited", last_result_.hydrogen_limited ? 1.0 : 0.0);
   status.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
   status.message = last_result_.hydrogen_limited ? "H2-limited" : "nominal";

@@ -5,3 +5,5 @@ ogs_node:
     step_rate_hz: 1.0
     stack_current_a: 27.0
     o2_required_kg_day: 2.3
+    # Faults are injected explicitly (sim fault-injection), not auto-tripped.
+    enable_auto_faults: false

@@ -50,10 +50,21 @@ SabatierResult SabatierSystem::step(double dt, double co2_in_mol_s, double h2_in
   // Exothermic heat release.
   r.reaction_heat_w = r.co2_consumed_mol_s * params_.kinetics.heat_of_reaction;
 
-  // Lumped reactor thermal update: dT/dt = (Q_rxn - UA(T - Tamb)) / C.
+  // Lumped reactor thermal update with a thermostatic trim heater:
+  //   dT/dt = (Q_rxn + Q_heater - UA(T - Tamb)) / C.
+  // The heater makes up the deficit between heat loss and the exotherm and adds
+  // a proportional pull toward the operating setpoint, so the reactor holds
+  // temperature (and conversion) instead of collapsing at low throughput. It
+  // never cools (>= 0); if the exotherm exceeds the loss at high throughput the
+  // heater backs off to zero and the equilibrium limit caps conversion.
   const double q_loss = params_.reactor.heat_loss_coeff_w_k *
                         (reactor_temp_k_ - params_.reactor.ambient_temp_k);
-  const double dT = (r.reaction_heat_w - q_loss) /
+  const double setpoint = params_.reactor.operating_temp_k;
+  double q_heater = (q_loss - r.reaction_heat_w) +
+                    params_.reactor.heater_gain_w_k * (setpoint - reactor_temp_k_);
+  q_heater = std::clamp(q_heater, 0.0, params_.reactor.trim_heater_max_w);
+  r.heater_power_w = q_heater;
+  const double dT = (r.reaction_heat_w + q_heater - q_loss) /
                     std::max(params_.reactor.thermal_mass_j_k, 1.0);
   reactor_temp_k_ += dT * dt;
   r.reactor_temp_k = reactor_temp_k_;
@@ -85,10 +96,13 @@ ReactorParams default_reactor_params()
   ReactorParams p{};
   p.operating_temp_k = 648.0;     // ~375 C — kinetic/thermodynamic sweet spot
   p.thermal_mass_j_k = 2000.0;
-  // Well-insulated small reactor: the exotherm (~165 W at flight CO2 rates)
-  // sustains the operating temperature against this loss.
   p.heat_loss_coeff_w_k = 0.5;
   p.ambient_temp_k = 295.0;
+  // Electric preheater holds the catalyst at the operating point. At flight CO2
+  // rates the exotherm (~150 W) is below the heat loss (~175 W) at 648 K, so the
+  // heater supplies the deficit; sized with margin for cold start.
+  p.trim_heater_max_w = 600.0;
+  p.heater_gain_w_k = 50.0;
   return p;
 }
 

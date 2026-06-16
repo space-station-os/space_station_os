@@ -26,6 +26,9 @@ ArsNode::ArsNode(const rclcpp::NodeOptions & options)
   if (!this->has_parameter("co2_required_kg_day")) {
     this->declare_parameter("co2_required_kg_day", co2_required_kg_day_);
   }
+  if (!this->has_parameter("enable_auto_faults")) {
+    this->declare_parameter("enable_auto_faults", enable_auto_faults_);
+  }
   autostart_timer_ = EclssDiagnostics::maybe_autostart(this);
 }
 
@@ -33,6 +36,7 @@ CallbackReturn ArsNode::on_configure(const rclcpp_lifecycle::State &)
 {
   step_rate_hz_ = this->get_parameter("step_rate_hz").as_double();
   co2_required_kg_day_ = this->get_parameter("co2_required_kg_day").as_double();
+  enable_auto_faults_ = this->get_parameter("enable_auto_faults").as_bool();
 
   bridge_ = std::make_unique<EclssParameterBridge>(this);
   bridge_->declare_ars_parameters(ars::default_ars_parameters());
@@ -266,7 +270,8 @@ void ArsNode::step()
   // never every step, so a momentary dip can't spam the fault bus / flip state).
   bool healthy = true;
   std::string health_msg = "nominal";
-  if (EclssDiagnostics::ars_co2_removal_low(last_result_.co2_removal_rate_kg_day,
+  if (enable_auto_faults_ &&
+      EclssDiagnostics::ars_co2_removal_low(last_result_.co2_removal_rate_kg_day,
                                             co2_required_kg_day_)) {
     healthy = false;
     health_msg = "CO2 removal below requirement";
@@ -312,10 +317,24 @@ rcl_interfaces::msg::SetParametersResult ArsNode::on_set_parameters(
   // next step() performs after the new values take effect. Static (geometry)
   // changes need a reconfigure cycle to rebuild the beds.
   for (const auto & p : params) {
-    if (EclssParameterBridge::is_static_parameter(p.get_name())) {
+    const std::string & n = p.get_name();
+    // Node-level (non-bridge) live params used directly in step().
+    if (n == "enable_auto_faults") {
+      enable_auto_faults_ = p.as_bool();
+      continue;
+    }
+    if (n == "co2_required_kg_day") {
+      co2_required_kg_day_ = p.as_double();
+      continue;
+    }
+    if (n == "step_rate_hz") {
+      step_rate_hz_ = p.as_double();
+      continue;
+    }
+    if (EclssParameterBridge::is_static_parameter(n)) {
       RCLCPP_INFO(get_logger(),
                   "Static parameter '%s' changed; reconfigure to apply",
-                  p.get_name().c_str());
+                  n.c_str());
     } else {
       params_dirty_ = true;
     }

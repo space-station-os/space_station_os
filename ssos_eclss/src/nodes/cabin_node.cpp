@@ -1,10 +1,13 @@
 #include "ssos_eclss/nodes/cabin_node.hpp"
 
 #include <functional>
+#include <vector>
 
 #include "ssos_eclss/cabin/cabin_atmosphere.hpp"
 #include "ssos_eclss/common/units.hpp"
 #include "ssos_eclss/nodes/eclss_diagnostics.hpp"
+
+using std::placeholders::_1;
 
 namespace ssos_eclss
 {
@@ -19,6 +22,7 @@ CabinNode::CabinNode(const rclcpp::NodeOptions & options)
   this->declare_parameter("cabin_volume_m3", cabin_volume_m3_);
   this->declare_parameter("cabin_temp_c", cabin_temp_c_);
   this->declare_parameter("co2_alarm_ppm", co2_alarm_ppm_);
+  this->declare_parameter("enable_auto_faults", enable_auto_faults_);
   autostart_timer_ = EclssDiagnostics::maybe_autostart(this);
 }
 
@@ -29,6 +33,7 @@ CallbackReturn CabinNode::on_configure(const rclcpp_lifecycle::State &)
   cabin_volume_m3_ = this->get_parameter("cabin_volume_m3").as_double();
   cabin_temp_c_ = this->get_parameter("cabin_temp_c").as_double();
   co2_alarm_ppm_ = this->get_parameter("co2_alarm_ppm").as_double();
+  enable_auto_faults_ = this->get_parameter("enable_auto_faults").as_bool();
 
   cabin::CabinParams cp{};
   cp.volume_m3 = cabin_volume_m3_;
@@ -62,7 +67,32 @@ CallbackReturn CabinNode::on_configure(const rclcpp_lifecycle::State &)
     [this](const std_msgs::msg::Float64::SharedPtr msg) {
       ogs_o2_kg_s_ = units::kg_per_day_to_kg_per_s(msg->data);
     });
+  param_cb_handle_ = this->add_on_set_parameters_callback(
+    std::bind(&CabinNode::on_set_parameters, this, _1));
   return CallbackReturn::SUCCESS;
+}
+
+rcl_interfaces::msg::SetParametersResult CabinNode::on_set_parameters(
+  const std::vector<rclcpp::Parameter> & params)
+{
+  rcl_interfaces::msg::SetParametersResult result;
+  result.successful = true;
+  for (const auto & p : params) {
+    const std::string & n = p.get_name();
+    if (n == "crew_size") {
+      crew_size_ = static_cast<int>(p.as_int());
+      // Rebuild the metabolic model so the new crew size takes effect live.
+      crew_ = std::make_unique<cabin::CrewMetabolicModel>(
+        crew_size_, cabin::default_crew_profile());
+    } else if (n == "co2_alarm_ppm") {
+      co2_alarm_ppm_ = p.as_double();
+    } else if (n == "step_rate_hz") {
+      step_rate_hz_ = p.as_double();
+    } else if (n == "enable_auto_faults") {
+      enable_auto_faults_ = p.as_bool();
+    }
+  }
+  return result;
 }
 
 CallbackReturn CabinNode::on_activate(const rclcpp_lifecycle::State &)
@@ -164,7 +194,7 @@ void CabinNode::step()
 
   bool healthy = true;
   std::string msg = "nominal";
-  if (last_co2_ppm_ > co2_alarm_ppm_) {
+  if (enable_auto_faults_ && last_co2_ppm_ > co2_alarm_ppm_) {
     healthy = false;
     msg = "cabin CO2 above alarm threshold";
     fault_pub_->publish(EclssDiagnostics::make_fault(

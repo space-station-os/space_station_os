@@ -1,9 +1,12 @@
 #include "ssos_eclss/nodes/wrs_node.hpp"
 
 #include <functional>
+#include <vector>
 
 #include "ssos_eclss/common/units.hpp"
 #include "ssos_eclss/nodes/eclss_diagnostics.hpp"
+
+using std::placeholders::_1;
 
 namespace ssos_eclss
 {
@@ -17,6 +20,7 @@ WrsNode::WrsNode(const rclcpp::NodeOptions & options)
   this->declare_parameter("urine_kg_day", urine_kg_day_);
   this->declare_parameter("condensate_kg_day", condensate_kg_day_);
   this->declare_parameter("potable_limit_us", potable_limit_us_);
+  this->declare_parameter("enable_auto_faults", enable_auto_faults_);
   autostart_timer_ = EclssDiagnostics::maybe_autostart(this);
 }
 
@@ -26,6 +30,7 @@ CallbackReturn WrsNode::on_configure(const rclcpp_lifecycle::State &)
   urine_kg_day_ = this->get_parameter("urine_kg_day").as_double();
   condensate_kg_day_ = this->get_parameter("condensate_kg_day").as_double();
   potable_limit_us_ = this->get_parameter("potable_limit_us").as_double();
+  enable_auto_faults_ = this->get_parameter("enable_auto_faults").as_bool();
 
   wrs_ = std::make_unique<wrs::WaterRecoverySystem>();
   wrs_->reset();
@@ -46,7 +51,31 @@ CallbackReturn WrsNode::on_configure(const rclcpp_lifecycle::State &)
     [this](const std_msgs::msg::Float64::SharedPtr msg) {
       sabatier_water_kg_s_ = units::kg_per_day_to_kg_per_s(msg->data);
     });
+  param_cb_handle_ = this->add_on_set_parameters_callback(
+    std::bind(&WrsNode::on_set_parameters, this, _1));
   return CallbackReturn::SUCCESS;
+}
+
+rcl_interfaces::msg::SetParametersResult WrsNode::on_set_parameters(
+  const std::vector<rclcpp::Parameter> & params)
+{
+  rcl_interfaces::msg::SetParametersResult result;
+  result.successful = true;
+  for (const auto & p : params) {
+    const std::string & n = p.get_name();
+    if (n == "urine_kg_day") {
+      urine_kg_day_ = p.as_double();
+    } else if (n == "condensate_kg_day") {
+      condensate_kg_day_ = p.as_double();
+    } else if (n == "potable_limit_us") {
+      potable_limit_us_ = p.as_double();
+    } else if (n == "step_rate_hz") {
+      step_rate_hz_ = p.as_double();
+    } else if (n == "enable_auto_faults") {
+      enable_auto_faults_ = p.as_bool();
+    }
+  }
+  return result;
 }
 
 CallbackReturn WrsNode::on_activate(const rclcpp_lifecycle::State &)
@@ -136,8 +165,9 @@ void WrsNode::step()
 
   bool healthy = true;
   std::string msg = "nominal";
-  if (last_result_.product_conductivity_us > potable_limit_us_ ||
-      last_result_.multifiltration_broken_through) {
+  if (enable_auto_faults_ &&
+      (last_result_.product_conductivity_us > potable_limit_us_ ||
+       last_result_.multifiltration_broken_through)) {
     healthy = false;
     msg = "product water out of potable spec";
     fault_pub_->publish(EclssDiagnostics::make_fault(

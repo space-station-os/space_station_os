@@ -46,6 +46,8 @@ public:
 private:
   void step();
   void register_with_manager();
+  rcl_interfaces::msg::SetParametersResult on_set_parameters(
+    const std::vector<rclcpp::Parameter> & params);
 
   std::unique_ptr<cabin::CabinAtmosphere> atmosphere_;
   std::unique_ptr<cabin::CrewMetabolicModel> crew_;
@@ -60,6 +62,7 @@ private:
   rclcpp::Client<RegisterSubsystem>::SharedPtr register_client_;
   rclcpp::TimerBase::SharedPtr step_timer_;
   rclcpp::TimerBase::SharedPtr autostart_timer_;
+  OnSetParametersCallbackHandle::SharedPtr param_cb_handle_;
 
   // Closed-loop coupling: ARS removes CO2 from the cabin, OGS adds O2.
   rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr ars_removal_sub_;
@@ -74,6 +77,7 @@ private:
   double co2_alarm_ppm_{7000.0};
   rclcpp::Time last_step_time_;
   bool first_step_{true};
+  bool enable_auto_faults_{false};  // faults injected explicitly, not auto-tripped
 };
 
 }  // namespace nodes

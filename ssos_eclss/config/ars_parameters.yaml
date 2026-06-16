@@ -8,6 +8,10 @@ ars_node:
     # step small enough (a few sim-seconds) for a stable, CFL-respecting bed PDE.
     step_rate_hz: 10.0
     co2_required_kg_day: 4.16
+    # Faults are injected explicitly (sim fault-injection), not auto-tripped. In
+    # the closed loop, removal settles at the crew production rate (== this
+    # requirement), so an auto threshold check there is a knife-edge.
+    enable_auto_faults: false
 
     ars:
       bed:

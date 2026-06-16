@@ -1,8 +1,11 @@
 #include "ssos_eclss/nodes/ogs_node.hpp"
 
 #include <functional>
+#include <vector>
 
 #include "ssos_eclss/nodes/eclss_diagnostics.hpp"
+
+using std::placeholders::_1;
 
 namespace ssos_eclss
 {
@@ -15,6 +18,7 @@ OgsNode::OgsNode(const rclcpp::NodeOptions & options)
   this->declare_parameter("step_rate_hz", step_rate_hz_);
   this->declare_parameter("stack_current_a", stack_current_a_);
   this->declare_parameter("o2_required_kg_day", o2_required_kg_day_);
+  this->declare_parameter("enable_auto_faults", enable_auto_faults_);
   autostart_timer_ = EclssDiagnostics::maybe_autostart(this);
 }
 
@@ -23,6 +27,7 @@ CallbackReturn OgsNode::on_configure(const rclcpp_lifecycle::State &)
   step_rate_hz_ = this->get_parameter("step_rate_hz").as_double();
   stack_current_a_ = this->get_parameter("stack_current_a").as_double();
   o2_required_kg_day_ = this->get_parameter("o2_required_kg_day").as_double();
+  enable_auto_faults_ = this->get_parameter("enable_auto_faults").as_bool();
 
   ogs::OgsParameters params = ogs::default_ogs_parameters();
   params.operating.stack_current_a = stack_current_a_;
@@ -36,7 +41,30 @@ CallbackReturn OgsNode::on_configure(const rclcpp_lifecycle::State &)
   fault_pub_ = this->create_publisher<FaultEvent>("/ssos/fault_event", 10);
   register_client_ =
     this->create_client<RegisterSubsystem>("/ssos/register_subsystem");
+  param_cb_handle_ = this->add_on_set_parameters_callback(
+    std::bind(&OgsNode::on_set_parameters, this, _1));
   return CallbackReturn::SUCCESS;
+}
+
+rcl_interfaces::msg::SetParametersResult OgsNode::on_set_parameters(
+  const std::vector<rclcpp::Parameter> & params)
+{
+  // Apply live edits to the step-used members (the editor pushes here).
+  rcl_interfaces::msg::SetParametersResult result;
+  result.successful = true;
+  for (const auto & p : params) {
+    const std::string & n = p.get_name();
+    if (n == "stack_current_a") {
+      stack_current_a_ = p.as_double();
+    } else if (n == "o2_required_kg_day") {
+      o2_required_kg_day_ = p.as_double();
+    } else if (n == "step_rate_hz") {
+      step_rate_hz_ = p.as_double();
+    } else if (n == "enable_auto_faults") {
+      enable_auto_faults_ = p.as_bool();
+    }
+  }
+  return result;
 }
 
 CallbackReturn OgsNode::on_activate(const rclcpp_lifecycle::State &)
@@ -121,7 +149,7 @@ void OgsNode::step()
 
   bool healthy = true;
   std::string msg = "nominal";
-  if (last_result_.o2_production_kg_day < o2_required_kg_day_) {
+  if (enable_auto_faults_ && last_result_.o2_production_kg_day < o2_required_kg_day_) {
     healthy = false;
     msg = "O2 production below requirement";
     fault_pub_->publish(EclssDiagnostics::make_fault(

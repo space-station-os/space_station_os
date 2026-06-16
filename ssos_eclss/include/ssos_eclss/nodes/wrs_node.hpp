@@ -43,6 +43,8 @@ public:
 private:
   void step();
   void register_with_manager();
+  rcl_interfaces::msg::SetParametersResult on_set_parameters(
+    const std::vector<rclcpp::Parameter> & params);
 
   std::unique_ptr<wrs::WaterRecoverySystem> wrs_;
   wrs::WrsResult last_result_{};
@@ -59,6 +61,7 @@ private:
   double sabatier_water_kg_s_{0.0};
   rclcpp::TimerBase::SharedPtr step_timer_;
   rclcpp::TimerBase::SharedPtr autostart_timer_;
+  OnSetParametersCallbackHandle::SharedPtr param_cb_handle_;
 
   double step_rate_hz_{1.0};
   double urine_kg_day_{6.0};
@@ -66,6 +69,7 @@ private:
   double potable_limit_us_{100.0};
   rclcpp::Time last_step_time_;
   bool first_step_{true};
+  bool enable_auto_faults_{false};  // faults injected explicitly, not auto-tripped
 };
 
 }  // namespace nodes

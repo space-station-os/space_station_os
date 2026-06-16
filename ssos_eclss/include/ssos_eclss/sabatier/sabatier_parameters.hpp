@@ -37,6 +37,13 @@ struct ReactorParams
   double thermal_mass_j_k;    // lumped reactor thermal mass [J/K]
   double heat_loss_coeff_w_k; // reactor-to-ambient conductance [W/K]
   double ambient_temp_k;      // ambient temperature [K]
+  // Thermostatic trim heater. At flight CO2 rates the exotherm alone is less
+  // than the heat loss, so an unheated reactor cools and conversion collapses
+  // (cooler -> slower kinetics -> less exotherm -> cooler...). The real ISS
+  // Sabatier uses an electric preheater to hold the catalyst at temperature;
+  // this models that closed-loop temperature control.
+  double trim_heater_max_w;   // max electric preheater power [W]
+  double heater_gain_w_k;     // proportional heater gain toward setpoint [W/K]
 };
 
 /// Complete Sabatier parameter set.

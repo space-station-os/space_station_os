@@ -25,6 +25,7 @@ struct SabatierResult
   double water_produced_kg_s;   // H2O produced [kg/s]
   double conversion;          // achieved CO2 conversion [-]
   double reaction_heat_w;     // exothermic heat released [W]
+  double heater_power_w;      // thermostatic trim-heater power [W]
   double reactor_temp_k;      // reactor temperature [K]
   bool hydrogen_limited;      // true if H2 was the stoichiometric limiter
 };

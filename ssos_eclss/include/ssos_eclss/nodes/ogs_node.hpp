@@ -45,6 +45,8 @@ public:
 private:
   void step();
   void register_with_manager();
+  rcl_interfaces::msg::SetParametersResult on_set_parameters(
+    const std::vector<rclcpp::Parameter> & params);
 
   std::unique_ptr<ogs::OxygenGeneratorSystem> ogs_;
   ogs::OgsResult last_result_{};
@@ -57,12 +59,14 @@ private:
   rclcpp::Client<RegisterSubsystem>::SharedPtr register_client_;
   rclcpp::TimerBase::SharedPtr step_timer_;
   rclcpp::TimerBase::SharedPtr autostart_timer_;
+  OnSetParametersCallbackHandle::SharedPtr param_cb_handle_;
 
   double step_rate_hz_{1.0};
   double stack_current_a_{27.0};
   double o2_required_kg_day_{2.3};
   rclcpp::Time last_step_time_;
   bool first_step_{true};
+  bool enable_auto_faults_{false};  // faults injected explicitly, not auto-tripped
 };
 
 }  // namespace nodes
