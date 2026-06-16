@@ -24,6 +24,7 @@
   <exec_depend>diagnostic_msgs</exec_depend>
   <exec_depend>space_station_interfaces</exec_depend>
   <exec_depend>space_station_communication</exec_depend>
+  <exec_depend>space_station_gnc</exec_depend>
   <exec_depend>ssos_eclss</exec_depend>
 
   <export>
