@@ -63,6 +63,7 @@ add_library(eclss_ros
   src/nodes/ogs_node.cpp
   src/nodes/wrs_node.cpp
   src/nodes/cabin_node.cpp
+  src/nodes/sabatier_node.cpp
 )
 target_link_libraries(eclss_ros eclss_physics)
 ament_target_dependencies(eclss_ros
@@ -87,6 +88,10 @@ add_executable(cabin_node src/main/cabin_main.cpp)
 target_link_libraries(cabin_node eclss_ros)
 ament_target_dependencies(cabin_node rclcpp rclcpp_lifecycle)
 
+add_executable(sabatier_node src/main/sabatier_main.cpp)
+target_link_libraries(sabatier_node eclss_ros)
+ament_target_dependencies(sabatier_node rclcpp rclcpp_lifecycle)
+
 # ---- Standalone validation executables (NO ROS) ----
 add_executable(ars_validation standalone/ars_validation.cpp)
 target_link_libraries(ars_validation eclss_physics)
@@ -100,7 +105,7 @@ target_link_libraries(breakthrough_curve_gen eclss_physics)
 # ---- Install ----
 install(TARGETS eclss_physics eclss_ros
   ARCHIVE DESTINATION lib LIBRARY DESTINATION lib RUNTIME DESTINATION bin)
-install(TARGETS ars_node ogs_node wrs_node cabin_node
+install(TARGETS ars_node ogs_node wrs_node cabin_node sabatier_node
   RUNTIME DESTINATION lib/${PROJECT_NAME})
 install(TARGETS ars_validation parameter_sweep breakthrough_curve_gen
   RUNTIME DESTINATION lib/${PROJECT_NAME})

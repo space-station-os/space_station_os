@@ -63,6 +63,11 @@ CallbackReturn ArsNode::on_configure(const rclcpp_lifecycle::State &)
   world_state_sub_ = this->create_subscription<WorldState>(
     "/sim/world_state", 10, std::bind(&ArsNode::on_world_state, this, _1));
 
+  // Closed-loop feedback: prefer the live cabin CO2 from cabin_node so the
+  // ARS inlet tracks the actual cabin and the loop self-regulates.
+  cabin_co2_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+    "/ssos/cabin/co2_ppm", 10, std::bind(&ArsNode::on_cabin_co2, this, _1));
+
   // Registration client.
   register_client_ =
     this->create_client<RegisterSubsystem>("/ssos/register_subsystem");
@@ -121,6 +126,7 @@ CallbackReturn ArsNode::on_cleanup(const rclcpp_lifecycle::State &)
   heartbeat_pub_.reset();
   fault_pub_.reset();
   world_state_sub_.reset();
+  cabin_co2_sub_.reset();
   register_client_.reset();
   ars_.reset();
   bridge_.reset();
@@ -132,11 +138,23 @@ void ArsNode::on_world_state(const WorldState::SharedPtr msg)
   const double total_p = units::kpa_to_pa(msg->cabin_pressure_kpa);
   cabin_.total_pressure_pa = total_p;
   cabin_.temperature_k = units::celsius_to_kelvin(msg->cabin_temp_celsius);
-  cabin_.co2_partial_pressure_pa =
-    units::ppm_to_fraction(msg->atmospheric_co2_ppm) * total_p;
+  // Only seed CO2 from the simulator until the cabin_node feedback arrives;
+  // afterwards on_cabin_co2() owns the inlet ppCO2 (closed loop).
+  if (!have_cabin_co2_) {
+    cabin_.co2_partial_pressure_pa =
+      units::ppm_to_fraction(msg->atmospheric_co2_ppm) * total_p;
+  }
   cabin_.h2o_partial_pressure_pa =
     gas::water_pp_from_rh(0.40, cabin_.temperature_k);
   have_world_state_ = true;
+}
+
+void ArsNode::on_cabin_co2(const std_msgs::msg::Float64::SharedPtr msg)
+{
+  // ppm -> partial pressure using the current cabin total pressure.
+  cabin_.co2_partial_pressure_pa =
+    units::ppm_to_fraction(msg->data) * cabin_.total_pressure_pa;
+  have_cabin_co2_ = true;
 }
 
 void ArsNode::step()

@@ -49,6 +49,19 @@ CallbackReturn CabinNode::on_configure(const rclcpp_lifecycle::State &)
   fault_pub_ = this->create_publisher<FaultEvent>("/ssos/fault_event", 10);
   register_client_ =
     this->create_client<RegisterSubsystem>("/ssos/register_subsystem");
+
+  // Closed-loop inputs: CO2 removed by the ARS (sink) and O2 made by the OGS
+  // (source). kg/day -> latched for the step() mass balance.
+  ars_removal_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+    "/ssos/ars/co2_removal_kg_day", 10,
+    [this](const std_msgs::msg::Float64::SharedPtr msg) {
+      ars_co2_removal_kg_s_ = units::kg_per_day_to_kg_per_s(msg->data);
+    });
+  ogs_o2_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+    "/ssos/ogs/o2_kg_day", 10,
+    [this](const std_msgs::msg::Float64::SharedPtr msg) {
+      ogs_o2_kg_s_ = units::kg_per_day_to_kg_per_s(msg->data);
+    });
   return CallbackReturn::SUCCESS;
 }
 
@@ -107,12 +120,16 @@ void CabinNode::step()
   first_step_ = false;
   last_step_time_ = now;
 
-  // Crew loads + leakage drive the cabin atmosphere.
+  // Crew loads + leakage drive the cabin atmosphere; the ARS removes CO2 and
+  // the OGS adds O2 (closed loop). GasFlows are molar [mol/s], so convert the
+  // ARS/OGS mass rates kg/s -> mol/s before summing.
   const cabin::MetabolicLoads m = crew_->loads(1.0);
   const cabin::GasFlows lk = leak_->leak_flows(*atmosphere_);
+  const double ars_co2_mol_s = ars_co2_removal_kg_s_ / units::M_CO2;
+  const double ogs_o2_mol_s = ogs_o2_kg_s_ / units::M_O2;
   cabin::GasFlows total{};
-  total.o2 = m.flows.o2 + lk.o2;
-  total.co2 = m.flows.co2 + lk.co2;
+  total.o2 = m.flows.o2 + ogs_o2_mol_s + lk.o2;
+  total.co2 = m.flows.co2 - ars_co2_mol_s + lk.co2;
   total.n2 = lk.n2;
   total.h2o = m.flows.h2o + lk.h2o;
   atmosphere_->apply_flows(dt, total);
@@ -138,6 +155,8 @@ void CabinNode::step()
   kv("o2_fraction", atmosphere_->o2_fraction());
   kv("total_pressure_kpa", units::pa_to_kpa(atmosphere_->total_pressure_pa()));
   kv("relative_humidity", atmosphere_->relative_humidity());
+  kv("ars_co2_removal_kg_day", units::kg_per_s_to_kg_per_day(ars_co2_removal_kg_s_));
+  kv("ogs_o2_kg_day", units::kg_per_s_to_kg_per_day(ogs_o2_kg_s_));
   status.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
   status.message = "nominal";
   diag.status.push_back(status);

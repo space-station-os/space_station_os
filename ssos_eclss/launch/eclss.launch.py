@@ -36,4 +36,5 @@ def generate_launch_description():
         node('ogs_node', 'ogs_node', 'ogs_parameters.yaml'),
         node('wrs_node', 'wrs_node', 'wrs_parameters.yaml'),
         node('cabin_node', 'cabin_node', 'cabin_parameters.yaml'),
+        node('sabatier_node', 'sabatier_node', 'sabatier_parameters.yaml'),
     ])

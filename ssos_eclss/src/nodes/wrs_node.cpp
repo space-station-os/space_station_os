@@ -39,6 +39,13 @@ CallbackReturn WrsNode::on_configure(const rclcpp_lifecycle::State &)
   fault_pub_ = this->create_publisher<FaultEvent>("/ssos/fault_event", 10);
   register_client_ =
     this->create_client<RegisterSubsystem>("/ssos/register_subsystem");
+
+  // Sabatier-recovered water (clean) joins the WRS feed.
+  sabatier_water_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+    "/ssos/sabatier/water_kg_day", 10,
+    [this](const std_msgs::msg::Float64::SharedPtr msg) {
+      sabatier_water_kg_s_ = units::kg_per_day_to_kg_per_s(msg->data);
+    });
   return CallbackReturn::SUCCESS;
 }
 
@@ -77,6 +84,7 @@ CallbackReturn WrsNode::on_cleanup(const rclcpp_lifecycle::State &)
   telemetry_pub_.reset();
   heartbeat_pub_.reset();
   fault_pub_.reset();
+  sabatier_water_sub_.reset();
   register_client_.reset();
   wrs_.reset();
   return CallbackReturn::SUCCESS;
@@ -96,7 +104,9 @@ void WrsNode::step()
   last_step_time_ = now;
 
   const double urine = units::kg_per_day_to_kg_per_s(urine_kg_day_);
-  const double condensate = units::kg_per_day_to_kg_per_s(condensate_kg_day_);
+  // Humidity condensate + Sabatier product water (both clean feeds).
+  const double condensate =
+    units::kg_per_day_to_kg_per_s(condensate_kg_day_) + sabatier_water_kg_s_;
   last_result_ = wrs_->step(dt, urine, condensate, 1.0e-8);
 
   std_msgs::msg::Float64 water;
@@ -118,6 +128,7 @@ void WrsNode::step()
   kv("conductivity_us", last_result_.product_conductivity_us);
   kv("overall_recovery", last_result_.overall_recovery);
   kv("voc_conversion", last_result_.voc_conversion);
+  kv("sabatier_feed_kg_day", units::kg_per_s_to_kg_per_day(sabatier_water_kg_s_));
   status.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
   status.message = "nominal";
   diag.status.push_back(status);
@@ -146,7 +157,7 @@ void WrsNode::register_with_manager()
   auto req = std::make_shared<RegisterSubsystem::Request>();
   req->subsystem_name = "wrs";
   req->published_topics = {"/ssos/wrs/potable_kg_day", "/ssos/wrs/diagnostics"};
-  req->subscribed_topics = {};
+  req->subscribed_topics = {"/ssos/sabatier/water_kg_day"};
   req->heartbeat_topic = "/ssos/wrs/heartbeat";
   register_client_->async_send_request(req);
 }

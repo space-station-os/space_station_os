@@ -1,5 +1,5 @@
-#ifndef SSOS_ECLSS__NODES__WRS_NODE_HPP_
-#define SSOS_ECLSS__NODES__WRS_NODE_HPP_
+#ifndef SSOS_ECLSS__NODES__SABATIER_NODE_HPP_
+#define SSOS_ECLSS__NODES__SABATIER_NODE_HPP_
 
 #include <memory>
 
@@ -13,9 +13,11 @@
 #include "space_station_interfaces/msg/subsystem_heartbeat.hpp"
 #include "space_station_interfaces/srv/register_subsystem.hpp"
 
-#include "ssos_eclss/wrs/water_recovery_system.hpp"
+#include "ssos_eclss/sabatier/sabatier_system.hpp"
 
-// Lifecycle node wrapping the Water Recovery System physics.
+// Lifecycle node wrapping the Sabatier CO2-reduction reactor. Closes the ECLSS
+// loop: CO2 desorbed by the ARS + H2 from the OGS -> CH4 (vented) + H2O (to the
+// WRS). CO2 in excess of the H2-limited reactable amount is vented to space.
 
 namespace ssos_eclss
 {
@@ -28,42 +30,40 @@ using FaultEvent = space_station_interfaces::msg::FaultEvent;
 using CallbackReturn =
   rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
 
-class WrsNode : public rclcpp_lifecycle::LifecycleNode
+class SabatierNode : public rclcpp_lifecycle::LifecycleNode
 {
 public:
-  explicit WrsNode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
+  explicit SabatierNode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
 
   CallbackReturn on_configure(const rclcpp_lifecycle::State & state) override;
   CallbackReturn on_activate(const rclcpp_lifecycle::State & state) override;
   CallbackReturn on_deactivate(const rclcpp_lifecycle::State & state) override;
   CallbackReturn on_cleanup(const rclcpp_lifecycle::State & state) override;
 
-  double last_conductivity_us() const { return last_result_.product_conductivity_us; }
-
 private:
   void step();
   void register_with_manager();
 
-  std::unique_ptr<wrs::WaterRecoverySystem> wrs_;
-  wrs::WrsResult last_result_{};
+  std::unique_ptr<sabatier::SabatierSystem> sabatier_;
+  sabatier::SabatierResult last_result_{};
+
+  // Closed-loop inputs (latched from topics).
+  double co2_available_kg_s_{0.0};  // from ARS desorption
+  double h2_available_mol_s_{0.0};  // derived from OGS O2 (2 H2 per O2)
 
   rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float64>::SharedPtr water_pub_;
   rclcpp_lifecycle::LifecyclePublisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr
     telemetry_pub_;
   rclcpp_lifecycle::LifecyclePublisher<SubsystemHeartbeat>::SharedPtr heartbeat_pub_;
   rclcpp_lifecycle::LifecyclePublisher<FaultEvent>::SharedPtr fault_pub_;
+
+  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr ars_co2_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr ogs_o2_sub_;
   rclcpp::Client<RegisterSubsystem>::SharedPtr register_client_;
-  // Closed-loop: clean product water recovered by the Sabatier reactor, fed in
-  // as an extra (distillate-quality) condensate stream.
-  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr sabatier_water_sub_;
-  double sabatier_water_kg_s_{0.0};
   rclcpp::TimerBase::SharedPtr step_timer_;
   rclcpp::TimerBase::SharedPtr autostart_timer_;
 
   double step_rate_hz_{1.0};
-  double urine_kg_day_{6.0};
-  double condensate_kg_day_{3.0};
-  double potable_limit_us_{100.0};
   rclcpp::Time last_step_time_;
   bool first_step_{true};
 };
@@ -71,4 +71,4 @@ private:
 }  // namespace nodes
 }  // namespace ssos_eclss
 
-#endif  // SSOS_ECLSS__NODES__WRS_NODE_HPP_
+#endif  // SSOS_ECLSS__NODES__SABATIER_NODE_HPP_

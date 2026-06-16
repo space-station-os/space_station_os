@@ -51,6 +51,7 @@ public:
 private:
   void step();
   void on_world_state(const WorldState::SharedPtr msg);
+  void on_cabin_co2(const std_msgs::msg::Float64::SharedPtr msg);
   void register_with_manager();
   rcl_interfaces::msg::SetParametersResult on_set_parameters(
     const std::vector<rclcpp::Parameter> & params);
@@ -61,6 +62,10 @@ private:
   ars::CabinConditions cabin_{};
   ars::ArsResult last_result_{};
   bool have_world_state_{false};
+  // Closed-loop: live cabin CO2 (ppm) from cabin_node, preferred over the
+  // simulator's world-state CO2 so removal tracks the actual cabin and the
+  // cabin<->ARS loop self-regulates to a steady ppCO2.
+  bool have_cabin_co2_{false};
 
   // Publishers
   rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float64>::SharedPtr co2_removal_pub_;
@@ -75,6 +80,7 @@ private:
 
   // Subscriber
   rclcpp::Subscription<WorldState>::SharedPtr world_state_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr cabin_co2_sub_;
 
   // Service client
   rclcpp::Client<RegisterSubsystem>::SharedPtr register_client_;

@@ -61,6 +61,12 @@ private:
   rclcpp::TimerBase::SharedPtr step_timer_;
   rclcpp::TimerBase::SharedPtr autostart_timer_;
 
+  // Closed-loop coupling: ARS removes CO2 from the cabin, OGS adds O2.
+  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr ars_removal_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr ogs_o2_sub_;
+  double ars_co2_removal_kg_s_{0.0};
+  double ogs_o2_kg_s_{0.0};
+
   double step_rate_hz_{1.0};
   int crew_size_{4};
   double cabin_volume_m3_{100.0};
