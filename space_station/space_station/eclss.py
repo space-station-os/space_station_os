@@ -210,6 +210,14 @@ class EclssWidget(QWidget):
         self._conduct_us = None
         self._recovery = None
         self._voc_conv = None
+        # Sabatier (CO2 reduction) telemetry — closes the loop on desorbed CO2.
+        self._sab_to = None       # CO2 routed to Sabatier [kg/day]
+        self._sab_vent = None     # CO2 vented to space [kg/day]
+        self._sab_frac = None     # fraction of desorbed CO2 to Sabatier [-]
+        self._sab_water = None    # recovered water [kg/day]
+        self._sab_ch4 = None      # methane produced (vented) [kg/day]
+        self._sab_conv = None     # CO2 conversion [-]
+        self._sab_h2lim = None    # hydrogen-limited flag
 
         # GUI-side cycle model (fallback when /ssos/ars/cycle_phase is absent)
         self._cycle_min = 0.0
@@ -332,6 +340,32 @@ class EclssWidget(QWidget):
                 bed_row.addWidget(d)
         root.addWidget(bed_card)
 
+        # --- CO2 Reduction (Sabatier) section ---
+        # Where the ARS-desorbed CO2 actually goes: H2-limited fraction reacts
+        # with OGS hydrogen (-> CH4 vented + water to WRS); the remainder is
+        # vented to space.
+        sab_hdr = QLabel("CO₂ REDUCTION · SABATIER · CO₂ + 4H₂ → CH₄ + 2H₂O")
+        sab_hdr.setProperty("class", "label")
+        sab_hdr.setFont(theme.label_font(12, tracking=2.0))
+        root.addWidget(sab_hdr)
+        self.card_sab_to = MetricCard("CO₂ → Sabatier", "—", "kg/day", "NO DATA", "muted")
+        self.card_sab_vent = MetricCard("CO₂ Vented", "—", "kg/day", "NO DATA", "muted")
+        self.card_sab_water = MetricCard("Water Recovered", "—", "kg/day", "NO DATA", "muted")
+        self.card_sab_conv = MetricCard("Conversion", "—", "%", "NO DATA", "muted")
+        root.addWidget(SpecRow([self.card_sab_to, self.card_sab_vent,
+                                self.card_sab_water, self.card_sab_conv]))
+        # Split meter: fraction of desorbed CO2 recovered vs vented.
+        sab_bars = QFrame()
+        sab_bars.setProperty("class", "card")
+        sbl = QHBoxLayout(sab_bars)
+        sbl.setContentsMargins(18, 14, 18, 14)
+        sbl.setSpacing(24)
+        self.meter_sab_split = MeterBar("CO₂ Recovered (vs vented)", "%", "green")
+        self.meter_sab_water = MeterBar("Water to WRS", "kg/day", "accent")
+        sbl.addWidget(self.meter_sab_split, 1)
+        sbl.addWidget(self.meter_sab_water, 1)
+        root.addWidget(sab_bars)
+
         # --- Oxygen Generation (OGS) section ---
         ogs_hdr = QLabel("OXYGEN GENERATION · OGS · PEM ELECTROLYSIS")
         ogs_hdr.setProperty("class", "label")
@@ -404,11 +438,17 @@ class EclssWidget(QWidget):
                 Float64, "/ssos/ogs/o2_kg_day", self._on_ogs_o2, 10)
             self.node.create_subscription(
                 Float64, "/ssos/wrs/potable_kg_day", self._on_wrs_water, 10)
+            # Sabatier CO2-reduction telemetry (closes the desorbed-CO2 loop).
+            self.node.create_subscription(
+                Float64, "/ssos/sabatier/water_kg_day", self._on_sab_water, 10)
             if _HAVE_DIAG:
                 self.node.create_subscription(
                     DiagnosticArray, "/ssos/ogs/diagnostics", self._on_ogs_diag, 10)
                 self.node.create_subscription(
                     DiagnosticArray, "/ssos/wrs/diagnostics", self._on_wrs_diag, 10)
+                self.node.create_subscription(
+                    DiagnosticArray, "/ssos/sabatier/diagnostics",
+                    self._on_sab_diag, 10)
         except Exception as e:
             self.node.get_logger().warn(f"[eclss] subscription setup failed: {e}")
 
@@ -449,6 +489,31 @@ class EclssWidget(QWidget):
                     self._recovery = val
                 elif kv.key == "voc_conversion":
                     self._voc_conv = val
+
+    def _on_sab_water(self, msg):
+        self._sab_water = msg.data
+
+    def _on_sab_diag(self, msg):
+        for status in msg.status:
+            for kv in status.values:
+                try:
+                    val = float(kv.value)
+                except (TypeError, ValueError):
+                    continue
+                if kv.key == "co2_to_sabatier_kg_day":
+                    self._sab_to = val
+                elif kv.key == "co2_vented_kg_day":
+                    self._sab_vent = val
+                elif kv.key == "co2_to_sabatier_fraction":
+                    self._sab_frac = val
+                elif kv.key == "water_kg_day" and self._sab_water is None:
+                    self._sab_water = val
+                elif kv.key == "ch4_kg_day":
+                    self._sab_ch4 = val
+                elif kv.key == "conversion":
+                    self._sab_conv = val
+                elif kv.key == "hydrogen_limited":
+                    self._sab_h2lim = val
 
     def _on_bed_states(self, msg):
         if len(msg.data) >= 12:
@@ -606,6 +671,26 @@ class EclssWidget(QWidget):
             self.meter_recovery.set_value(f"{self._recovery * 100.0:.1f}", self._recovery)
         if self._potable is not None:
             self.meter_potable.set_value(f"{self._potable:.2f}", self._potable / 9.0)
+
+        # ---- Sabatier (CO2 reduction / split) ----
+        if self._sab_to is not None:
+            h2lim = bool(self._sab_h2lim)
+            self.card_sab_to.set_value(f"{self._sab_to:.2f}")
+            self.card_sab_to.set_footer(
+                "H₂-LIMITED" if h2lim else "RECOVERED", "amber" if h2lim else "green")
+        if self._sab_vent is not None:
+            self.card_sab_vent.set_value(f"{self._sab_vent:.2f}")
+            self.card_sab_vent.set_footer("TO SPACE", "muted")
+        if self._sab_water is not None:
+            self.card_sab_water.set_value(f"{self._sab_water:.2f}")
+            self.card_sab_water.set_footer("TO WRS", "green")
+            self.meter_sab_water.set_value(f"{self._sab_water:.2f}", self._sab_water / 4.0)
+        if self._sab_conv is not None:
+            self.card_sab_conv.set_value(f"{self._sab_conv * 100.0:.1f}")
+            self.card_sab_conv.set_footer("CATALYTIC", "green")
+        if self._sab_frac is not None:
+            self.meter_sab_split.set_value(
+                f"{self._sab_frac * 100.0:.0f}", self._sab_frac)
 
     def _update_beds(self):
         """Trains: A (beds 0,1), D (beds 2,3). adsorbing_train picks which
