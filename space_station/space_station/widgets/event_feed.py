@@ -32,7 +32,7 @@ class EventFeed(QWidget):
 
         header = QLabel("EVENT FEED")
         header.setProperty("class", "label")
-        header.setFont(theme.label_font(9, tracking=2.0))
+        header.setFont(theme.label_font(11, tracking=2.0))
         header.setContentsMargins(14, 12, 14, 8)
         root.addWidget(header)
 
@@ -72,20 +72,20 @@ class EventFeed(QWidget):
         top = QHBoxLayout()
         top.setContentsMargins(0, 0, 0, 0)
         tag = QLabel(str(subsystem).upper())
-        tag.setFont(theme.label_font(8, tracking=1.5))
+        tag.setFont(theme.label_font(10, tracking=1.5))
         sev_color = theme.color(_SEV_COLOR.get(severity, "txt3"))
         tag.setStyleSheet(f"color: {sev_color}; border: none;")
         top.addWidget(tag)
         top.addStretch()
         ts = QLabel(datetime.datetime.now().strftime("%H:%M:%S"))
-        ts.setFont(theme.mono_font(8))
+        ts.setFont(theme.mono_font(10))
         ts.setStyleSheet(f"color: {theme.color('txt3')}; border: none;")
         top.addWidget(ts)
         v.addLayout(top)
 
         msg = QLabel(str(message))
         msg.setWordWrap(True)
-        msg.setFont(theme.sans_font(10))
+        msg.setFont(theme.sans_font(12))
         msg.setStyleSheet(f"color: {theme.color('txt2')}; border: none;")
         v.addWidget(msg)
         return frame

@@ -23,12 +23,12 @@ def page_header(title, subtitle, tag=""):
 
     t = QLabel(title)
     t.setProperty("class", "title")
-    t.setFont(theme.sans_font(24, bold=True))
+    t.setFont(theme.sans_font(26, bold=True))
     left.addWidget(t)
 
     s = QLabel(subtitle.upper())
     s.setProperty("class", "subtitle")
-    s.setFont(theme.label_font(9, tracking=2.5))
+    s.setFont(theme.label_font(11, tracking=2.5))
     left.addWidget(s)
     row.addLayout(left)
     row.addStretch()
@@ -36,7 +36,7 @@ def page_header(title, subtitle, tag=""):
     if tag:
         tg = QLabel(tag)
         tg.setProperty("class", "tag")
-        tg.setFont(theme.mono_font(9))
+        tg.setFont(theme.mono_font(11))
         row.addWidget(tg, 0, Qt.AlignTop)
 
     v.addLayout(row)

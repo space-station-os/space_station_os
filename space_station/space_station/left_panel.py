@@ -27,7 +27,7 @@ class LeftPanel(QWidget):
 
         header = QLabel("SSOS-NOVA")
         header.setProperty("class", "label")
-        header.setFont(theme.label_font(9, tracking=2.0, bold=True))
+        header.setFont(theme.label_font(11, tracking=2.0, bold=True))
         layout.addWidget(header)
 
         # Transcript (renders basic HTML)

@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import QTimer
 import rclpy
-from rclpy.executors import MultiThreadedExecutor
+from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 
 from space_station.video_player import VideoPlayer
@@ -92,7 +92,10 @@ class MainWindow(QMainWindow):
         rclpy.init(args=None, context=self._ros_ctx)
         self.node: Node = rclpy.create_node('space_station_gui_node',
                                             context=self._ros_ctx)
-        self.executor = MultiThreadedExecutor(context=self._ros_ctx, num_threads=4)
+        # Single-threaded: spin_once is pumped from the GUI-thread QTimer, so all
+        # subscription callbacks run in the GUI thread. This keeps Qt updates
+        # (status pill, rosters, event feed) thread-safe and reliable.
+        self.executor = SingleThreadedExecutor(context=self._ros_ctx)
         self.executor.add_node(self.node)
 
         self._ros_timer = QTimer(self)
@@ -330,19 +333,23 @@ class MainWindow(QMainWindow):
             self.roster.set_status(row, "nominal" if healthy else "fault")
 
     # ---------------- Videos ----------------
-    def _play_startup_video(self):
-        def after_video():
-            pass
+    def _play_video(self, filename):
+        """Play a bundled video (blocking) via the OpenCV VideoPlayer.
+        Crash-proof: any failure just returns so the app still proceeds."""
         try:
             if _USE_NEW_RESOURCES_API:
-                video_resource = files("space_station.assets") / "Ssos_begin.mp4"
-                with as_file(video_resource) as path:
-                    VideoPlayer(str(path), on_finished_callback=after_video).play()
+                res = files("space_station.assets") / filename
+                with as_file(res) as path:
+                    VideoPlayer(str(path)).play()
             else:
-                with pkg_resources.path("space_station.assets", "Ssos_begin.mp4") as path:
-                    VideoPlayer(str(path), on_finished_callback=after_video).play()
+                with pkg_resources.path("space_station.assets", filename) as path:
+                    VideoPlayer(str(path)).play()
         except Exception:
             pass
+
+    def _play_startup_video(self):
+        # Intro splash before the main window is shown.
+        self._play_video("Ssos_begin.mp4")
 
     # ---------------- ROS shutdown ----------------
     def _shutdown_ros(self):
@@ -365,7 +372,9 @@ class MainWindow(QMainWindow):
             pass
 
     def closeEvent(self, event):
+        # Stop ROS first (so timers/spin halt), play the exit splash, then close.
         self._shutdown_ros()
+        self._play_video("exit_vid.mp4")
         super().closeEvent(event)
 
 

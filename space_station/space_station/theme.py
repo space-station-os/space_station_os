@@ -145,14 +145,14 @@ def load_fonts():
         FONT_MONO = fixed.family()
 
 
-def mono_font(size: int = 14, bold: bool = False) -> QFont:
+def mono_font(size: int = 16, bold: bool = False) -> QFont:
     f = QFont(FONT_MONO, size)
     f.setStyleHint(QFont.Monospace)
     f.setBold(bold)
     return f
 
 
-def label_font(size: int = 11, tracking: float = 1.5, bold: bool = False) -> QFont:
+def label_font(size: int = 13, tracking: float = 1.5, bold: bool = False) -> QFont:
     """Uppercase wide-tracked label font (the signature Vast look)."""
     f = QFont(FONT_SANS, size)
     f.setBold(bold)
@@ -161,7 +161,7 @@ def label_font(size: int = 11, tracking: float = 1.5, bold: bool = False) -> QFo
     return f
 
 
-def sans_font(size: int = 13, bold: bool = False) -> QFont:
+def sans_font(size: int = 15, bold: bool = False) -> QFont:
     f = QFont(FONT_SANS, size)
     f.setBold(bold)
     return f
@@ -194,7 +194,7 @@ QMainWindow, QDialog {{
 QWidget {{
     background-color: {t['bg']};
     color: {t['txt']};
-    font-size: 14px;
+    font-size: 16px;
 }}
 
 /* ---- Cards / blocks ---- */
@@ -234,7 +234,7 @@ QFrame[class="vline"] {{
 QGroupBox {{
     margin-top: 16px;
     padding: 10px;
-    font-size: 11px;
+    font-size: 13px;
     color: {t['txt3']};
 }}
 QGroupBox::title {{
@@ -252,38 +252,38 @@ QLabel {{
 }}
 QLabel[class="label"] {{
     color: {t['txt3']};
-    font-size: 11px;
+    font-size: 13px;
 }}
 QLabel[class="metric-value"] {{
     color: {t['txt']};
     font-family: "{FONT_MONO}";
-    font-size: 34px;
+    font-size: 36px;
 }}
 QLabel[class="value"] {{
     color: {t['txt']};
     font-family: "{FONT_MONO}";
-    font-size: 17px;
+    font-size: 19px;
 }}
 QLabel[class="title"] {{
     color: {t['txt']};
-    font-size: 32px;
+    font-size: 34px;
 }}
 QLabel[class="subtitle"] {{
     color: {t['txt3']};
-    font-size: 12px;
+    font-size: 14px;
 }}
 QLabel[class="tag"] {{
     color: {t['txt2']};
     font-family: "{FONT_MONO}";
-    font-size: 12px;
+    font-size: 14px;
     border: 1px solid {t['line']};
     border-radius: 4px;
     padding: 3px 8px;
 }}
-QLabel[class="footer-green"] {{ color: {t['green']}; font-size: 12px; }}
-QLabel[class="footer-amber"] {{ color: {t['amber']}; font-size: 12px; }}
-QLabel[class="footer-red"]   {{ color: {t['red']};   font-size: 12px; }}
-QLabel[class="footer-muted"] {{ color: {t['txt3']};  font-size: 12px; }}
+QLabel[class="footer-green"] {{ color: {t['green']}; font-size: 14px; }}
+QLabel[class="footer-amber"] {{ color: {t['amber']}; font-size: 14px; }}
+QLabel[class="footer-red"]   {{ color: {t['red']};   font-size: 14px; }}
+QLabel[class="footer-muted"] {{ color: {t['txt3']};  font-size: 14px; }}
 
 /* ---- Buttons ---- */
 QPushButton {{
@@ -292,7 +292,7 @@ QPushButton {{
     border: 1px solid {t['line']};
     border-radius: 6px;
     padding: 6px 12px;
-    font-size: 13px;
+    font-size: 15px;
 }}
 QPushButton:hover {{
     color: {t['txt']};
@@ -310,7 +310,7 @@ QPushButton[class="nav-tab"] {{
     border-radius: 0px;
     color: {t['txt3']};
     padding: 8px 16px;
-    font-size: 13px;
+    font-size: 15px;
 }}
 QPushButton[class="nav-tab"]:hover {{
     color: {t['txt2']};
@@ -362,7 +362,7 @@ QHeaderView::section {{
     border: none;
     border-bottom: 1px solid {t['line']};
     padding: 6px;
-    font-size: 11px;
+    font-size: 13px;
 }}
 QTableCornerButton::section {{
     background-color: {t['bg2']};
@@ -376,7 +376,7 @@ QProgressBar {{
     border-radius: 6px;
     text-align: center;
     color: {t['txt2']};
-    font-size: 12px;
+    font-size: 14px;
 }}
 QProgressBar::chunk {{
     background-color: {t['accent']};
@@ -432,7 +432,7 @@ QTabBar::tab {{
     color: {t['txt3']};
     padding: 8px 16px;
     border: none;
-    font-size: 12px;
+    font-size: 14px;
 }}
 QTabBar::tab:selected {{
     color: {t['txt']};

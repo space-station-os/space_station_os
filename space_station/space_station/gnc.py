@@ -86,13 +86,13 @@ class GncWidget(QWidget):
         att_layout.setSpacing(8)
         att_hdr = QLabel("ATTITUDE")
         att_hdr.setProperty("class", "label")
-        att_hdr.setFont(theme.label_font(8, tracking=2.0))
+        att_hdr.setFont(theme.label_font(10, tracking=2.0))
         att_layout.addWidget(att_hdr)
         self.attitude_label = QLabel("QUAT  [0.00, 0.00, 0.00, 1.00]")
         self.angvel_label = QLabel("ω     [0.00, 0.00, 0.00] rad/s")
         for lbl in [self.attitude_label, self.angvel_label]:
             lbl.setProperty("class", "value")
-            lbl.setFont(theme.mono_font(11))
+            lbl.setFont(theme.mono_font(13))
             att_layout.addWidget(lbl)
         right_panel.addWidget(att_box)
 
@@ -104,7 +104,7 @@ class GncWidget(QWidget):
         ctl_outer.setSpacing(8)
         ctl_hdr = QLabel("CONTROL")
         ctl_hdr.setProperty("class", "label")
-        ctl_hdr.setFont(theme.label_font(8, tracking=2.0))
+        ctl_hdr.setFont(theme.label_font(10, tracking=2.0))
         ctl_outer.addWidget(ctl_hdr)
         ctl_layout = QHBoxLayout()
         for name in ["Thrust", "Reset", "Forward Sim"]:

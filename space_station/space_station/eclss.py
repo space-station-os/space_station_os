@@ -67,7 +67,8 @@ except Exception:
 
 from space_station import theme
 from space_station.widgets import (
-    MetricCard, SpecRow, TelemetryPlot, BedLoadBar, CyclePhaseBar, page_header
+    MetricCard, SpecRow, TelemetryPlot, BedLoadBar, CyclePhaseBar, MeterBar,
+    page_header
 )
 
 # --- Unit helpers / constants ---
@@ -94,16 +95,16 @@ def _stat_line(label, unit):
     row.setContentsMargins(0, 0, 0, 0)
     lab = QLabel(label.upper())
     lab.setProperty("class", "label")
-    lab.setFont(theme.label_font(8, tracking=1.5))
+    lab.setFont(theme.label_font(10, tracking=1.5))
     row.addWidget(lab)
     row.addStretch()
     val = QLabel("—")
     val.setProperty("class", "value")
-    val.setFont(theme.mono_font(13))
+    val.setFont(theme.mono_font(15))
     row.addWidget(val)
     u = QLabel(unit)
     u.setProperty("class", "label")
-    u.setFont(theme.label_font(8))
+    u.setFont(theme.label_font(10))
     row.addWidget(u)
     return row, val
 
@@ -121,12 +122,12 @@ class _Bed(QFrame):
         top = QHBoxLayout()
         top.setContentsMargins(0, 0, 0, 0)
         self.name = QLabel(name)
-        self.name.setFont(theme.label_font(9, tracking=2.0, bold=True))
+        self.name.setFont(theme.label_font(11, tracking=2.0, bold=True))
         self.name.setStyleSheet(f"color: {theme.color('txt')};")
         top.addWidget(self.name)
         top.addStretch()
         self.tag = QLabel(mode)
-        self.tag.setFont(theme.mono_font(8))
+        self.tag.setFont(theme.mono_font(10))
         top.addWidget(self.tag)
         v.addLayout(top)
 
@@ -136,12 +137,12 @@ class _Bed(QFrame):
         readout = QHBoxLayout()
         readout.setContentsMargins(0, 0, 0, 0)
         self.load = QLabel("—")
-        self.load.setFont(theme.mono_font(11))
+        self.load.setFont(theme.mono_font(13))
         self.load.setStyleSheet(f"color: {theme.color('txt2')};")
         readout.addWidget(self.load)
         readout.addStretch()
         self.temp = QLabel("—")
-        self.temp.setFont(theme.mono_font(11))
+        self.temp.setFont(theme.mono_font(13))
         self.temp.setStyleSheet(f"color: {theme.color('txt3')};")
         readout.addWidget(self.temp)
         v.addLayout(readout)
@@ -152,8 +153,12 @@ class _Bed(QFrame):
         mode = (mode or "ADS").upper()
         self._mode = mode
         self.tag.setText(mode)
-        is_des = mode == "DES"
-        color = theme.color("amber") if is_des else theme.color("txt3")
+        if mode == "ADS":
+            color = theme.color("txt3")
+        elif mode == "VAC":
+            color = theme.color("red")
+        else:  # DES (incl. regen air-save / desorb)
+            color = theme.color("amber")
         self.tag.setStyleSheet(
             f"color: {color}; border: 1px solid {theme.color('line')};"
             f" border-radius: 3px; padding: 1px 5px;"
@@ -230,7 +235,7 @@ class EclssWidget(QWidget):
         # --- Air Revitalization (ARS / 4BMS) section ---
         ars_hdr = QLabel("AIR REVITALIZATION · ARS · 4BMS")
         ars_hdr.setProperty("class", "label")
-        ars_hdr.setFont(theme.label_font(10, tracking=2.0))
+        ars_hdr.setFont(theme.label_font(12, tracking=2.0))
         root.addWidget(ars_hdr)
 
         # --- Spec row ---
@@ -251,7 +256,7 @@ class EclssWidget(QWidget):
         pcl.setContentsMargins(16, 14, 16, 14)
         plot_hdr = QLabel("CO₂ PARTIAL PRESSURE · 80 MIN")
         plot_hdr.setProperty("class", "label")
-        plot_hdr.setFont(theme.label_font(8, tracking=2.0))
+        plot_hdr.setFont(theme.label_font(10, tracking=2.0))
         pcl.addWidget(plot_hdr)
         self.plot = TelemetryPlot(
             max_points=240, y_range=(0, 4.0), setpoint=CO2_SETPOINT_TORR,
@@ -266,7 +271,7 @@ class EclssWidget(QWidget):
         scl.setSpacing(12)
         stat_hdr = QLabel("PRECOOLER / BLOWER")
         stat_hdr.setProperty("class", "label")
-        stat_hdr.setFont(theme.label_font(8, tracking=2.0))
+        stat_hdr.setFont(theme.label_font(10, tracking=2.0))
         scl.addWidget(stat_hdr)
         r1, self.val_precooler = _stat_line("Precooler Exit", "°C")
         r2, self.val_dp = _stat_line("System ΔP", "in·H₂O")
@@ -286,7 +291,7 @@ class EclssWidget(QWidget):
         ccl.setSpacing(8)
         cyc_hdr = QLabel("HALF-CYCLE PHASE")
         cyc_hdr.setProperty("class", "label")
-        cyc_hdr.setFont(theme.label_font(8, tracking=2.0))
+        cyc_hdr.setFont(theme.label_font(10, tracking=2.0))
         ccl.addWidget(cyc_hdr)
         self.cycle_bar = CyclePhaseBar()
         ccl.addWidget(self.cycle_bar)
@@ -294,7 +299,7 @@ class EclssWidget(QWidget):
         marks.setContentsMargins(0, 0, 0, 0)
         for i, m in enumerate(["0", "10", "70", "80 MIN"]):
             lab = QLabel(m)
-            lab.setFont(theme.mono_font(8))
+            lab.setFont(theme.mono_font(10))
             lab.setStyleSheet(f"color: {theme.color('txt3')};")
             if i == 0:
                 lab.setAlignment(Qt.AlignLeft)
@@ -330,7 +335,7 @@ class EclssWidget(QWidget):
         # --- Oxygen Generation (OGS) section ---
         ogs_hdr = QLabel("OXYGEN GENERATION · OGS · PEM ELECTROLYSIS")
         ogs_hdr.setProperty("class", "label")
-        ogs_hdr.setFont(theme.label_font(10, tracking=2.0))
+        ogs_hdr.setFont(theme.label_font(12, tracking=2.0))
         root.addWidget(ogs_hdr)
         self.card_o2_prod = MetricCard("O₂ Production", "—", "kg/day", "NO DATA", "muted")
         self.card_stack_v = MetricCard("Stack Voltage", "—", "V", "NO DATA", "muted")
@@ -338,11 +343,22 @@ class EclssWidget(QWidget):
         self.card_stack_t = MetricCard("Stack Temp", "—", "°C", "NO DATA", "muted")
         root.addWidget(SpecRow([self.card_o2_prod, self.card_stack_v,
                                 self.card_stack_p, self.card_stack_t]))
+        # Animated OGS meters.
+        ogs_bars = QFrame()
+        ogs_bars.setProperty("class", "card")
+        obl = QHBoxLayout(ogs_bars)
+        obl.setContentsMargins(18, 14, 18, 14)
+        obl.setSpacing(24)
+        self.meter_o2 = MeterBar("O₂ Output", "kg/day", "accent")
+        self.meter_stack_t = MeterBar("Stack Temp", "°C", "amber")
+        obl.addWidget(self.meter_o2, 1)
+        obl.addWidget(self.meter_stack_t, 1)
+        root.addWidget(ogs_bars)
 
         # --- Water Recovery (WRS) section ---
         wrs_hdr = QLabel("WATER RECOVERY · WRS · UPA + WPA")
         wrs_hdr.setProperty("class", "label")
-        wrs_hdr.setFont(theme.label_font(10, tracking=2.0))
+        wrs_hdr.setFont(theme.label_font(12, tracking=2.0))
         root.addWidget(wrs_hdr)
         self.card_potable = MetricCard("Potable Water", "—", "kg/day", "NO DATA", "muted")
         self.card_conduct = MetricCard("Conductivity", "—", "µS/cm", "NO DATA", "muted")
@@ -350,6 +366,17 @@ class EclssWidget(QWidget):
         self.card_voc = MetricCard("VOC Conversion", "—", "%", "NO DATA", "muted")
         root.addWidget(SpecRow([self.card_potable, self.card_conduct,
                                 self.card_recovery, self.card_voc]))
+        # Animated WRS meters.
+        wrs_bars = QFrame()
+        wrs_bars.setProperty("class", "card")
+        wbl = QHBoxLayout(wrs_bars)
+        wbl.setContentsMargins(18, 14, 18, 14)
+        wbl.setSpacing(24)
+        self.meter_recovery = MeterBar("Water Recovery", "%", "green")
+        self.meter_potable = MeterBar("Potable Output", "kg/day", "accent")
+        wbl.addWidget(self.meter_recovery, 1)
+        wbl.addWidget(self.meter_potable, 1)
+        root.addWidget(wrs_bars)
 
         root.addStretch()
 
@@ -552,6 +579,12 @@ class EclssWidget(QWidget):
         if self._stack_t_k is not None:
             self.card_stack_t.set_value(f"{k_to_c(self._stack_t_k):.1f}")
             self.card_stack_t.set_footer("CELL STACK", "green")
+        # OGS meters (O2 vs OGA max 9.25 kg/day; stack temp vs ~80 C span)
+        if self._o2_prod is not None:
+            self.meter_o2.set_value(f"{self._o2_prod:.2f}", self._o2_prod / 9.25)
+        if self._stack_t_k is not None:
+            tc = k_to_c(self._stack_t_k)
+            self.meter_stack_t.set_value(f"{tc:.1f}", tc / 80.0)
 
         # ---- WRS ----
         if self._potable is not None:
@@ -568,6 +601,11 @@ class EclssWidget(QWidget):
         if self._voc_conv is not None:
             self.card_voc.set_value(f"{self._voc_conv * 100.0:.1f}")
             self.card_voc.set_footer("CATALYTIC", "green")
+        # WRS meters (recovery fraction; potable vs ~9 kg/day nominal)
+        if self._recovery is not None:
+            self.meter_recovery.set_value(f"{self._recovery * 100.0:.1f}", self._recovery)
+        if self._potable is not None:
+            self.meter_potable.set_value(f"{self._potable:.2f}", self._potable / 9.0)
 
     def _update_beds(self):
         """Trains: A (beds 0,1), D (beds 2,3). adsorbing_train picks which
@@ -608,12 +646,14 @@ class EclssWidget(QWidget):
         """Drive the four bed cells directly from /ssos/ars/bed_states.
         Layout (12 floats): [load x4][tempK x4][mode x4], bed order
         [ADS A1, ADS A2, DES D1, DES D2]. mode 0=ADSORBING else regenerating."""
+        # mode code: 0=ADSORBING, 1=DESORBING, 2=AIR_SAVE, 3=VACUUM, 4=other
+        _MODE = {0: "ADS", 1: "DES", 2: "DES", 3: "VAC"}
         d = self._bed_states
         for i in range(4):
             loading = d[i]
             temp_k = d[4 + i]
             mode_code = int(round(d[8 + i]))
-            adsorbing = (mode_code == 0)
-            self.beds[i].set_mode("ADS" if adsorbing else "DES")
+            tag = _MODE.get(mode_code, "DES")
+            self.beds[i].set_mode(tag)
             self.beds[i].set_loading(max(0.0, min(1.0, loading)))
-            self.beds[i].set_temp_f(k_to_f(temp_k), hot=not adsorbing)
+            self.beds[i].set_temp_f(k_to_f(temp_k), hot=(tag != "ADS"))

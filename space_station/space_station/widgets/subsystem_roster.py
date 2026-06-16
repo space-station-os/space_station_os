@@ -42,13 +42,13 @@ class _RosterRow(QWidget):
         row.addWidget(self._dot, 0, Qt.AlignVCenter)
 
         self._name = QLabel(name.upper())
-        self._name.setFont(theme.label_font(9, tracking=1.5))
+        self._name.setFont(theme.label_font(11, tracking=1.5))
         self._name.setStyleSheet(f"color: {theme.color('txt2')};")
         row.addWidget(self._name)
         row.addStretch()
 
         self._status = QLabel("—")
-        self._status.setFont(theme.mono_font(9))
+        self._status.setFont(theme.mono_font(11))
         self._status.setStyleSheet(f"color: {theme.color('txt3')};")
         row.addWidget(self._status)
 
@@ -76,7 +76,7 @@ class SubsystemRoster(QWidget):
 
         header = QLabel("SUBSYSTEMS")
         header.setProperty("class", "label")
-        header.setFont(theme.label_font(9, tracking=2.0))
+        header.setFont(theme.label_font(11, tracking=2.0))
         header.setContentsMargins(14, 12, 14, 8)
         root.addWidget(header)
 

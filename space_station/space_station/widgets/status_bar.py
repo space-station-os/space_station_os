@@ -59,7 +59,7 @@ class _StatBlock(QWidget):
 
         self._label = QLabel(label.upper())
         self._label.setProperty("class", "label")
-        self._label.setFont(theme.label_font(8, tracking=2.0))
+        self._label.setFont(theme.label_font(10, tracking=2.0))
         v.addWidget(self._label)
 
         row = QHBoxLayout()
@@ -73,7 +73,7 @@ class _StatBlock(QWidget):
             row.addWidget(self._dot, 0, Qt.AlignVCenter)
         self._value = QLabel(value)
         self._value.setProperty("class", "value")
-        self._value.setFont(theme.mono_font(12))
+        self._value.setFont(theme.mono_font(14))
         row.addWidget(self._value)
         row.addStretch()
         v.addLayout(row)
@@ -107,7 +107,7 @@ class StatusBar(QWidget):
         # ---- Left: logo + wordmark ----
         root.addWidget(_DotGrid())
         word = QLabel("SPACE STATION OS")
-        word.setFont(theme.label_font(12, tracking=3.0, bold=True))
+        word.setFont(theme.label_font(14, tracking=3.0, bold=True))
         word.setStyleSheet(f"color: {theme.color('txt')};")
         root.addWidget(word)
         root.addStretch()

@@ -101,7 +101,7 @@ class EPSWidget(QWidget):
         for i in range(24):
             lbl = QLabel(f"B{i}: -- %")
             lbl.setAlignment(Qt.AlignCenter)
-            lbl.setFont(theme.mono_font(9))
+            lbl.setFont(theme.mono_font(11))
             lbl.setStyleSheet(self._cell_style(theme.color("panel2"), theme.color("txt2")))
             lbl.mousePressEvent = lambda e, idx=i: self._show_battery_popup(idx)
             self.battery_labels.append(lbl)

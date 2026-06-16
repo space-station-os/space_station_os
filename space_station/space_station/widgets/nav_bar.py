@@ -37,7 +37,7 @@ class NavBar(QWidget):
             btn.setProperty("class", "nav-tab")
             btn.setProperty("active", "false")
             btn.setCheckable(True)
-            btn.setFont(theme.label_font(10, tracking=2.0))
+            btn.setFont(theme.label_font(12, tracking=2.0))
             btn.setCursor(btn.cursor())
             btn.clicked.connect(lambda _checked, idx=i: self._on_click(idx))
             self._group.addButton(btn, i)

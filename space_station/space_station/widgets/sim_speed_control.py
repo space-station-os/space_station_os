@@ -21,7 +21,7 @@ class SimSpeedControl(QWidget):
 
         lab = QLabel("SIM SPEED")
         lab.setProperty("class", "label")
-        lab.setFont(theme.label_font(9, tracking=2.0))
+        lab.setFont(theme.label_font(11, tracking=2.0))
         row.addWidget(lab)
 
         self._buttons = {}

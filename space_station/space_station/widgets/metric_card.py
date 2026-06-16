@@ -26,7 +26,7 @@ class MetricCard(QFrame):
         # Label (uppercase wide-tracked)
         self.label = QLabel(str(label).upper())
         self.label.setProperty("class", "label")
-        self.label.setFont(theme.label_font(8, tracking=2.0))
+        self.label.setFont(theme.label_font(10, tracking=2.0))
         root.addWidget(self.label)
 
         # Value + unit row
@@ -36,19 +36,19 @@ class MetricCard(QFrame):
 
         self.value = QLabel(str(value))
         self.value.setProperty("class", "metric-value")
-        self.value.setFont(theme.mono_font(22))
+        self.value.setFont(theme.mono_font(24))
         value_row.addWidget(self.value, 0, Qt.AlignBottom)
 
         self.unit = QLabel(unit)
         self.unit.setProperty("class", "label")
-        self.unit.setFont(theme.label_font(9, tracking=1.0))
+        self.unit.setFont(theme.label_font(11, tracking=1.0))
         value_row.addWidget(self.unit, 0, Qt.AlignBottom)
         value_row.addStretch()
         root.addLayout(value_row)
 
         # Footer status line
         self.footer = QLabel(footer)
-        self.footer.setFont(theme.sans_font(9))
+        self.footer.setFont(theme.sans_font(11))
         root.addWidget(self.footer)
         root.addStretch()
 
