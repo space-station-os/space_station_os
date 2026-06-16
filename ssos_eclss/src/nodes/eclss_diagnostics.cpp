@@ -56,13 +56,17 @@ rclcpp::TimerBase::SharedPtr EclssDiagnostics::maybe_autostart(
   if (!node->has_parameter("autostart")) {
     node->declare_parameter("autostart", false);
   }
+  if (!node->has_parameter("autostart_delay_ms")) {
+    node->declare_parameter("autostart_delay_ms", delay_ms);
+  }
   if (!node->get_parameter("autostart").as_bool()) {
     return nullptr;
   }
+  const int delay = static_cast<int>(node->get_parameter("autostart_delay_ms").as_int());
   // Self-cancelling one-shot: configure -> activate, no ChangeState events.
   auto holder = std::make_shared<rclcpp::TimerBase::SharedPtr>();
   *holder = node->create_wall_timer(
-    std::chrono::milliseconds(delay_ms),
+    std::chrono::milliseconds(delay),
     [node, holder]() {
       (*holder)->cancel();
       RCLCPP_INFO(node->get_logger(), "autostart: configuring + activating");
