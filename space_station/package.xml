@@ -26,6 +26,8 @@
   <exec_depend>space_station_communication</exec_depend>
   <exec_depend>space_station_gnc</exec_depend>
   <exec_depend>ssos_eclss</exec_depend>
+  <exec_depend>ssos_core</exec_depend>
+  <exec_depend>ssos_sim</exec_depend>
 
   <export>
     <build_type>ament_python</build_type>
