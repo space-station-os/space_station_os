@@ -110,8 +110,10 @@ TothParams default_co2_on_13x()
   TothParams p;
   p.q_m0 = 4.30;       // mol/kg
   p.chi = 2.20;        // -
-  // Affinity calibrated so equilibrium loading at ISS ppCO2 (~2-3 torr, 22 C)
-  // is ~2 mol/kg, giving the ~140 min breakthrough onset reported in the paper.
+  // Affinity for CO2 on 13X at ISS ppCO2 (~2 torr). Kept moderate so the
+  // adsorption thermal wave stays bounded in this lumped bed-thermal model;
+  // continuous system-level CO2 removal is reported as the cyclic average (see
+  // FourBedSystem::step), not a single bed's instantaneous breakthrough.
   p.b0 = 1.4e-3;       // 1/Pa
   p.dH = 38000.0;      // J/mol
   p.t0 = 0.42;         // -

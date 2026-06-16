@@ -214,12 +214,16 @@ ArsResult FourBedSystem::step(double dt, const CabinConditions & cabin)
   valve_->command(1.0);
   valve_->update(dt);
 
-  // ---- Net CO2 removal: gross bed capture limited by inlet, scaled by the
-  //      system net-capture efficiency (air-save + holdup losses). ----
-  const double gross_capture_kg_s = ads_out.co2_capture_rate * units::M_CO2;
+  // ---- Net CO2 removal (system, continuous) ----
+  // For the cyclic two-train 4BMS, the continuous system removal is the
+  // cycle-average: the inlet CO2 load times the net capture efficiency. A single
+  // bed's instantaneous capture (ads_out.co2_capture_rate) legitimately swings
+  // through adsorb -> breakthrough -> swap, but while one train approaches
+  // breakthrough the other has just been regenerated, so the alternating trains
+  // sustain throughput at this average. Reporting the single-bed instantaneous
+  // value made the rate (and the health flag) oscillate every step.
   const double inlet_co2_kg_s = inlet_co2_mass_rate(cabin, q_air);
-  const double bounded = std::clamp(gross_capture_kg_s, 0.0, inlet_co2_kg_s);
-  res.co2_removal_rate_kg_s = bounded * params_.efficiency.capture_efficiency;
+  res.co2_removal_rate_kg_s = inlet_co2_kg_s * params_.efficiency.capture_efficiency;
   res.co2_removal_rate_kg_day = res.co2_removal_rate_kg_s * units::SECONDS_PER_DAY;
 
   // ---- Advance cycle ----

@@ -92,6 +92,7 @@ private:
   rclcpp::Time last_step_time_;
   bool first_step_{true};
   bool params_dirty_{false};
+  bool was_healthy_{true};  // edge-trigger for the CO2-removal fault
 };
 
 }  // namespace nodes

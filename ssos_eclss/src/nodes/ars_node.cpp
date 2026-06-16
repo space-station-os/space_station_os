@@ -244,17 +244,21 @@ void ArsNode::step()
     cycle_phase_pub_->publish(phase);
   }
 
-  // Fault detection.
+  // Fault detection (edge-triggered: publish a fault only when health changes,
+  // never every step, so a momentary dip can't spam the fault bus / flip state).
   bool healthy = true;
   std::string health_msg = "nominal";
   if (EclssDiagnostics::ars_co2_removal_low(last_result_.co2_removal_rate_kg_day,
                                             co2_required_kg_day_)) {
     healthy = false;
     health_msg = "CO2 removal below requirement";
+  }
+  if (!healthy && was_healthy_) {
     fault_pub_->publish(EclssDiagnostics::make_fault(
       now, "ars", "co2_removal_below_requirement",
       FaultEvent::SEVERITY_CRITICAL, health_msg, {"/ssos/ars/co2_removal_kg_day"}));
   }
+  was_healthy_ = healthy;
 
   // Heartbeat.
   heartbeat_pub_->publish(EclssDiagnostics::make_heartbeat(
