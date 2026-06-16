@@ -13,6 +13,7 @@ from space_station.widgets.event_feed import EventFeed
 from space_station.widgets.status_bar import StatusBar
 from space_station.widgets.nav_bar import NavBar
 from space_station.widgets.subsystem_roster import SubsystemRoster
+from space_station.widgets.sim_speed_control import SimSpeedControl
 from space_station.widgets.page_header import page_header
 
 __all__ = [
@@ -26,4 +27,5 @@ __all__ = [
     "StatusBar",
     "NavBar",
     "SubsystemRoster",
+    "SimSpeedControl",
 ]

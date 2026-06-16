@@ -21,7 +21,13 @@ from space_station.thermal import ThermalWidget
 from space_station.comms import CommsWidget
 
 # Mission-control shell widgets
-from space_station.widgets import StatusBar, NavBar, EventFeed, SubsystemRoster
+from space_station.widgets import (
+    StatusBar, NavBar, EventFeed, SubsystemRoster, SimSpeedControl
+)
+
+# Live parameter setting (sim speed control)
+from rcl_interfaces.srv import SetParameters
+from rcl_interfaces.msg import Parameter as RclParameter, ParameterValue, ParameterType
 
 from space_station.left_panel import LeftPanel
 from space_station.agent import SsosAIAgent
@@ -139,11 +145,22 @@ class MainWindow(QMainWindow):
         self.status_bar = StatusBar()
         root.addWidget(self.status_bar)
 
-        # --- Nav bar ---
+        # --- Nav bar (tabs left, sim-speed control right) ---
         self._nav_labels = ["Overview", "ECLSS", "GNC", "EPS", "Thermal", "Comms"]
         self.nav_bar = NavBar(self._nav_labels)
         self.nav_bar.tab_changed.connect(self._on_tab_changed)
-        root.addWidget(self.nav_bar)
+
+        nav_row = QWidget()
+        nav_row.setStyleSheet(f"background-color: {theme.color('bg2')};")
+        nrl = QHBoxLayout(nav_row)
+        nrl.setContentsMargins(0, 0, 0, 0)
+        nrl.setSpacing(0)
+        nrl.addWidget(self.nav_bar)
+        nrl.addStretch()
+        self.sim_speed = SimSpeedControl()
+        self.sim_speed.speed_changed.connect(self._on_sim_speed)
+        nrl.addWidget(self.sim_speed)
+        root.addWidget(nav_row)
 
         # --- Body: content stack + right sidebar ---
         body = QHBoxLayout()
@@ -227,6 +244,26 @@ class MainWindow(QMainWindow):
 
     def _on_tab_changed(self, idx):
         self.stack.setCurrentIndex(idx)
+
+    # ---------------- Sim speed control ----------------
+    def _on_sim_speed(self, speed):
+        """Set the simulation_controller's time_scale parameter live."""
+        if not hasattr(self, "_sim_param_client") or self._sim_param_client is None:
+            self._sim_param_client = self.node.create_client(
+                SetParameters, "/simulation_controller/set_parameters")
+        if not self._sim_param_client.service_is_ready():
+            # Sim not up yet; note it and skip (the chip still reflects intent).
+            self.event_feed.add_event(
+                "SIM", f"speed {speed:g}x pending — simulation_controller not ready",
+                "warning")
+            return
+        req = SetParameters.Request()
+        req.parameters = [RclParameter(
+            name="time_scale",
+            value=ParameterValue(type=ParameterType.PARAMETER_DOUBLE,
+                                 double_value=float(speed)))]
+        self._sim_param_client.call_async(req)
+        self.event_feed.add_event("SIM", f"sim time scale set to {speed:g}x", "info")
 
     # ---------------- Global telemetry subscriptions ----------------
     def _init_global_subs(self):

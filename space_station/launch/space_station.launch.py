@@ -55,9 +55,18 @@ def generate_launch_description():
         namespace='', output='screen')
 
     # ---- ssos_sim: simulation_controller (lifecycle) ----
+    # Seed an ISS-like cabin CO2 (~2600 ppm ~= 2 torr ppCO2) so the ARS, which
+    # reads /sim/world_state, sees a realistic load and the beds actually fill.
     sim_controller = LifecycleNode(
         package='ssos_sim', executable='simulation_controller',
-        name='simulation_controller', namespace='', output='screen')
+        name='simulation_controller', namespace='', output='screen',
+        parameters=[{
+            'ic.atmospheric_co2_ppm': 2600.0,
+            # Start at real time; the operator accelerates sim time from the GUI
+            # (SIM SPEED chips -> simulation_controller time_scale).
+            'time_scale': 1.0,
+            'sim_duration_s': 1.0e9,   # effectively run indefinitely
+        }])
 
     # Configure core + sim as soon as their processes start.
     configure_core_sim = [

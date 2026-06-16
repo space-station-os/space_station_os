@@ -24,6 +24,10 @@ SimulationController::SimulationController(const rclcpp::NodeOptions & options)
   this->declare_parameter("scenario_file", "");
   this->declare_parameter("sim_rate_hz", 10.0);
   this->declare_parameter("sim_duration_s", 300.0);
+  // Wall-time acceleration: sim time advances time_scale x faster than real time
+  // (1.0 = real time). Read live each step so it can be changed at runtime, e.g.
+  //   ros2 param set /simulation_controller time_scale 30.0
+  this->declare_parameter("time_scale", 1.0);
 
   // Initial condition parameters (defaults = ISS-like LEO)
   this->declare_parameter("ic.altitude_km", 408.0);
@@ -131,7 +135,14 @@ void SimulationController::step()
     return;
   }
 
-  double dt = 1.0 / sim_rate_hz_;
+  // Sim time advances time_scale x faster than wall time. The step timer fires
+  // at sim_rate_hz (wall), so each step advances time_scale / sim_rate_hz of sim
+  // time. time_scale is read live so it can be changed at runtime.
+  double time_scale = this->get_parameter("time_scale").as_double();
+  if (time_scale <= 0.0) {
+    time_scale = 1.0;
+  }
+  double dt = time_scale / sim_rate_hz_;
 
   // 1. Advance world model
   world_model_->step(dt);
