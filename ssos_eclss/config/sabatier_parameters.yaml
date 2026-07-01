@@ -1,0 +1,5 @@
+# Sabatier CO2-reduction reactor parameters for ssos_eclss/sabatier_node.
+sabatier_node:
+  ros__parameters:
+    use_sim_time: true
+    step_rate_hz: 1.0
