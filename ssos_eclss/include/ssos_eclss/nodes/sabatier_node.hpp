@@ -40,6 +40,8 @@ public:
   CallbackReturn on_deactivate(const rclcpp_lifecycle::State & state) override;
   CallbackReturn on_cleanup(const rclcpp_lifecycle::State & state) override;
 
+  const sabatier::SabatierResult & last_result() const { return last_result_; }
+
 private:
   void step();
   void register_with_manager();

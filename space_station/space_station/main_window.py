@@ -32,6 +32,7 @@ from rcl_interfaces.msg import Parameter as RclParameter, ParameterValue, Parame
 from space_station.left_panel import LeftPanel
 from space_station.agent import SsosAIAgent
 from space_station.param_editor import ParameterEditorDialog
+from space_station.fault_injector import FaultInjectorDialog
 
 # Global SSOS interfaces (optional — degrade gracefully if not built)
 try:
@@ -183,6 +184,21 @@ class MainWindow(QMainWindow):
         self.params_btn.clicked.connect(self._on_params_clicked)
         nrl.addWidget(self.params_btn)
 
+        # FAULT: open the fault-injection dialog (trigger a chosen ECLSS fault).
+        self.fault_btn = QPushButton("FAULT")
+        self.fault_btn.setObjectName("fault_button")
+        self.fault_btn.setCursor(Qt.PointingHandCursor)
+        self.fault_btn.setToolTip("Inject an ECLSS fault")
+        self.fault_btn.setStyleSheet(
+            f"#fault_button {{ color: {theme.color('amber')};"
+            f" background: transparent; border: 1px solid {theme.color('amber')};"
+            f" border-radius: 5px; padding: 6px 16px; font-size: 14px;"
+            f" font-weight: bold; letter-spacing: 2px; margin: 0 0 0 12px; }}"
+            f"#fault_button:hover {{ background: {theme.color('amber')};"
+            f" color: {theme.color('bg')}; }}")
+        self.fault_btn.clicked.connect(self._on_fault_clicked)
+        nrl.addWidget(self.fault_btn)
+
         # END: clean shutdown of the whole session (GUI exit -> launch Shutdown
         # tears down every ROS node, so nothing is left running).
         self.end_btn = QPushButton("END")
@@ -286,6 +302,11 @@ class MainWindow(QMainWindow):
     # ---------------- Parameter editor ----------------
     def _on_params_clicked(self):
         dlg = ParameterEditorDialog(self.node, self.executor, self)
+        dlg.exec_()
+
+    # ---------------- Fault injection ----------------
+    def _on_fault_clicked(self):
+        dlg = FaultInjectorDialog(self.node, self.executor, self)
         dlg.exec_()
 
     # ---------------- Session end ----------------

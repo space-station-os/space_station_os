@@ -147,18 +147,28 @@ holdup loss the cell model does not resolve, reproducing the paper's 0.82–0.84
 
 | Direction | Topic / service | Type |
 |-----------|-----------------|------|
-| sub | `/sim/world_state` | `WorldState` (cabin ppCO₂, temp, pressure — Epic A boundary) |
-| pub | `/ssos/ars/co2_removal_kg_day` | `std_msgs/Float64` |
+| sub | `/ssos/cabin/co2_ppm` | `std_msgs/Float64` — **live cabin ppCO₂ (closed loop, preferred)** |
+| sub | `/sim/world_state` | `WorldState` — cabin ppCO₂/temp/pressure fallback until cabin feedback arrives |
+| pub | `/ssos/ars/co2_removal_kg_day` | `std_msgs/Float64` — feeds cabin (sink) and Sabatier |
+| pub | `/ssos/ars/bed_states` | `std_msgs/Float64MultiArray` [12] — per-bed loading, solid temp, mode |
+| pub | `/ssos/ars/cycle_phase` | `std_msgs/Float64MultiArray` [3] — elapsed, half-cycle, adsorbing train |
 | pub | `/ssos/ars/diagnostics` | `diagnostic_msgs/DiagnosticArray` (scrubbed CO₂, ΔP, bed temps, blower flow, train) |
 | pub | `/ssos/ars/heartbeat` | `SubsystemHeartbeat` |
 | pub | `/ssos/fault_event` | `FaultEvent` |
 | client | `/ssos/register_subsystem` | `RegisterSubsystem` |
 
-Each tick: read cabin conditions, advance `FourBedSystem.step(dt, cabin)`,
-publish the removal rate + telemetry + heartbeat. **Fault detection:** if CO₂
-removal drops below `co2_required_kg_day` (default 4.16) it publishes a
-`co2_removal_below_requirement` `CRITICAL` fault and marks the heartbeat
-unhealthy.
+Each tick: read the live cabin ppCO₂, advance `FourBedSystem.step(dt, cabin)`
+(split into ≤5 s CFL sub-steps so the cycle tracks accelerated sim time),
+publish the removal rate + bed/cycle/diagnostic telemetry + heartbeat. Because
+removal is driven by the actual cabin ppCO₂, the cabin↔ARS pair self-regulates.
+
+**Fault detection (opt-in).** Off by default. With `enable_auto_faults:=true`,
+if CO₂ removal drops below `co2_required_kg_day` (default 4.16) the node
+publishes an edge-triggered `co2_removal_below_requirement` `CRITICAL` fault and
+marks the heartbeat unhealthy. It is off by default because, in the closed loop,
+removal settles at the crew's *current* production rate (which equals the
+requirement), so an always-on threshold there would be a knife-edge. See the
+main README §7 for the fault-injection paths.
 
 ### Parameters (mapped by `EclssParameterBridge`, validated)
 
@@ -172,18 +182,22 @@ ars.operating.{inlet_flow_scfm,inlet_ppco2_torr,ltl_inlet_temp_k,ltl_flow_gpm,
 ars.efficiency.{capture_efficiency,holdup_loss}
 ```
 
+Plus node-level parameters: `step_rate_hz` (default 10), `co2_required_kg_day`
+(4.16, fault threshold), `enable_auto_faults` (false).
+
 Static parameters (`ars.bed.*`) require a reconfigure cycle; the rest are
 live-tunable and validated (Toth `t0 ∈ (0,1]`, voidage `∈ (0,1)`, temperatures
 `> 0`, etc.) before reaching the physics.
 
 ### How it emulates the ISS unit
 
-The node reproduces the CDRA control loop: it pulls "cabin" CO₂/temperature from
-the simulator just as the real assembly samples cabin air, runs the same 10-60-10
-cycle with train swapping and heater scheduling, and reports the CO₂ removal rate
-and bed temperatures as telemetry. The physics object is identical to what could
-run on flight hardware — only the I/O boundary (ROS topics vs sensors/effectors)
-differs.
+The node reproduces the CDRA control loop: it samples the live cabin ppCO₂ (from
+`cabin_node`, just as the real assembly samples cabin air), runs the same
+10-60-10 cycle with train swapping and heater scheduling, and reports the CO₂
+removal rate and bed temperatures as telemetry. Removal is fed back into the
+cabin balance and forward to Sabatier, so the cabin↔ARS loop is closed. The
+physics object is identical to what could run on flight hardware — only the I/O
+boundary (ROS topics vs sensors/effectors) differs.
 
 ---
 

@@ -1,8 +1,10 @@
 #include "ssos_eclss/nodes/ogs_node.hpp"
 
+#include <algorithm>
 #include <functional>
 #include <vector>
 
+#include "ssos_eclss/common/units.hpp"
 #include "ssos_eclss/nodes/eclss_diagnostics.hpp"
 
 using std::placeholders::_1;
@@ -34,6 +36,8 @@ CallbackReturn OgsNode::on_configure(const rclcpp_lifecycle::State &)
   ogs_ = std::make_unique<ogs::OxygenGeneratorSystem>(params);
 
   o2_pub_ = this->create_publisher<std_msgs::msg::Float64>("/ssos/ogs/o2_kg_day", 10);
+  water_demand_pub_ = this->create_publisher<std_msgs::msg::Float64>(
+    "/ssos/ogs/water_demand_kg_day", 10);
   telemetry_pub_ = this->create_publisher<diagnostic_msgs::msg::DiagnosticArray>(
     "/ssos/ogs/diagnostics", 10);
   heartbeat_pub_ =
@@ -41,6 +45,11 @@ CallbackReturn OgsNode::on_configure(const rclcpp_lifecycle::State &)
   fault_pub_ = this->create_publisher<FaultEvent>("/ssos/fault_event", 10);
   register_client_ =
     this->create_client<RegisterSubsystem>("/ssos/register_subsystem");
+  potable_available_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+    "/ssos/wrs/potable_available_kg", 10,
+    [this](const std_msgs::msg::Float64::SharedPtr msg) {
+      potable_available_kg_ = msg->data;
+    });
   param_cb_handle_ = this->add_on_set_parameters_callback(
     std::bind(&OgsNode::on_set_parameters, this, _1));
   return CallbackReturn::SUCCESS;
@@ -70,6 +79,7 @@ rcl_interfaces::msg::SetParametersResult OgsNode::on_set_parameters(
 CallbackReturn OgsNode::on_activate(const rclcpp_lifecycle::State &)
 {
   o2_pub_->on_activate();
+  water_demand_pub_->on_activate();
   telemetry_pub_->on_activate();
   heartbeat_pub_->on_activate();
   fault_pub_->on_activate();
@@ -89,6 +99,7 @@ CallbackReturn OgsNode::on_deactivate(const rclcpp_lifecycle::State &)
     step_timer_.reset();
   }
   o2_pub_->on_deactivate();
+  water_demand_pub_->on_deactivate();
   telemetry_pub_->on_deactivate();
   heartbeat_pub_->on_deactivate();
   fault_pub_->on_deactivate();
@@ -99,9 +110,11 @@ CallbackReturn OgsNode::on_cleanup(const rclcpp_lifecycle::State &)
 {
   step_timer_.reset();
   o2_pub_.reset();
+  water_demand_pub_.reset();
   telemetry_pub_.reset();
   heartbeat_pub_.reset();
   fault_pub_.reset();
+  potable_available_sub_.reset();
   register_client_.reset();
   ogs_.reset();
   return CallbackReturn::SUCCESS;
@@ -113,18 +126,33 @@ void OgsNode::step()
   double dt = 1.0 / std::max(step_rate_hz_, 1.0e-3);
   if (!first_step_) {
     const double measured = (now - last_step_time_).seconds();
-    if (measured > 0.0 && measured < 100.0) {
+    // Honour accelerated sim time; integrated in sub-steps below.
+    if (measured > 0.0 && measured < 1.0e6) {
       dt = measured;
     }
   }
   first_step_ = false;
   last_step_time_ = now;
 
-  last_result_ = ogs_->step(dt, stack_current_a_, 1.0e9);
+  // Feedwater comes from the WRS potable bus; when the tank is empty the stack
+  // is feedwater-limited and O2 output falls. Sub-step for stack thermal stability.
+  const double available_water_mol_s =
+    std::max(0.0, potable_available_kg_) / units::M_H2O / dt;
+  constexpr double kMaxStackDt = 30.0;
+  constexpr int kMaxChunks = 240;
+  const int chunks = std::clamp(
+    static_cast<int>(std::ceil(dt / kMaxStackDt)), 1, kMaxChunks);
+  const double h = dt / static_cast<double>(chunks);
+  for (int i = 0; i < chunks; ++i) {
+    last_result_ = ogs_->step(h, stack_current_a_, available_water_mol_s);
+  }
 
   std_msgs::msg::Float64 o2;
   o2.data = last_result_.o2_production_kg_day;
   o2_pub_->publish(o2);
+  std_msgs::msg::Float64 water_demand;
+  water_demand.data = last_result_.water_consumed_kg_day;
+  water_demand_pub_->publish(water_demand);
 
   diagnostic_msgs::msg::DiagnosticArray diag;
   diag.header.stamp = now;
@@ -139,6 +167,8 @@ void OgsNode::step()
   };
   kv("o2_kg_day", last_result_.o2_production_kg_day);
   kv("h2_mol_s", last_result_.h2_production_mol_s);
+  kv("water_demand_kg_day", last_result_.water_consumed_kg_day);
+  kv("feedwater_limited", last_result_.feedwater_limited ? 1.0 : 0.0);
   kv("stack_voltage", last_result_.stack_voltage);
   kv("stack_power_w", last_result_.stack_power_w);
   kv("stack_temp_k", last_result_.stack_temperature_k);
@@ -168,8 +198,9 @@ void OgsNode::register_with_manager()
   }
   auto req = std::make_shared<RegisterSubsystem::Request>();
   req->subsystem_name = "ogs";
-  req->published_topics = {"/ssos/ogs/o2_kg_day", "/ssos/ogs/diagnostics"};
-  req->subscribed_topics = {"/sim/world_state"};
+  req->published_topics = {"/ssos/ogs/o2_kg_day", "/ssos/ogs/water_demand_kg_day",
+                           "/ssos/ogs/diagnostics"};
+  req->subscribed_topics = {"/ssos/wrs/potable_available_kg"};
   req->heartbeat_topic = "/ssos/ogs/heartbeat";
   register_client_->async_send_request(req);
 }

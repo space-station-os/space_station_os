@@ -1,0 +1,17 @@
+# Astronaut (crew) simulator parameters for ssos_eclss/crew_node.
+# Water streams per crew member per day follow the ISS water balance
+# (AIAA water-balance paper, Fig. 1); gas loads follow ICES-2021-365.
+crew_node:
+  ros__parameters:
+    use_sim_time: true
+    step_rate_hz: 1.0
+    # Sim-seconds per full diurnal cycle. 86400 = realtime; lower it to make the
+    # sleep/nominal/exercise/recovery cycle repeat faster (daily averages hold).
+    day_length_s: 86400.0
+    metabolic_scale: 1.0      # global multiplier on CO2/O2/latent (fitness/activity)
+    crew_size: 4
+    drink_kg_day: 2.20        # drinking + hygiene + food prep (from potable bus)
+    flush_kg_day: 0.30        # toilet flush (from potable bus)
+    urine_kg_day: 1.20        # urine to WRS
+    feces_water_kg_day: 0.15  # faecal water (lost)
+    trash_water_kg_day: 0.20  # wet-trash water (lost)

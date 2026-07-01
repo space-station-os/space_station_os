@@ -210,6 +210,18 @@ class EclssWidget(QWidget):
         self._conduct_us = None
         self._recovery = None
         self._voc_conv = None
+        # Crew (astronaut) telemetry
+        self._crew_activity = None
+        self._crew_co2 = None
+        self._crew_o2 = None
+        self._crew_urine = None
+        self._crew_potable_demand = None
+        self._crew_size = None
+        # Water balance (WRS inventories)
+        self._potable_avail = None
+        self._wastewater = None
+        self._days_supply = None
+        self._upa_processing = None
         # Sabatier (CO2 reduction) telemetry — closes the loop on desorbed CO2.
         self._sab_to = None       # CO2 routed to Sabatier [kg/day]
         self._sab_vent = None     # CO2 vented to space [kg/day]
@@ -239,6 +251,20 @@ class EclssWidget(QWidget):
         root.addWidget(page_header(
             "Environmental Control & Life Support",
             "Air · Oxygen · Water Recovery", "ECLSS"))
+
+        # --- Crew (metabolic) section ---
+        crew_hdr = QLabel("CREW · METABOLIC LOADS")
+        crew_hdr.setProperty("class", "label")
+        crew_hdr.setFont(theme.label_font(12, tracking=2.0))
+        root.addWidget(crew_hdr)
+        self.card_crew_activity = MetricCard("Activity", "—", "", "NO DATA", "muted")
+        self.card_crew_co2 = MetricCard("CO₂ Produced", "—", "kg/day", "NO DATA", "muted")
+        self.card_crew_o2 = MetricCard("O₂ Consumed", "—", "kg/day", "NO DATA", "muted")
+        self.card_crew_urine = MetricCard("Urine → WRS", "—", "kg/day", "NO DATA", "muted")
+        self.card_crew_potable = MetricCard("Water Demand", "—", "kg/day", "NO DATA", "muted")
+        root.addWidget(SpecRow([self.card_crew_activity, self.card_crew_co2,
+                                self.card_crew_o2, self.card_crew_urine,
+                                self.card_crew_potable]))
 
         # --- Air Revitalization (ARS / 4BMS) section ---
         ars_hdr = QLabel("AIR REVITALIZATION · ARS · 4BMS")
@@ -412,6 +438,31 @@ class EclssWidget(QWidget):
         wbl.addWidget(self.meter_potable, 1)
         root.addWidget(wrs_bars)
 
+        # --- Water balance (inventories) section ---
+        wb_hdr = QLabel("WATER BALANCE · INVENTORY")
+        wb_hdr.setProperty("class", "label")
+        wb_hdr.setFont(theme.label_font(12, tracking=2.0))
+        root.addWidget(wb_hdr)
+        self.card_potable_avail = MetricCard(
+            "Potable Available", "—", "kg", "NO DATA", "muted")
+        self.card_days_supply = MetricCard(
+            "Days of Supply", "—", "days", "NO DATA", "muted")
+        self.card_wastewater = MetricCard(
+            "Wastewater Tank", "—", "kg", "NO DATA", "muted")
+        self.card_upa = MetricCard("UPA", "—", "", "NO DATA", "muted")
+        root.addWidget(SpecRow([self.card_potable_avail, self.card_days_supply,
+                                self.card_wastewater, self.card_upa]))
+        wb_bars = QFrame()
+        wb_bars.setProperty("class", "card")
+        wbbl = QHBoxLayout(wb_bars)
+        wbbl.setContentsMargins(18, 14, 18, 14)
+        wbbl.setSpacing(24)
+        self.meter_potable_store = MeterBar("Potable Store", "kg", "accent")
+        self.meter_wastewater = MeterBar("Wastewater Tank", "kg", "amber")
+        wbbl.addWidget(self.meter_potable_store, 1)
+        wbbl.addWidget(self.meter_wastewater, 1)
+        root.addWidget(wb_bars)
+
         root.addStretch()
 
     # ----------------------------- ROS -----------------------------
@@ -449,6 +500,8 @@ class EclssWidget(QWidget):
                 self.node.create_subscription(
                     DiagnosticArray, "/ssos/sabatier/diagnostics",
                     self._on_sab_diag, 10)
+                self.node.create_subscription(
+                    DiagnosticArray, "/ssos/crew/diagnostics", self._on_crew_diag, 10)
         except Exception as e:
             self.node.get_logger().warn(f"[eclss] subscription setup failed: {e}")
 
@@ -489,6 +542,35 @@ class EclssWidget(QWidget):
                     self._recovery = val
                 elif kv.key == "voc_conversion":
                     self._voc_conv = val
+                elif kv.key == "potable_available_kg":
+                    self._potable_avail = val
+                elif kv.key == "wastewater_kg":
+                    self._wastewater = val
+                elif kv.key == "days_of_supply":
+                    self._days_supply = val
+                elif kv.key == "upa_processing":
+                    self._upa_processing = val
+
+    def _on_crew_diag(self, msg):
+        for status in msg.status:
+            for kv in status.values:
+                if kv.key == "activity":
+                    self._crew_activity = kv.value
+                    continue
+                try:
+                    val = float(kv.value)
+                except (TypeError, ValueError):
+                    continue
+                if kv.key == "co2_kg_day":
+                    self._crew_co2 = val
+                elif kv.key == "o2_kg_day":
+                    self._crew_o2 = val
+                elif kv.key == "urine_kg_day":
+                    self._crew_urine = val
+                elif kv.key == "potable_demand_kg_day":
+                    self._crew_potable_demand = val
+                elif kv.key == "crew_size":
+                    self._crew_size = val
 
     def _on_sab_water(self, msg):
         self._sab_water = msg.data
@@ -671,6 +753,47 @@ class EclssWidget(QWidget):
             self.meter_recovery.set_value(f"{self._recovery * 100.0:.1f}", self._recovery)
         if self._potable is not None:
             self.meter_potable.set_value(f"{self._potable:.2f}", self._potable / 9.0)
+
+        # ---- Crew (metabolic) ----
+        if self._crew_activity is not None:
+            self.card_crew_activity.set_value(self._crew_activity.upper())
+            hot = self._crew_activity in ("exercise", "recovery")
+            self.card_crew_activity.set_footer(
+                f"CREW {int(self._crew_size)}" if self._crew_size else "CREW",
+                "amber" if hot else "green")
+        if self._crew_co2 is not None:
+            self.card_crew_co2.set_value(f"{self._crew_co2:.2f}")
+            self.card_crew_co2.set_footer("TO CABIN", "green")
+        if self._crew_o2 is not None:
+            self.card_crew_o2.set_value(f"{self._crew_o2:.2f}")
+            self.card_crew_o2.set_footer("FROM CABIN", "green")
+        if self._crew_urine is not None:
+            self.card_crew_urine.set_value(f"{self._crew_urine:.2f}")
+            self.card_crew_urine.set_footer("TO WRS", "green")
+        if self._crew_potable_demand is not None:
+            self.card_crew_potable.set_value(f"{self._crew_potable_demand:.2f}")
+            self.card_crew_potable.set_footer("FROM POTABLE", "green")
+
+        # ---- Water balance (inventories) ----
+        if self._potable_avail is not None:
+            self.card_potable_avail.set_value(f"{self._potable_avail:.1f}")
+            self.card_potable_avail.set_footer("STORED", "green")
+            self.meter_potable_store.set_value(
+                f"{self._potable_avail:.0f}", self._potable_avail / 1000.0)
+        if self._days_supply is not None:
+            ok = self._days_supply >= 5.0
+            self.card_days_supply.set_value(f"{self._days_supply:.1f}")
+            self.card_days_supply.set_footer(
+                "NOMINAL" if ok else "LOW", "green" if ok else "amber")
+        if self._wastewater is not None:
+            self.card_wastewater.set_value(f"{self._wastewater:.1f}")
+            self.card_wastewater.set_footer("WSTA", "amber")
+            self.meter_wastewater.set_value(
+                f"{self._wastewater:.1f}", self._wastewater / 22.0)
+        if self._upa_processing is not None:
+            proc = self._upa_processing >= 0.5
+            self.card_upa.set_value("PROCESSING" if proc else "IDLE")
+            self.card_upa.set_footer("UPA", "green" if proc else "muted")
 
         # ---- Sabatier (CO2 reduction / split) ----
         if self._sab_to is not None:

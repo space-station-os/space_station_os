@@ -113,23 +113,33 @@ cleanup pattern; on activation it registers with the `system_manager`.
 
 | Direction | Topic / service | Type |
 |-----------|-----------------|------|
-| pub | `/ssos/ogs/o2_kg_day` | `std_msgs/Float64` |
-| pub | `/ssos/ogs/diagnostics` | `diagnostic_msgs/DiagnosticArray` (O₂, H₂, stack V/power/temp) |
+| sub | `/ssos/wrs/potable_available_kg` | `std_msgs/Float64` — **feedwater available from the WRS potable bus** |
+| pub | `/ssos/ogs/o2_kg_day` | `std_msgs/Float64` — feeds the cabin |
+| pub | `/ssos/ogs/water_demand_kg_day` | `std_msgs/Float64` — feedwater draw, deducted by the WRS |
+| pub | `/ssos/ogs/diagnostics` | `diagnostic_msgs/DiagnosticArray` (O₂, H₂, water demand, `feedwater_limited`, stack V/power/temp) |
 | pub | `/ssos/ogs/heartbeat` | `SubsystemHeartbeat` |
 | pub | `/ssos/fault_event` | `FaultEvent` |
 | client | `/ssos/register_subsystem` | `RegisterSubsystem` |
 
-Each tick advances the stack at the commanded current and publishes O₂
-production, H₂ rate (to Sabatier), stack voltage/power/temperature. **Fault
-detection:** O₂ production below `o2_required_kg_day` raises an `o2_production_low`
-`CRITICAL` fault and an unhealthy heartbeat.
+Each tick draws feedwater from the WRS potable bus (limited to what the tank can
+supply — if empty the stack is `feedwater_limited` and O₂ output falls), advances
+the stack at the commanded current (split into ≤30 s thermal sub-steps for
+accelerated time), and publishes O₂ production, H₂ rate (to Sabatier), water
+demand (back to the WRS) and stack V/power/temperature. Electrolysis of ~1 L of
+water per crew member per day yields ~0.9 kg O₂ — closing the loop against the
+crew's O₂ consumption.
+
+**Fault detection (opt-in).** Off by default. With `enable_auto_faults:=true`,
+O₂ production below `o2_required_kg_day` raises an `o2_production_low` `CRITICAL`
+fault and an unhealthy heartbeat.
 
 ### Parameters
 
 ```
 step_rate_hz           # node step rate [Hz]
 stack_current_a        # PSM current [A], selectable 10-46.9 (default 27 ~ 5.3 kg/day)
-o2_required_kg_day     # life-support requirement for fault detection
+o2_required_kg_day     # life-support requirement (fault threshold)
+enable_auto_faults     # opt-in threshold faults (default false)
 ```
 
 The full electrochemical parameter set (cell area, i0, R_membrane,
@@ -138,12 +148,14 @@ extended to the parameter bridge for live tuning.
 
 ### How it emulates the ISS unit
 
-The node mirrors the OGA control concept: a selectable PSM current drives a
-28-cell stack, the model returns the resulting O₂ (to cabin) and H₂ (to
-Sabatier) at the paper's rates, and the stack thermal state evolves like the
-real recirculation-loop-cooled stack. Setting `stack_current_a` to 46.9 A
-reproduces the OGA's maximum 9.25 kg/day; lower currents emulate part-load
-operation for a smaller crew.
+The node mirrors the OGA control concept: a selectable PSM current drives the
+electrolysis stack, feedwater is pulled from the potable bus (as the OGA draws
+from the WPA), the model returns the resulting O₂ (to cabin) and H₂ (to
+Sabatier), and the stack thermal state evolves like the real
+recirculation-loop-cooled stack. Setting `stack_current_a` to 46.9 A reproduces
+the OGA's maximum 9.25 kg/day; lower currents emulate part-load operation for a
+smaller crew. When the WRS potable tank runs dry the stack throttles, exactly as
+electrolysis is gated by available water on-station.
 
 ---
 

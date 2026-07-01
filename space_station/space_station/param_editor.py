@@ -1,18 +1,10 @@
 #!/usr/bin/env python3
 """Live parameter editor dialog.
 
-Discovers parameters from the running ssos nodes (simulation_controller + the
-ECLSS lifecycle nodes) via the ROS 2 parameter services and lets the operator
-edit and push them live:
-
-    /<node>/list_parameters   rcl_interfaces/srv/ListParameters
-    /<node>/get_parameters    rcl_interfaces/srv/GetParameters
-    /<node>/set_parameters    rcl_interfaces/srv/SetParameters
-
-The GUI owns a SingleThreadedExecutor pumped from a QTimer; this dialog is
-opened from a button click (Qt event context, not inside a ROS spin), so it can
-pump that executor synchronously with a bounded timeout to resolve the service
-futures without blocking the UI indefinitely.
+Discovers parameters from the running sim + ECLSS nodes via the ROS 2 parameter
+services (list/get/set_parameters) and pushes edits live. Service futures are
+resolved by pumping the GUI's executor with a bounded timeout; safe because the
+dialog runs in Qt event context, not inside a ROS spin.
 """
 import time
 

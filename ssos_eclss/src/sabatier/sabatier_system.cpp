@@ -50,13 +50,10 @@ SabatierResult SabatierSystem::step(double dt, double co2_in_mol_s, double h2_in
   // Exothermic heat release.
   r.reaction_heat_w = r.co2_consumed_mol_s * params_.kinetics.heat_of_reaction;
 
-  // Lumped reactor thermal update with a thermostatic trim heater:
-  //   dT/dt = (Q_rxn + Q_heater - UA(T - Tamb)) / C.
-  // The heater makes up the deficit between heat loss and the exotherm and adds
-  // a proportional pull toward the operating setpoint, so the reactor holds
-  // temperature (and conversion) instead of collapsing at low throughput. It
-  // never cools (>= 0); if the exotherm exceeds the loss at high throughput the
-  // heater backs off to zero and the equilibrium limit caps conversion.
+  // Lumped thermal update with thermostatic trim heater:
+  //   dT/dt = (Q_rxn + Q_heater - UA(T - Tamb)) / C
+  // Heater covers the loss/exotherm deficit plus a proportional term toward the
+  // setpoint (clamped >= 0), holding conversion at low throughput.
   const double q_loss = params_.reactor.heat_loss_coeff_w_k *
                         (reactor_temp_k_ - params_.reactor.ambient_temp_k);
   const double setpoint = params_.reactor.operating_temp_k;
@@ -98,10 +95,7 @@ ReactorParams default_reactor_params()
   p.thermal_mass_j_k = 2000.0;
   p.heat_loss_coeff_w_k = 0.5;
   p.ambient_temp_k = 295.0;
-  // Electric preheater holds the catalyst at the operating point. At flight CO2
-  // rates the exotherm (~150 W) is below the heat loss (~175 W) at 648 K, so the
-  // heater supplies the deficit; sized with margin for cold start.
-  p.trim_heater_max_w = 600.0;
+  p.trim_heater_max_w = 600.0;   // sized with margin over the ~25 W steady deficit
   p.heater_gain_w_k = 50.0;
   return p;
 }

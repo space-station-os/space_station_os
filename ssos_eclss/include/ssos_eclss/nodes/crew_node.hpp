@@ -1,7 +1,8 @@
-#ifndef SSOS_ECLSS__NODES__CABIN_NODE_HPP_
-#define SSOS_ECLSS__NODES__CABIN_NODE_HPP_
+#ifndef SSOS_ECLSS__NODES__CREW_NODE_HPP_
+#define SSOS_ECLSS__NODES__CREW_NODE_HPP_
 
 #include <memory>
+#include <vector>
 
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
@@ -9,16 +10,14 @@
 
 #include "diagnostic_msgs/msg/diagnostic_array.hpp"
 #include "std_msgs/msg/float64.hpp"
-#include "space_station_interfaces/msg/fault_event.hpp"
 #include "space_station_interfaces/msg/subsystem_heartbeat.hpp"
 #include "space_station_interfaces/srv/register_subsystem.hpp"
 
-#include "ssos_eclss/cabin/cabin_atmosphere.hpp"
-#include "ssos_eclss/cabin/leak_model.hpp"
+#include "ssos_eclss/crew/crew_simulator.hpp"
 
-// Lifecycle node for the cabin atmosphere. Closes the mass balance from crew
-// (CO2/O2), ARS (CO2 removal), OGS (O2) and leakage; publishes ppCO2, O2
-// fraction and total pressure.
+// Astronaut (crew) simulator lifecycle node. Publishes the crew's metabolic gas
+// loads (to the cabin) and water streams (to the WRS + potable bus), driven by
+// a diurnal activity schedule over sim time.
 
 namespace ssos_eclss
 {
@@ -27,62 +26,56 @@ namespace nodes
 
 using RegisterSubsystem = space_station_interfaces::srv::RegisterSubsystem;
 using SubsystemHeartbeat = space_station_interfaces::msg::SubsystemHeartbeat;
-using FaultEvent = space_station_interfaces::msg::FaultEvent;
 using CallbackReturn =
   rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
 
-class CabinNode : public rclcpp_lifecycle::LifecycleNode
+class CrewNode : public rclcpp_lifecycle::LifecycleNode
 {
 public:
-  explicit CabinNode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
+  explicit CrewNode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
 
   CallbackReturn on_configure(const rclcpp_lifecycle::State & state) override;
   CallbackReturn on_activate(const rclcpp_lifecycle::State & state) override;
   CallbackReturn on_deactivate(const rclcpp_lifecycle::State & state) override;
   CallbackReturn on_cleanup(const rclcpp_lifecycle::State & state) override;
 
-  double last_co2_ppm() const { return last_co2_ppm_; }
+  const crew::CrewOutputs & last_outputs() const { return last_outputs_; }
 
 private:
   void step();
   void register_with_manager();
   rcl_interfaces::msg::SetParametersResult on_set_parameters(
     const std::vector<rclcpp::Parameter> & params);
+  crew::CrewParams build_params() const;
 
-  std::unique_ptr<cabin::CabinAtmosphere> atmosphere_;
-  std::unique_ptr<cabin::LeakModel> leak_;
-  double last_co2_ppm_{0.0};
+  std::unique_ptr<crew::CrewSimulator> crew_;
+  crew::CrewOutputs last_outputs_{};
 
   rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float64>::SharedPtr co2_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float64>::SharedPtr o2_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float64>::SharedPtr latent_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float64>::SharedPtr urine_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float64>::SharedPtr potable_pub_;
   rclcpp_lifecycle::LifecyclePublisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr
     telemetry_pub_;
   rclcpp_lifecycle::LifecyclePublisher<SubsystemHeartbeat>::SharedPtr heartbeat_pub_;
-  rclcpp_lifecycle::LifecyclePublisher<FaultEvent>::SharedPtr fault_pub_;
   rclcpp::Client<RegisterSubsystem>::SharedPtr register_client_;
   rclcpp::TimerBase::SharedPtr step_timer_;
   rclcpp::TimerBase::SharedPtr autostart_timer_;
   OnSetParametersCallbackHandle::SharedPtr param_cb_handle_;
 
-  // Mass-balance inputs latched from topics.
-  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr crew_co2_sub_;
-  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr crew_o2_sub_;
-  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr ars_removal_sub_;
-  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr ogs_o2_sub_;
-  double crew_co2_kg_s_{0.0};
-  double crew_o2_consumption_kg_s_{0.0};
-  double ars_co2_removal_kg_s_{0.0};
-  double ogs_o2_kg_s_{0.0};
-
   double step_rate_hz_{1.0};
-  double cabin_volume_m3_{100.0};
-  double cabin_temp_c_{22.0};
-  double co2_alarm_ppm_{7000.0};
-  rclcpp::Time last_step_time_;
-  bool first_step_{true};
-  bool enable_auto_faults_{false};  // faults injected explicitly, not auto-tripped
+  double day_length_s_{86400.0};   // length of one sim "day" [s]
+  double metabolic_scale_{1.0};    // global multiplier on gas/latent rates
+  int crew_size_{4};
+  double drink_kg_day_{2.20};
+  double flush_kg_day_{0.30};
+  double urine_kg_day_{1.20};
+  double feces_water_kg_day_{0.15};
+  double trash_water_kg_day_{0.20};
 };
 
 }  // namespace nodes
 }  // namespace ssos_eclss
 
-#endif  // SSOS_ECLSS__NODES__CABIN_NODE_HPP_
+#endif  // SSOS_ECLSS__NODES__CREW_NODE_HPP_

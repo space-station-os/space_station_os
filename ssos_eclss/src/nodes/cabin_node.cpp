@@ -18,7 +18,6 @@ CabinNode::CabinNode(const rclcpp::NodeOptions & options)
 : rclcpp_lifecycle::LifecycleNode("cabin_node", options)
 {
   this->declare_parameter("step_rate_hz", step_rate_hz_);
-  this->declare_parameter("crew_size", crew_size_);
   this->declare_parameter("cabin_volume_m3", cabin_volume_m3_);
   this->declare_parameter("cabin_temp_c", cabin_temp_c_);
   this->declare_parameter("co2_alarm_ppm", co2_alarm_ppm_);
@@ -29,7 +28,6 @@ CabinNode::CabinNode(const rclcpp::NodeOptions & options)
 CallbackReturn CabinNode::on_configure(const rclcpp_lifecycle::State &)
 {
   step_rate_hz_ = this->get_parameter("step_rate_hz").as_double();
-  crew_size_ = static_cast<int>(this->get_parameter("crew_size").as_int());
   cabin_volume_m3_ = this->get_parameter("cabin_volume_m3").as_double();
   cabin_temp_c_ = this->get_parameter("cabin_temp_c").as_double();
   co2_alarm_ppm_ = this->get_parameter("co2_alarm_ppm").as_double();
@@ -39,8 +37,6 @@ CallbackReturn CabinNode::on_configure(const rclcpp_lifecycle::State &)
   cp.volume_m3 = cabin_volume_m3_;
   cp.temperature_k = units::celsius_to_kelvin(cabin_temp_c_);
   atmosphere_ = std::make_unique<cabin::CabinAtmosphere>(cp);
-  crew_ = std::make_unique<cabin::CrewMetabolicModel>(crew_size_,
-                                                      cabin::default_crew_profile());
   cabin::LeakParams lp{};
   lp.nominal_area_m2 = 1.0e-7;
   lp.discharge_coeff = 0.62;
@@ -55,8 +51,18 @@ CallbackReturn CabinNode::on_configure(const rclcpp_lifecycle::State &)
   register_client_ =
     this->create_client<RegisterSubsystem>("/ssos/register_subsystem");
 
-  // Closed-loop inputs: CO2 removed by the ARS (sink) and O2 made by the OGS
-  // (source). kg/day -> latched for the step() mass balance.
+  // Mass-balance inputs [kg/day -> kg/s]: crew CO2/O2 (source/sink), ARS CO2
+  // removal (sink) and OGS O2 (source).
+  crew_co2_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+    "/ssos/crew/co2_kg_day", 10,
+    [this](const std_msgs::msg::Float64::SharedPtr msg) {
+      crew_co2_kg_s_ = units::kg_per_day_to_kg_per_s(msg->data);
+    });
+  crew_o2_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+    "/ssos/crew/o2_consumption_kg_day", 10,
+    [this](const std_msgs::msg::Float64::SharedPtr msg) {
+      crew_o2_consumption_kg_s_ = units::kg_per_day_to_kg_per_s(msg->data);
+    });
   ars_removal_sub_ = this->create_subscription<std_msgs::msg::Float64>(
     "/ssos/ars/co2_removal_kg_day", 10,
     [this](const std_msgs::msg::Float64::SharedPtr msg) {
@@ -79,12 +85,7 @@ rcl_interfaces::msg::SetParametersResult CabinNode::on_set_parameters(
   result.successful = true;
   for (const auto & p : params) {
     const std::string & n = p.get_name();
-    if (n == "crew_size") {
-      crew_size_ = static_cast<int>(p.as_int());
-      // Rebuild the metabolic model so the new crew size takes effect live.
-      crew_ = std::make_unique<cabin::CrewMetabolicModel>(
-        crew_size_, cabin::default_crew_profile());
-    } else if (n == "co2_alarm_ppm") {
+    if (n == "co2_alarm_ppm") {
       co2_alarm_ppm_ = p.as_double();
     } else if (n == "step_rate_hz") {
       step_rate_hz_ = p.as_double();
@@ -131,8 +132,11 @@ CallbackReturn CabinNode::on_cleanup(const rclcpp_lifecycle::State &)
   heartbeat_pub_.reset();
   fault_pub_.reset();
   register_client_.reset();
+  crew_co2_sub_.reset();
+  crew_o2_sub_.reset();
+  ars_removal_sub_.reset();
+  ogs_o2_sub_.reset();
   atmosphere_.reset();
-  crew_.reset();
   leak_.reset();
   return CallbackReturn::SUCCESS;
 }
@@ -143,6 +147,8 @@ void CabinNode::step()
   double dt = 1.0 / std::max(step_rate_hz_, 1.0e-3);
   if (!first_step_) {
     const double measured = (now - last_step_time_).seconds();
+    // Cap the step: the cabin<->ARS CO2 feedback is integrated explicitly and
+    // goes unstable if a large accelerated dt is taken with a stale removal rate.
     if (measured > 0.0 && measured < 100.0) {
       dt = measured;
     }
@@ -150,18 +156,15 @@ void CabinNode::step()
   first_step_ = false;
   last_step_time_ = now;
 
-  // Crew loads + leakage drive the cabin atmosphere; the ARS removes CO2 and
-  // the OGS adds O2 (closed loop). GasFlows are molar [mol/s], so convert the
-  // ARS/OGS mass rates kg/s -> mol/s before summing.
-  const cabin::MetabolicLoads m = crew_->loads(1.0);
+  // Molar mass balance [mol/s]: crew produces CO2 / consumes O2, ARS removes
+  // CO2, OGS adds O2, plus leakage. Crew latent water is condensed by the CHX
+  // and routed to the WRS, so it does not accumulate in the cabin here.
   const cabin::GasFlows lk = leak_->leak_flows(*atmosphere_);
-  const double ars_co2_mol_s = ars_co2_removal_kg_s_ / units::M_CO2;
-  const double ogs_o2_mol_s = ogs_o2_kg_s_ / units::M_O2;
   cabin::GasFlows total{};
-  total.o2 = m.flows.o2 + ogs_o2_mol_s + lk.o2;
-  total.co2 = m.flows.co2 - ars_co2_mol_s + lk.co2;
+  total.co2 = (crew_co2_kg_s_ - ars_co2_removal_kg_s_) / units::M_CO2 + lk.co2;
+  total.o2 = (ogs_o2_kg_s_ - crew_o2_consumption_kg_s_) / units::M_O2 + lk.o2;
   total.n2 = lk.n2;
-  total.h2o = m.flows.h2o + lk.h2o;
+  total.h2o = lk.h2o;
   atmosphere_->apply_flows(dt, total);
 
   last_co2_ppm_ = atmosphere_->co2_ppm();
