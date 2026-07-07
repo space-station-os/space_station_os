@@ -98,23 +98,14 @@ add_executable(crew_node src/main/crew_main.cpp)
 target_link_libraries(crew_node eclss_ros)
 ament_target_dependencies(crew_node rclcpp rclcpp_lifecycle)
 
-# ---- Standalone validation executables (NO ROS) ----
-add_executable(ars_validation standalone/ars_validation.cpp)
-target_link_libraries(ars_validation eclss_physics)
 
-add_executable(parameter_sweep standalone/parameter_sweep.cpp)
-target_link_libraries(parameter_sweep eclss_physics)
-
-add_executable(breakthrough_curve_gen standalone/breakthrough_curve_gen.cpp)
-target_link_libraries(breakthrough_curve_gen eclss_physics)
 
 # ---- Install ----
 install(TARGETS eclss_physics eclss_ros
   ARCHIVE DESTINATION lib LIBRARY DESTINATION lib RUNTIME DESTINATION bin)
 install(TARGETS ars_node ogs_node wrs_node cabin_node sabatier_node crew_node
   RUNTIME DESTINATION lib/${PROJECT_NAME})
-install(TARGETS ars_validation parameter_sweep breakthrough_curve_gen
-  RUNTIME DESTINATION lib/${PROJECT_NAME})
+
 install(DIRECTORY include/ DESTINATION include)
 install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch)
 install(DIRECTORY config/ DESTINATION share/${PROJECT_NAME}/config)

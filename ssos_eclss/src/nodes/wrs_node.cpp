@@ -165,8 +165,11 @@ void WrsNode::step()
   double dt = 1.0 / std::max(step_rate_hz_, 1.0e-3);
   if (!first_step_) {
     const double measured = (now - last_step_time_).seconds();
-    // Honour accelerated sim time; tank integration is linear and clamped.
-    if (measured > 0.0 && measured < 1.0e6) {
+    // Sim clock drives dt: elapsed sim time, 0 when the clock is paused/frozen
+    // (freezes the tanks); tank integration is linear and clamped.
+    if (this->get_parameter("use_sim_time").as_bool()) {
+      dt = std::min(std::max(measured, 0.0), 1.0e6);
+    } else if (measured > 0.0 && measured < 1.0e6) {
       dt = measured;
     }
   }

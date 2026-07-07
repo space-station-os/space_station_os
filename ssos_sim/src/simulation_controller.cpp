@@ -138,20 +138,27 @@ void SimulationController::step()
   // Sim time advances time_scale x faster than wall time. The step timer fires
   // at sim_rate_hz (wall), so each step advances time_scale / sim_rate_hz of sim
   // time. time_scale is read live so it can be changed at runtime.
-  double time_scale = this->get_parameter("time_scale").as_double();
-  if (time_scale <= 0.0) {
-    time_scale = 1.0;
+  // time_scale <= 0 PAUSES the simulation: sim time and the world model stop
+  // advancing, but /clock and world state keep publishing (at the frozen value)
+  // so subscribers stay alive. This lets an external agent halt the sim, act,
+  // and resume by restoring a positive time_scale.
+  const double time_scale = this->get_parameter("time_scale").as_double();
+  const bool paused = (time_scale <= 0.0);
+  if (paused != paused_) {
+    paused_ = paused;
+    RCLCPP_INFO(get_logger(), "Simulation %s at T+%.1fs",
+                paused ? "PAUSED" : "RESUMED", sim_time_s_);
   }
-  double dt = time_scale / sim_rate_hz_;
+  const double dt = paused ? 0.0 : time_scale / sim_rate_hz_;
 
-  // 1. Advance world model
-  world_model_->step(dt);
-  sim_time_s_ += dt;
+  // 1. Advance world model + fault schedule only while running.
+  if (!paused) {
+    world_model_->step(dt);
+    sim_time_s_ += dt;
+    check_fault_schedule();
+  }
 
-  // 2. Check fault schedule
-  check_fault_schedule();
-
-  // 3. Publish world state
+  // 3. Publish world state (frozen when paused)
   auto ws = world_model_->get_state();
   ws.stamp = rclcpp::Clock().now();  // Use wall clock for stamp
   world_state_pub_->publish(ws);

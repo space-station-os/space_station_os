@@ -147,9 +147,12 @@ void CabinNode::step()
   double dt = 1.0 / std::max(step_rate_hz_, 1.0e-3);
   if (!first_step_) {
     const double measured = (now - last_step_time_).seconds();
-    // Cap the step: the cabin<->ARS CO2 feedback is integrated explicitly and
-    // goes unstable if a large accelerated dt is taken with a stale removal rate.
-    if (measured > 0.0 && measured < 100.0) {
+    // Sim clock drives dt: elapsed sim time, 0 when the clock is paused/frozen
+    // (freezes the atmosphere). Capped because the cabin<->ARS CO2 feedback is
+    // integrated explicitly and is unstable with a large dt + stale removal.
+    if (this->get_parameter("use_sim_time").as_bool()) {
+      dt = std::min(std::max(measured, 0.0), 100.0);
+    } else if (measured > 0.0 && measured < 100.0) {
       dt = measured;
     }
   }
