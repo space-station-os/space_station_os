@@ -1,0 +1,53 @@
+# ECLSS fault catalog. Each entry maps to a faults::FaultDefinition and can be
+# scheduled by the simulation controller via /sim/inject_fault. The 'magnitude'
+# meaning depends on the fault type (see docs/fault_catalog.md):
+#   sensor_bias/drift  -> offset / rate
+#   sensor_scale       -> multiplier
+#   heater_partial     -> surviving power fraction
+#   blower_degraded    -> residual effectiveness fraction
+#   cabin_leak         -> equivalent orifice area [m^2]
+faults:
+  ars_heater_partial:
+    type: heater_partial
+    severity: warning
+    target: ars_heater
+    magnitude: 0.368        # 7 of 19 elements survive
+    start_time_s: 600.0
+    duration_s: -1.0
+    description: "ARS regeneration heater partial element failure"
+
+  ars_blower_degraded:
+    type: blower_degraded
+    severity: warning
+    target: ars_blower
+    magnitude: 0.6
+    start_time_s: 300.0
+    duration_s: 1200.0
+    description: "ARS process blower degraded to 60% effectiveness"
+
+  ars_precooler_degraded:
+    type: precooler_degraded
+    severity: warning
+    target: ars_precooler
+    magnitude: 0.5
+    start_time_s: 0.0
+    duration_s: -1.0
+    description: "ARS precooler fouling reduces UA to 50%"
+
+  co2_sensor_drift:
+    type: sensor_drift
+    severity: warning
+    target: co2_sensor
+    magnitude: 0.05         # Pa per second
+    start_time_s: 0.0
+    duration_s: -1.0
+    description: "Cabin CO2 sensor slow drift"
+
+  cabin_micrometeoroid_leak:
+    type: cabin_leak
+    severity: critical
+    target: cabin
+    magnitude: 1.0e-5       # m^2 equivalent orifice
+    start_time_s: 1800.0
+    duration_s: -1.0
+    description: "Micrometeoroid puncture of the pressure shell"

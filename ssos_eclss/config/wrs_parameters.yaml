@@ -1,0 +1,10 @@
+# WRS (urine processor + water processor) parameters for ssos_eclss/wrs_node.
+wrs_node:
+  ros__parameters:
+    use_sim_time: true
+    step_rate_hz: 1.0
+    urine_kg_day: 6.0
+    condensate_kg_day: 3.0
+    potable_limit_us: 100.0
+    # Faults are injected explicitly (sim fault-injection), not auto-tripped.
+    enable_auto_faults: false
