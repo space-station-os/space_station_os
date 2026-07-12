@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>ssos_eclss</name>
+  <version>0.9.0</version>
+  <description>High-fidelity ECLSS physics simulation for Space Station OS</description>
+  <maintainer email="spacestationos@spacedata.co.jp">Space Station OS</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>rclcpp_lifecycle</depend>
+  <depend>space_station_interfaces</depend>
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>diagnostic_msgs</depend>
+  <depend>lifecycle_msgs</depend>
+
+  <!-- Runtime-only: used by eclss_system.launch.py for full-system bringup -->
+  <exec_depend>ssos_core</exec_depend>
+  <exec_depend>ssos_sim</exec_depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
