@@ -76,6 +76,7 @@ private:
   double sim_rate_hz_{10.0};
   double sim_duration_s_{300.0};
   double sim_time_s_{0.0};
+  bool paused_{false};  // true while time_scale <= 0 (sim time frozen)
   std::string scenario_name_;
   std::vector<ScheduledFault> fault_schedule_;
 

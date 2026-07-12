@@ -13,17 +13,15 @@ from PyQt5.QtWebSockets import QWebSocket
 import os
 from ament_index_python.packages import get_package_share_directory
 
+from space_station import theme
+from space_station.widgets import page_header
 
-DARK = """
-QGroupBox { color: white; border: 1px solid #3a3a3a; border-radius: 8px; margin-top: 14px; }
-QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; }
-QLabel { color: lightgray; }
-QListWidget { color: white; background-color: #1d1d1d; border: 1px solid #333; }
-QPushButton { background-color: #2a2a2a; color: white; border: 1px solid #444; border-radius: 6px; padding: 4px 8px; }
-QPushButton:hover { background-color: #333; }
-"""
 
-def led(on: bool, color_ok="#2f6", color_off="#555"):
+def led(on: bool, color_ok=None, color_off=None):
+    if color_ok is None:
+        color_ok = theme.color("green")
+    if color_off is None:
+        color_off = theme.color("txt3")
     c = color_ok if on else color_off
     return f"border-radius:6px; background:{c}; min-width:12px; max-width:12px; min-height:12px; max-height:12px;"
 
@@ -40,9 +38,7 @@ class CommsWidget(QWidget):
                  starlink_ws="ws://localhost:8080",
                  mapping_path: Optional[str] = None):
         super().__init__(parent)
-        self.setStyleSheet(DARK)
-        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
-        self.setMaximumHeight(360)  # keep it short
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
 
         self.node = ros_node  # optional (not used here, but consistent with the rest of your GUI)
         self.forward_url = forward_ws
@@ -82,15 +78,16 @@ class CommsWidget(QWidget):
         root.setContentsMargins(8, 8, 8, 8)
         root.setSpacing(6)
 
-        # Title
+        # Header
+        header = page_header("Communications",
+                             "Starlink Relay · Downlink / Uplink", "COMMS")
+        root.addWidget(header)
+
+        # Connection badge row
         title_row = QHBoxLayout()
-        t = QLabel("Communication System")
-        t.setFont(QFont("Arial", 16, QFont.Bold))
-        t.setStyleSheet("color:white;")
-        title_row.addWidget(t)
         title_row.addStretch()
         self.badge = QLabel("DISCONNECTED")
-        self.badge.setStyleSheet("color:white; background:#522; padding:2px 6px; border-radius:6px;")
+        self._set_badge_style(False)
         title_row.addWidget(self.badge)
         root.addLayout(title_row)
 
@@ -243,14 +240,24 @@ class CommsWidget(QWidget):
             self.led_up.setStyleSheet(led(ago <= 5))
         self._update_badge()
 
+    def _set_badge_style(self, connected: bool):
+        if connected:
+            fg = theme.color("green")
+        else:
+            fg = theme.color("red")
+        self.badge.setStyleSheet(
+            f"color:{fg}; background:{theme.color('panel2')}; "
+            f"border:1px solid {fg}; padding:2px 6px; border-radius:6px;"
+        )
+
     def _update_badge(self):
         ok = self.forward_connected
         if ok:
             self.badge.setText("OK")
-            self.badge.setStyleSheet("color:white; background:#1d3b1d; padding:2px 6px; border-radius:6px;")
+            self._set_badge_style(True)
         else:
             self.badge.setText("DISCONNECTED")
-            self.badge.setStyleSheet("color:white; background:#522; padding:2px 6px; border-radius:6px;")
+            self._set_badge_style(False)
 
     def _reconnect_all(self):
         try: self.ws_forward.close()
