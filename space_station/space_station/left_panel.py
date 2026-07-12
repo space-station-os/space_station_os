@@ -1,8 +1,9 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QTextEdit, QLabel
 )
-from PyQt5.QtGui import QFont
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import pyqtSignal
+
+from space_station import theme
 
 
 class LeftPanel(QWidget):
@@ -25,17 +26,18 @@ class LeftPanel(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
 
         header = QLabel("SSOS-NOVA")
-        header.setFont(QFont("Arial", 12, QFont.Bold))
-        header.setStyleSheet("color: white;")
+        header.setProperty("class", "label")
+        header.setFont(theme.label_font(11, tracking=2.0, bold=True))
         layout.addWidget(header)
 
         # Transcript (renders basic HTML)
         self.ai_output = QTextEdit()
         self.ai_output.setReadOnly(True)
         self.ai_output.setStyleSheet(
-            "background:#0b0b0b; color:#ddd; border:1px solid #333; font-size:12px;"
+            f"background:{theme.color('panel')}; color:{theme.color('txt2')};"
+            f" border:1px solid {theme.color('line')}; border-radius:8px; font-size:12px;"
         )
-        self.ai_output.setFixedHeight(320)
+        self.ai_output.setMinimumHeight(140)
         self.ai_output.setPlaceholderText("Ask a question below…")
         layout.addWidget(self.ai_output)
 
@@ -61,8 +63,8 @@ class LeftPanel(QWidget):
         safe = self._escape(text)
         html = (
             "<div style='margin:6px 0;'>"
-            "<span style='color:#9BEF00; font-weight:700;'>SSOS-AI:</span> "
-            f"<span style='color:#d7ffd7;'>{safe}</span>"
+            f"<span style='color:{theme.color('green')}; font-weight:700;'>SSOS-AI:</span> "
+            f"<span style='color:{theme.color('txt')};'>{safe}</span>"
             "</div>"
         )
         self.ai_output.append(html)
@@ -75,8 +77,8 @@ class LeftPanel(QWidget):
         safe = self._escape(q)
         html = (
             "<div style='margin:6px 0;'>"
-            "<span style='color:#00E5FF; font-weight:700;'>Astronaut:</span> "
-            f"<span style='color:#d0f6ff;'>{safe}</span>"
+            f"<span style='color:{theme.color('blue')}; font-weight:700;'>Astronaut:</span> "
+            f"<span style='color:{theme.color('txt2')};'>{safe}</span>"
             "</div>"
         )
         self.ai_output.append(html)
