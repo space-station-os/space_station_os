@@ -35,6 +35,14 @@ from space_station.widgets import (
 from rcl_interfaces.srv import SetParameters
 from rcl_interfaces.msg import Parameter as RclParameter, ParameterValue, ParameterType
 
+# Simulation clock (core ROS; independent of the ssos interfaces)
+try:
+    from rosgraph_msgs.msg import Clock
+    _HAVE_CLOCK = True
+except Exception:
+    Clock = None
+    _HAVE_CLOCK = False
+
 from space_station.left_panel import LeftPanel
 try:
     from space_station.agent import SsosAIAgent
@@ -393,6 +401,13 @@ class MainWindow(QMainWindow):
 
     # ---------------- Global telemetry subscriptions ----------------
     def _init_global_subs(self):
+        # Simulation clock, subscribed regardless of the ssos interfaces so the
+        # Sim Clock still runs in a minimal (sim-only) bring-up.
+        if _HAVE_CLOCK:
+            try:
+                self.node.create_subscription(Clock, "/clock", self._on_clock, 10)
+            except Exception as e:
+                self.node.get_logger().warn(f"[shell] /clock sub failed: {e}")
         if not _HAVE_SSOS_MSGS:
             self.event_feed.add_event(
                 "SHELL", "ssos interfaces not found — telemetry shell idle", "warning"
@@ -409,6 +424,10 @@ class MainWindow(QMainWindow):
                     self._on_heartbeat, 10)
         except Exception as e:
             self.node.get_logger().warn(f"[shell] global subs failed: {e}")
+
+    def _on_clock(self, msg):
+        sim_secs = msg.clock.sec + msg.clock.nanosec * 1e-9
+        QTimer.singleShot(0, lambda: self.status_bar.set_sim_clock(sim_secs))
 
     def _on_system_state(self, msg):
         state = _STATE_NAMES.get(int(msg.state), "INIT")
