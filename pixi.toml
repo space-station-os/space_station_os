@@ -59,6 +59,7 @@ pillow = "*"            # PIL, explicit
 pyyaml = "*"            # provides yaml
 python-dotenv = "*"     # provides dotenv (agent.py)
 openai = "*"            # agent.py LLM client
+casadi = ">=3.7.2,<4"
 
 # Keep the environment hermetic: ignore the user's ~/.local pip packages so the
 # GUI always uses the pinned env (avoids picking up a stray/broken local install).
