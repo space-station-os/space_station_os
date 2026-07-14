@@ -3,7 +3,9 @@
 Left:  3x3 dot-grid logo + "SPACE STATION OS" (uppercase, wide-tracked).
 Right: a row of [LABEL / value] stat blocks separated by hairlines:
        STATION (state pill w/ colored dot), CREW, ORBIT, COMMS,
-       MISSION ELAPSED (live mono clock, ticks at 1 Hz).
+       MISSION ELAPSED (wall-clock, ticks at 1 Hz) and SIM CLOCK
+       (simulation time from /clock; accelerates with time_scale, freezes
+       when the sim is paused).
 """
 
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QFrame
@@ -117,10 +119,15 @@ class StatusBar(QWidget):
         self.crew = _StatBlock("Crew", "4")
         self.orbit = _StatBlock("Orbit", "—")
         self.comms = _StatBlock("Comms", "—")
+        # Two clocks: wall-clock mission elapsed (ticks at 1 Hz), and the sim
+        # clock driven by /clock (races ahead when time_scale is increased,
+        # freezes when the sim is paused).
         self.clock = _StatBlock("Mission Elapsed", "000/00:00:00")
+        self.sim_clock = _StatBlock("Sim Clock", "000/00:00:00")
 
         for i, block in enumerate(
-            [self.station, self.crew, self.orbit, self.comms, self.clock]
+            [self.station, self.crew, self.orbit, self.comms,
+             self.clock, self.sim_clock]
         ):
             root.addWidget(self._divider())
             root.addWidget(block)
@@ -159,3 +166,10 @@ class StatusBar(QWidget):
 
     def set_comms(self, text):
         self.comms.set_value(str(text))
+
+    def set_sim_clock(self, sim_seconds):
+        """Display the simulation clock (seconds of sim time from /clock)."""
+        secs = max(0, int(sim_seconds))
+        days = secs // 86400
+        t = QTime(0, 0, 0).addSecs(secs % 86400)
+        self.sim_clock.set_value(f"{days:03d}/{t.toString('HH:mm:ss')}")
