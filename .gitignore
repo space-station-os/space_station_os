@@ -9,3 +9,5 @@ log/
 
 # pixi environment (keep pixi.toml and pixi.lock; ignore the resolved env)
 .pixi/
+.claude/
+.log
