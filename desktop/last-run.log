@@ -1,0 +1,87 @@
+✨ Pixi task (build): colcon build --symlink-install --packages-up-to space_station ssos_core ssos_sim ssos_eclss
+Starting >>> space_station_interfaces
+Starting >>> space_station_communication
+Starting >>> space_station_gnc
+Finished <<< space_station_interfaces [0.27s]
+Starting >>> ssos_core
+Starting >>> ssos_sim
+Finished <<< ssos_sim [0.07s]
+Finished <<< ssos_core [0.08s]
+Starting >>> ssos_eclss
+Finished <<< space_station_gnc [0.36s]
+Finished <<< ssos_eclss [0.12s]
+Finished <<< space_station_communication [0.64s]
+Starting >>> space_station
+Finished <<< space_station [0.63s]
+
+Summary: 7 packages finished [1.33s]
+
+✨ Pixi task (station): bash -c 'source install/setup.bash && ros2 launch space_station space_station.launch.py'
+[INFO] [launch]: All log files can be found below /home/sid/.ros/log/2026-07-14-12-19-42-643669-jarvis-39338
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [space_station-1]: process started with pid [39385]
+[INFO] [system_manager-2]: process started with pid [39387]
+[INFO] [simulation_controller-3]: process started with pid [39389]
+[INFO] [ars_node-4]: process started with pid [39406]
+[INFO] [ogs_node-5]: process started with pid [39408]
+[INFO] [wrs_node-6]: process started with pid [39411]
+[INFO] [cabin_node-7]: process started with pid [39413]
+[INFO] [sabatier_node-8]: process started with pid [39415]
+[INFO] [crew_node-9]: process started with pid [39429]
+[INFO] [launch.user]: system_manager started; configuring...
+[INFO] [launch.user]: simulation_controller started; configuring...
+[system_manager-2] [INFO] [1784011782.751563355] [system_manager]: SystemManager created (unconfigured)
+[simulation_controller-3] [INFO] [1784011782.767362600] [simulation_controller]: SimulationController created (unconfigured)
+[system_manager-2] [INFO] [1784011783.012315451] [system_manager]: Configuring...
+[simulation_controller-3] [INFO] [1784011783.014101045] [simulation_controller]: Configuring...
+[system_manager-2] [INFO] [1784011783.015099773] [system_manager]: Configured. Heartbeat timeout=5.0s, eval period=1.0s
+[simulation_controller-3] [INFO] [1784011783.016492025] [simulation_controller]: Configured. Rate=10.0Hz, duration=1000000000s, altitude=408.0km
+[space_station-1] [INFO] [1784011783.680569034] [space_station_gui_node]: [gnc] ISS structure loaded
+[space_station-1] [INFO] [1784011783.708922562] [space_station_gui_node]: [ThermalWidget] Quadrant UI Initializing (PyQtGraph)
+[space_station-1] [WARN] [1784011785.726045365] [space_station_gui_node]: [ThermalWidget] Coolant action server unavailable; skipping goal
+[INFO] [launch.user]: Activating system_manager + simulation_controller...
+[system_manager-2] [INFO] [1784011792.734458808] [system_manager]: Activating...
+[system_manager-2] [INFO] [1784011792.734489632] [system_manager]: State transition: INIT -> INIT (system_manager activated)
+[simulation_controller-3] [INFO] [1784011792.734631576] [simulation_controller]: Activating — simulation starting
+[ars_node-4] [INFO] [1784011793.775491430] [ars_node]: autostart: configuring + activating
+[ogs_node-5] [INFO] [1784011793.777629281] [ogs_node]: autostart: configuring + activating
+[sabatier_node-8] [INFO] [1784011793.780331587] [sabatier_node]: autostart: configuring + activating
+[cabin_node-7] [INFO] [1784011793.781775881] [cabin_node]: autostart: configuring + activating
+[wrs_node-6] [INFO] [1784011793.782299619] [wrs_node]: autostart: configuring + activating
+[crew_node-9] [INFO] [1784011793.788133489] [crew_node]: autostart: configuring + activating
+[ars_node-4] [INFO] [1784011793.789005412] [ars_node]: ARS configured (design CO2 removal 4.26 kg/day)
+[ars_node-4] [INFO] [1784011793.789222267] [ars_node]: ARS activated
+[system_manager-2] [INFO] [1784011793.790015514] [system_manager]: Registered subsystem 'ars' (heartbeat: /ssos/ars/heartbeat)
+[system_manager-2] [INFO] [1784011793.790045312] [system_manager]: State transition: INIT -> DEGRADED (degraded subsystems: ars)
+[system_manager-2] [INFO] [1784011793.792776598] [system_manager]: Registered subsystem 'ogs' (heartbeat: /ssos/ogs/heartbeat)
+[system_manager-2] [INFO] [1784011793.793647660] [system_manager]: Registered subsystem 'sabatier' (heartbeat: /ssos/sabatier/heartbeat)
+[system_manager-2] [INFO] [1784011793.795528024] [system_manager]: Registered subsystem 'wrs' (heartbeat: /ssos/wrs/heartbeat)
+[system_manager-2] [INFO] [1784011793.795758191] [system_manager]: Registered subsystem 'cabin' (heartbeat: /ssos/cabin/heartbeat)
+[system_manager-2] [INFO] [1784011793.796901345] [system_manager]: Registered subsystem 'crew' (heartbeat: /ssos/crew/heartbeat)
+[system_manager-2] [INFO] [1784011794.797133908] [system_manager]: State transition: DEGRADED -> NOMINAL (all subsystems active and healthy)
+[INFO] [space_station-1]: process has finished cleanly [pid 39385]
+[INFO] [launch]: process[space_station-1] was required: shutting down launched system
+[INFO] [crew_node-9]: sending signal 'SIGINT' to process[crew_node-9]
+[INFO] [sabatier_node-8]: sending signal 'SIGINT' to process[sabatier_node-8]
+[INFO] [cabin_node-7]: sending signal 'SIGINT' to process[cabin_node-7]
+[INFO] [wrs_node-6]: sending signal 'SIGINT' to process[wrs_node-6]
+[INFO] [ogs_node-5]: sending signal 'SIGINT' to process[ogs_node-5]
+[INFO] [ars_node-4]: sending signal 'SIGINT' to process[ars_node-4]
+[INFO] [simulation_controller-3]: sending signal 'SIGINT' to process[simulation_controller-3]
+[INFO] [system_manager-2]: sending signal 'SIGINT' to process[system_manager-2]
+[crew_node-9] [INFO] [1784011866.839626093] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[sabatier_node-8] [INFO] [1784011866.840651206] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[cabin_node-7] [INFO] [1784011866.841508652] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[wrs_node-6] [INFO] [1784011866.842364855] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[ogs_node-5] [INFO] [1784011866.843194176] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[ars_node-4] [INFO] [1784011866.843703451] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[simulation_controller-3] [INFO] [1784011866.844061373] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[system_manager-2] [INFO] [1784011866.844433853] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[INFO] [crew_node-9]: process has finished cleanly [pid 39429]
+[INFO] [sabatier_node-8]: process has finished cleanly [pid 39415]
+[INFO] [cabin_node-7]: process has finished cleanly [pid 39413]
+[INFO] [ogs_node-5]: process has finished cleanly [pid 39408]
+[INFO] [system_manager-2]: process has finished cleanly [pid 39387]
+[INFO] [simulation_controller-3]: process has finished cleanly [pid 39389]
+[INFO] [ars_node-4]: process has finished cleanly [pid 39406]
+[INFO] [wrs_node-6]: process has finished cleanly [pid 39411]

@@ -1,0 +1,18 @@
+✔ The default environment has been installed.
+✨ Pixi task (build): colcon build --symlink-install --packages-up-to space_station ssos_core ssos_sim ssos_eclss
+Starting >>> space_station_interfaces
+Starting >>> space_station_communication
+Starting >>> space_station_gnc
+Finished <<< space_station_interfaces [0.30s]
+Starting >>> ssos_core
+Starting >>> ssos_sim
+Finished <<< ssos_core [0.07s]
+Finished <<< ssos_sim [0.07s]
+Starting >>> ssos_eclss
+Finished <<< space_station_gnc [0.38s]
+Finished <<< ssos_eclss [0.12s]
+Finished <<< space_station_communication [0.74s]
+Starting >>> space_station
+Finished <<< space_station [0.75s]
+
+Summary: 7 packages finished [1.55s]

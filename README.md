@@ -27,6 +27,24 @@ in [docs/PIXI.md](docs/PIXI.md). Linux (`linux-64`) is supported first.
 
 ---
 
+##  Install as a Desktop App (Ubuntu)
+
+Prefer clicking an icon over the terminal? Install a desktop shortcut that
+launches the full mission-control stack. Requires [pixi](https://pixi.sh).
+
+```bash
+cd space_station_os
+bash desktop/install.sh
+```
+
+A progress popup runs `pixi install` + `pixi run build`, then places a
+**Space Station OS** icon on your Desktop. Double-click it to launch (on the
+first launch, if GNOME warns, right-click the icon and choose "Allow Launching").
+Uninstall with `bash desktop/uninstall.sh`. Full details in
+[docs/DESKTOP_APP.md](docs/DESKTOP_APP.md).
+
+---
+
 ##  Quick Start with Docker (with GUI support)
 
 If you prefer not to build everything locally, use our **prebuilt Docker image** to get up and running instantly — including GUI support for the astronaut simulation.
