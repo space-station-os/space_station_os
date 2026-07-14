@@ -1,0 +1,73 @@
+# Reproducible build + run environment for Space Station OS.
+#
+# ROS 2 Jazzy is provided by the RoboStack conda channel, so no system ROS
+# install, apt, or rosdep is required. Everything (ROS, build tools, and the
+# GUI's Python deps) is pinned by pixi.lock.
+#
+# Quick start (Linux):
+#   pixi install          # resolve + fetch the environment
+#   pixi run build        # colcon build the SSOS packages
+#   pixi run station      # launch the full stack (GUI + core + sim + eclss)
+#
+# Scope: the current SSOS stack -- space_station (GUI), ssos_core, ssos_sim,
+# ssos_eclss. See docs/PIXI.md.
+
+[workspace]
+name = "space-station-os"
+version = "0.8.9"
+description = "Space Station OS -- reproducible ROS 2 Jazzy build/run environment (RoboStack)"
+channels = ["https://prefix.dev/robostack-jazzy", "conda-forge"]
+platforms = ["linux-64"]
+
+[dependencies]
+# ---- ROS 2 Jazzy (RoboStack) ----
+ros-jazzy-ros-base = "*"
+ros-jazzy-rclcpp = "*"
+ros-jazzy-rclpy = "*"
+ros-jazzy-rclcpp-lifecycle = "*"
+ros-jazzy-rclcpp-action = "*"
+ros-jazzy-lifecycle-msgs = "*"
+ros-jazzy-diagnostic-msgs = "*"
+ros-jazzy-std-msgs = "*"
+ros-jazzy-sensor-msgs = "*"
+ros-jazzy-geometry-msgs = "*"
+ros-jazzy-rosgraph-msgs = "*"
+ros-jazzy-rosidl-default-generators = "*"
+ros-jazzy-rosidl-default-runtime = "*"
+ros-jazzy-ament-cmake = "*"
+ros-jazzy-ament-cmake-gtest = "*"
+ros-jazzy-launch = "*"
+ros-jazzy-launch-ros = "*"
+
+# ---- build tooling ----
+colcon-common-extensions = "*"
+cmake = "*"
+ninja = "*"
+cxx-compiler = "*"
+c-compiler = "*"
+pkg-config = "*"
+
+# ---- mission-control GUI (Python) ----
+pyqt = "*"              # PyQt5
+pyqtgraph = "*"
+pyopengl = "*"
+trimesh = "*"
+numpy = "*"
+opencv = "*"            # provides cv2
+matplotlib-base = "*"   # eps.py; pulls pillow (PIL)
+pillow = "*"            # PIL, explicit
+pyyaml = "*"            # provides yaml
+python-dotenv = "*"     # provides dotenv (agent.py)
+openai = "*"            # agent.py LLM client
+
+# Keep the environment hermetic: ignore the user's ~/.local pip packages so the
+# GUI always uses the pinned env (avoids picking up a stray/broken local install).
+[activation.env]
+PYTHONNOUSERSITE = "1"
+
+[tasks]
+build = "colcon build --symlink-install --packages-up-to space_station ssos_core ssos_sim ssos_eclss"
+test = { cmd = "colcon test --packages-select ssos_eclss && colcon test-result --verbose", depends-on = ["build"] }
+station = { cmd = "bash -c 'source install/setup.bash && ros2 launch space_station space_station.launch.py'", depends-on = ["build"] }
+gui = { cmd = "bash -c 'source install/setup.bash && ros2 run space_station space_station'", depends-on = ["build"] }
+clean = "rm -rf build install log"

@@ -10,6 +10,23 @@ https://github.com/user-attachments/assets/5b82c516-075d-44ac-b440-fb73bedc1e91
 
 ---
 
+##  Quick Start with pixi (reproducible local build)
+
+[pixi](https://pixi.sh) gives you a pinned ROS 2 Jazzy environment (via
+[RoboStack](https://robostack.github.io)) with no system ROS, `apt`, or `rosdep`.
+From a clean checkout:
+
+```bash
+pixi install        # resolve + fetch ROS 2 Jazzy + build tools + GUI deps
+pixi run build      # colcon build space_station, ssos_core, ssos_sim, ssos_eclss
+pixi run station    # launch the full stack (GUI + core + sim + eclss)
+```
+
+Other tasks: `pixi run gui`, `pixi run test`, `pixi run clean`. Scope and details
+in [docs/PIXI.md](docs/PIXI.md). Linux (`linux-64`) is supported first.
+
+---
+
 ##  Quick Start with Docker (with GUI support)
 
 If you prefer not to build everything locally, use our **prebuilt Docker image** to get up and running instantly — including GUI support for the astronaut simulation.
@@ -97,7 +114,7 @@ source install/setup.bash
 To quickly run the entire space station 
 
 ```bash
-ros2 launch space_station space_station.launch.py"
+ros2 launch space_station space_station.launch.py
 ```
 
 To run OpenMCT (open http://localhost:9097)
