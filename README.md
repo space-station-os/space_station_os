@@ -1,16 +1,40 @@
-# **Space Station OS – Setup & Demo Guide**
-
-
+# Space Station OS
 
 https://github.com/user-attachments/assets/5b82c516-075d-44ac-b440-fb73bedc1e91
 
-
-
 [![CI](https://github.com/space-station-os/space_station_os/actions/workflows/ci.yml/badge.svg)](https://github.com/space-station-os/space_station_os/actions/workflows/ci.yml)
+
+Space Station OS (SSOS) is an open-source simulation of a crewed space station and
+its subsystems, built on ROS 2. It models the closed-loop physics of life support,
+power, thermal, GNC, and communications, coordinated by a shared core and a
+simulation controller, and visualized through a mission-control GUI.
+
+The goal is a realistic, extensible platform for people building, researching, or
+learning about space stations and their subsystems.
 
 ---
 
-##  Quick Start with pixi (reproducible local build)
+## Repository layout
+
+| Package | What it is |
+|---------|------------|
+| `ssos_core` | System manager: global state model, subsystem registration, fault aggregation |
+| `ssos_sim` | Simulation controller: world model, sim clock, scenario loading, fault injection |
+| `ssos_eclss` | High-fidelity ECLSS physics (ARS / WRS / OGS, crew, closed loop) |
+| `space_station` | Mission-control GUI and the top-level launch files |
+
+### Legacy Systems
+| `space_station_eclss` | Environmental Control and Life Support System |
+| `space_station_eps` | Electrical Power System |
+| `space_station_gnc` | Guidance, Navigation and Control |
+| `space_station_thermal_control` | Active Thermal Control System |
+| `space_station_communication` | Communications |
+| `space_station_interfaces` | Shared ROS 2 messages, services, and actions |
+| `space_station_mission_control` | OpenMCT dashboards and the OpenMCT-ROS bridge |
+
+---
+
+## Quick Start with pixi (reproducible local build)
 
 [pixi](https://pixi.sh) gives you a pinned ROS 2 Jazzy environment (via
 [RoboStack](https://robostack.github.io)) with no system ROS, `apt`, or `rosdep`.
@@ -22,14 +46,30 @@ pixi run build      # colcon build space_station, ssos_core, ssos_sim, ssos_ecls
 pixi run station    # launch the full stack (GUI + core + sim + eclss)
 ```
 
-Other tasks: `pixi run gui`, `pixi run test`, `pixi run clean`. Scope and details
-in [docs/PIXI.md](docs/PIXI.md). Linux (`linux-64`) is supported first.
+---
+
+## Install as a Desktop App (Ubuntu)
+
+Prefer clicking an icon over the terminal? Install a desktop shortcut that
+launches the full mission-control stack. Requires [pixi](https://pixi.sh).
+
+```bash
+cd space_station_os
+bash desktop/install.sh
+```
+
+A progress popup runs `pixi install` + `pixi run build`, then places a
+**Space Station OS** icon on your Desktop. Double-click it to launch (on the
+first launch, if GNOME warns, right-click the icon and choose "Allow Launching").
+Uninstall with `bash desktop/uninstall.sh`. Full details in
+[docs/DESKTOP_APP.md](docs/DESKTOP_APP.md).
 
 ---
 
-##  Quick Start with Docker (with GUI support)
+## Quick Start with Docker (with GUI support)
 
-If you prefer not to build everything locally, use our **prebuilt Docker image** to get up and running instantly — including GUI support for the astronaut simulation.
+If you prefer not to build locally, use the prebuilt Docker image, including GUI
+support for the simulation.
 
 ### 1. Pull the image
 
@@ -39,19 +79,15 @@ docker pull ghcr.io/space-station-os/space_station_os:latest
 
 > Docker must be installed and running. No need to install ROS 2 or dependencies manually.
 
----
-
 ### 2. Allow GUI access
 
-Before running the container, allow local Docker containers to access your X server:
+Allow local Docker containers to reach your X server:
 
 ```bash
 xhost +local:root
 ```
 
----
-
-### 3. Run the container with GUI support
+### 3. Run the container
 
 ```bash
 docker run -it --rm \
@@ -65,66 +101,80 @@ docker run -it --rm \
 
 ---
 
-##  Local Installation (Build from Source)
+## Build from source
 
-Use this method if you want to modify the source code or don't want to use Docker.
+Use this if you want to modify the code and are not using pixi or Docker.
 
 ### Prerequisites
 
-* **OS:** Ubuntu 22.04
-* **ROS 2:** Humble (Desktop)
-  → [ROS 2 Installation Guide](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html)
+* **OS:** Ubuntu 24.04
+* **ROS 2:** Jazzy (Desktop)
+  -> [ROS 2 Jazzy installation guide](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html)
 
-### 1. Create a ROS 2 workspace
+### 1. Create a workspace and clone
 
 ```bash
 mkdir -p ~/ssos_ws/src
 cd ~/ssos_ws/src
-```
-
-### 2. Clone the super-repository with submodules
-
-```bash
 git clone https://github.com/space-station-os/space_station_os.git
-cd space_station_os
 ```
 
-### 3. Build the workspace
-
-Go back to the workspace root and build everything:
+### 2. Install dependencies and build
 
 ```bash
 cd ~/ssos_ws
-colcon build --symlink-install
-sudo rosdep init
-rosdep update 
+sudo rosdep init      # first time only; skip if already initialized
+rosdep update
 rosdep install --from-paths src --ignore-src -r -y
+colcon build --symlink-install
 source install/setup.bash
 ```
 
-> Always source the workspace before running ROS 2 commands:
+> Source the workspace in every new terminal before running ROS 2 commands:
 >
 > ```bash
 > source ~/ssos_ws/install/setup.bash
 > ```
 
 ---
-# TO RUN THE DEMOS
 
-To quickly run the entire space station 
+## Running the simulation
+
+Launch the full space station (New systems following SSOS 2026 architecture):
 
 ```bash
 ros2 launch space_station space_station.launch.py
 ```
 
-To run OpenMCT (open http://localhost:9097)
+Or launch a single subsystem (Legacy systems):
+
+```bash
+ros2 launch space_station eclss.launch.py
+ros2 launch space_station eps.launch.py
+ros2 launch space_station gnc.launch.py
+ros2 launch space_station thermals.launch.py
+```
+
+### OpenMCT dashboard
+
+To run the OpenMCT bridge (then open http://localhost:9097):
 
 ```bash
 ./open_mct-bridge.sh
 ```
 
-([Check out our wiki](https://github.com/space-station-os/space_station_os/wiki))
-##  Contributing
+---
 
-See the project backlog:
-[Space Station OS – Project Board](https://github.com/orgs/space-station-os/projects/2/views/1)
+## Documentation
+
+* [docs/PIXI.md](docs/PIXI.md) - reproducible pixi build and run
+* [docs/DESKTOP_APP.md](docs/DESKTOP_APP.md) - desktop app install and updates
+* [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) - how to contribute
+* [Project wiki](https://github.com/space-station-os/space_station_os/wiki)
+
+---
+
+## Contributing
+
+See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) and the project backlog:
+[Space Station OS - Project Board](https://github.com/orgs/space-station-os/projects/2/views/1)

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Space Station OS
+GenericName=Mission Control
+Comment=Space Station OS mission control (ECLSS + simulation)
+Exec=@LAUNCHER@
+Icon=@ICON@
+Terminal=false
+Categories=Science;Education;Engineering;
+Keywords=space;station;eclss;ros2;simulation;
+StartupNotify=true
