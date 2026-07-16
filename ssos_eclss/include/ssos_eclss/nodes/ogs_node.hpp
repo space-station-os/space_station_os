@@ -52,15 +52,11 @@ private:
   ogs::OgsResult last_result_{};
 
   rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float64>::SharedPtr o2_pub_;
-  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float64>::SharedPtr water_demand_pub_;
   rclcpp_lifecycle::LifecyclePublisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr
     telemetry_pub_;
   rclcpp_lifecycle::LifecyclePublisher<SubsystemHeartbeat>::SharedPtr heartbeat_pub_;
   rclcpp_lifecycle::LifecyclePublisher<FaultEvent>::SharedPtr fault_pub_;
   rclcpp::Client<RegisterSubsystem>::SharedPtr register_client_;
-  // Feedwater available from the WRS potable bus [kg].
-  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr potable_available_sub_;
-  double potable_available_kg_{0.0};
   rclcpp::TimerBase::SharedPtr step_timer_;
   rclcpp::TimerBase::SharedPtr autostart_timer_;
   OnSetParametersCallbackHandle::SharedPtr param_cb_handle_;

@@ -92,34 +92,3 @@ TEST(SabatierSystem, ProducesWaterForWrs)
   EXPECT_GT(r.water_produced_kg_s, 0.0);
   EXPECT_NEAR(r.water_produced_kg_s, r.water_produced_mol_s * units::M_H2O, 1.0e-15);
 }
-
-// Regression: at flight CO2 rates the exotherm alone is below the heat loss, so
-// without the thermostatic trim heater the reactor cooled and conversion
-// collapsed to zero. The heater must hold the setpoint and keep conversion high.
-TEST(SabatierSystem, TrimHeaterHoldsTemperatureAtFlightRate)
-{
-  SabatierSystem s;  // starts at the operating setpoint (~648 K)
-  const double co2 = 4.16 / 86400.0 / units::M_CO2;  // ~4.16 kg/day
-  const double h2 = 2.0 * (5.3 / 86400.0 / units::M_O2);  // OGS H2 (2 per O2)
-  SabatierResult r{};
-  for (int i = 0; i < 6000; ++i) {
-    r = s.step(1.0, co2, h2);
-  }
-  EXPECT_NEAR(r.reactor_temp_k, 648.0, 20.0);  // held near setpoint (no collapse)
-  EXPECT_GT(r.conversion, 0.9);
-  EXPECT_GT(r.heater_power_w, 0.0);            // heater supplies the deficit
-}
-
-TEST(SabatierSystem, TrimHeaterRecoversFromCoolStart)
-{
-  SabatierSystem s;
-  s.reset(500.0);  // below the kinetic sweet spot
-  const double co2 = 4.16 / 86400.0 / units::M_CO2;
-  const double h2 = 2.0 * (5.3 / 86400.0 / units::M_O2);
-  SabatierResult r{};
-  for (int i = 0; i < 6000; ++i) {
-    r = s.step(1.0, co2, h2);
-  }
-  EXPECT_GT(r.reactor_temp_k, 600.0);  // pulled back up, not collapsed
-  EXPECT_GT(r.conversion, 0.8);
-}

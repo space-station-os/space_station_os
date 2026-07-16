@@ -24,7 +24,7 @@ setup(
         ],
     },
     include_package_data=True,
-    install_requires=['setuptools', 'pyqtgraph', 'trimesh'],
+    install_requires=['setuptools'],
     zip_safe=True,
     maintainer='siddarth',
     maintainer_email='siddarth.dayasagar@gmail.com',
