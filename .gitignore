@@ -11,3 +11,8 @@ log/
 .pixi/
 .claude/
 .log
+
+# local app log files
+desktop/install.log
+desktop/last-run.log
+desktop/space-station-os.desktop.in
