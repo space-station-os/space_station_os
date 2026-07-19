@@ -2,7 +2,7 @@ import os
 import sys
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget,
-    QFrame, QApplication, QScrollArea, QPushButton
+    QFrame, QApplication, QScrollArea, QPushButton, QLabel
 )
 from PyQt5.QtCore import QTimer, Qt
 import rclpy
@@ -18,7 +18,13 @@ from space_station.eclss import EclssWidget
 from space_station.gnc import GncWidget
 from space_station.eps import EPSWidget
 from space_station.thermal import ThermalWidget
-from space_station.comms import CommsWidget
+try:
+    from space_station.comms import CommsWidget
+    _COMMS_IMPORT_ERROR = None
+except Exception as exc:
+    CommsWidget = None
+    _COMMS_IMPORT_ERROR = exc
+
 
 # Mission-control shell widgets
 from space_station.widgets import (
@@ -38,7 +44,12 @@ except Exception:
     _HAVE_CLOCK = False
 
 from space_station.left_panel import LeftPanel
-from space_station.agent import SsosAIAgent
+try:
+    from space_station.agent import SsosAIAgent
+    _AI_IMPORT_ERROR = None
+except Exception as exc:
+    SsosAIAgent = None
+    _AI_IMPORT_ERROR = exc
 from space_station.param_editor import ParameterEditorDialog
 from space_station.fault_injector import FaultInjectorDialog
 
@@ -125,17 +136,42 @@ class MainWindow(QMainWindow):
         # ---- Global mission-control telemetry (shell-level subscriptions) ----
         self._init_global_subs()
 
-        # --- AI Agent wiring (preserved) ---
-        self.ai_agent = SsosAIAgent(
-            self.node,
-            base_url=os.environ.get("SSOS_LLM_BASE_URL",
-                                    "https://integrate.api.nvidia.com/v1"),
-            model=os.environ.get("SSOS_LLM_MODEL", "openai/gpt-oss-20b"),
-            api_key=os.environ.get("NVIDIA_API_KEY"),
-            request_timeout_s=10.0,
-        )
-        self.left_panel.ask_ai.connect(self.ai_agent.ask)
-        self.ai_agent.ai_reply.connect(self.left_panel.append_ai_response)
+        # --- Optional AI Agent wiring ---
+        self.ai_agent = None
+        try:
+            if SsosAIAgent is None:
+                raise RuntimeError(
+                    f"AI agent import failed: {_AI_IMPORT_ERROR}"
+                )
+
+            self.ai_agent = SsosAIAgent(
+                self.node,
+                base_url=os.environ.get(
+                    "SSOS_LLM_BASE_URL",
+                    "https://integrate.api.nvidia.com/v1",
+                ),
+                model=os.environ.get(
+                    "SSOS_LLM_MODEL",
+                    "openai/gpt-oss-20b",
+                ),
+                api_key=os.environ.get("NVIDIA_API_KEY"),
+                request_timeout_s=10.0,
+            )
+            self.left_panel.ask_ai.connect(self.ai_agent.ask)
+            self.ai_agent.ai_reply.connect(
+                self.left_panel.append_ai_response
+            )
+        except Exception as exc:
+            self.node.get_logger().warn(f"[ai] disabled: {exc}")
+            self.left_panel.append_ai_response(
+                "NOVA is disabled. Install the optional OpenAI client and "
+                "set NVIDIA_API_KEY to enable AI assistance."
+            )
+            self.left_panel.ask_ai.connect(
+                lambda _question: self.left_panel.append_ai_response(
+                    "NOVA is currently unavailable."
+                )
+            )
 
         # Startup splash
         self._play_startup_video()
@@ -235,7 +271,26 @@ class MainWindow(QMainWindow):
         self.gnc_panel = GncWidget(self.node)
         self.eps_panel = EPSWidget(self.node)
         self.thermal_panel = ThermalWidget(self.node)
-        self.comms_panel = CommsWidget(self.node)
+        try:
+            if CommsWidget is None:
+                raise RuntimeError(
+                    f"Comms panel import failed: {_COMMS_IMPORT_ERROR}"
+                )
+
+            self.comms_panel = CommsWidget(self.node)
+        except Exception as exc:
+            self.node.get_logger().warn(f"[comms] disabled: {exc}")
+
+            self.comms_panel = QWidget()
+            comms_layout = QVBoxLayout(self.comms_panel)
+
+            comms_label = QLabel(
+                "Live communications monitoring is unavailable."
+            )
+            comms_label.setWordWrap(True)
+
+            comms_layout.addWidget(comms_label)
+            comms_layout.addStretch()
         self.overview_panel = OverviewWidget(self.node)
 
         self.stack.addWidget(self.overview_panel)  # 0 Overview

@@ -39,9 +39,6 @@ public:
   CallbackReturn on_cleanup(const rclcpp_lifecycle::State & state) override;
 
   double last_conductivity_us() const { return last_result_.product_conductivity_us; }
-  double potable_available_kg() const { return potable_kg_; }
-  double wastewater_kg() const { return wastewater_kg_; }
-  bool upa_processing() const { return upa_processing_; }
 
 private:
   void step();
@@ -53,47 +50,23 @@ private:
   wrs::WrsResult last_result_{};
 
   rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float64>::SharedPtr water_pub_;
-  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float64>::SharedPtr
-    potable_available_pub_;
-  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float64>::SharedPtr wastewater_pub_;
   rclcpp_lifecycle::LifecyclePublisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr
     telemetry_pub_;
   rclcpp_lifecycle::LifecyclePublisher<SubsystemHeartbeat>::SharedPtr heartbeat_pub_;
   rclcpp_lifecycle::LifecyclePublisher<FaultEvent>::SharedPtr fault_pub_;
   rclcpp::Client<RegisterSubsystem>::SharedPtr register_client_;
-
-  // Feed streams latched from topics [kg/s].
-  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr crew_urine_sub_;
-  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr crew_latent_sub_;
-  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr crew_potable_sub_;
-  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr ogs_demand_sub_;
+  // Closed-loop: clean product water recovered by the Sabatier reactor, fed in
+  // as an extra (distillate-quality) condensate stream.
   rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr sabatier_water_sub_;
-  double crew_urine_kg_s_{0.0};
-  double crew_latent_kg_s_{0.0};
-  double crew_potable_demand_kg_s_{0.0};
-  double ogs_demand_kg_s_{0.0};
   double sabatier_water_kg_s_{0.0};
-
   rclcpp::TimerBase::SharedPtr step_timer_;
   rclcpp::TimerBase::SharedPtr autostart_timer_;
   OnSetParametersCallbackHandle::SharedPtr param_cb_handle_;
 
-  // Water inventory [kg]. Urine collects in the wastewater tank (WSTA) and is
-  // batch-processed by the UPA; recovered + condensate + Sabatier water fill
-  // the potable tank, which crew (drinking/flush) and OGS (electrolysis) draw.
-  double wastewater_kg_{0.0};
-  double potable_kg_{0.0};
-  bool upa_processing_{false};
-
   double step_rate_hz_{1.0};
+  double urine_kg_day_{6.0};
+  double condensate_kg_day_{3.0};
   double potable_limit_us_{100.0};
-  double wastewater_capacity_kg_{22.0};
-  double potable_capacity_kg_{1000.0};
-  double initial_potable_kg_{300.0};
-  double max_urine_process_kg_day_{13.6};
-  double upa_start_fraction_{0.70};
-  double upa_stop_fraction_{0.05};
-  double potable_reserve_kg_{5.0};
   rclcpp::Time last_step_time_;
   bool first_step_{true};
   bool enable_auto_faults_{false};  // faults injected explicitly, not auto-tripped

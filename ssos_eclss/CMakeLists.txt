@@ -46,7 +46,6 @@ add_library(eclss_physics
   src/cabin/cabin_atmosphere.cpp
   src/cabin/crew_metabolic_model.cpp
   src/cabin/leak_model.cpp
-  src/crew/crew_simulator.cpp
   src/faults/fault_types.cpp
   src/faults/sensor_fault.cpp
   src/faults/actuator_fault.cpp
@@ -65,7 +64,6 @@ add_library(eclss_ros
   src/nodes/wrs_node.cpp
   src/nodes/cabin_node.cpp
   src/nodes/sabatier_node.cpp
-  src/nodes/crew_node.cpp
 )
 target_link_libraries(eclss_ros eclss_physics)
 ament_target_dependencies(eclss_ros
@@ -94,18 +92,23 @@ add_executable(sabatier_node src/main/sabatier_main.cpp)
 target_link_libraries(sabatier_node eclss_ros)
 ament_target_dependencies(sabatier_node rclcpp rclcpp_lifecycle)
 
-add_executable(crew_node src/main/crew_main.cpp)
-target_link_libraries(crew_node eclss_ros)
-ament_target_dependencies(crew_node rclcpp rclcpp_lifecycle)
+# ---- Standalone validation executables (NO ROS) ----
+add_executable(ars_validation standalone/ars_validation.cpp)
+target_link_libraries(ars_validation eclss_physics)
 
+add_executable(parameter_sweep standalone/parameter_sweep.cpp)
+target_link_libraries(parameter_sweep eclss_physics)
 
+add_executable(breakthrough_curve_gen standalone/breakthrough_curve_gen.cpp)
+target_link_libraries(breakthrough_curve_gen eclss_physics)
 
 # ---- Install ----
 install(TARGETS eclss_physics eclss_ros
   ARCHIVE DESTINATION lib LIBRARY DESTINATION lib RUNTIME DESTINATION bin)
-install(TARGETS ars_node ogs_node wrs_node cabin_node sabatier_node crew_node
+install(TARGETS ars_node ogs_node wrs_node cabin_node sabatier_node
   RUNTIME DESTINATION lib/${PROJECT_NAME})
-
+install(TARGETS ars_validation parameter_sweep breakthrough_curve_gen
+  RUNTIME DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY include/ DESTINATION include)
 install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch)
 install(DIRECTORY config/ DESTINATION share/${PROJECT_NAME}/config)
@@ -153,10 +156,6 @@ if(BUILD_TESTING)
   ament_add_gtest(test_crew_metabolic test/unit/cabin/test_crew_metabolic.cpp)
   target_link_libraries(test_crew_metabolic eclss_physics)
 
-  # ---- Crew simulator (diurnal) test ----
-  ament_add_gtest(test_crew_simulator test/unit/crew/test_crew_simulator.cpp)
-  target_link_libraries(test_crew_simulator eclss_physics)
-
   # ---- Faults tests ----
   ament_add_gtest(test_fault_injector test/unit/faults/test_fault_injector.cpp)
   target_link_libraries(test_fault_injector eclss_physics)
@@ -188,15 +187,6 @@ if(BUILD_TESTING)
   target_link_libraries(test_parameter_bridge eclss_ros)
   ament_target_dependencies(test_parameter_bridge rclcpp rclcpp_lifecycle
     space_station_interfaces std_msgs diagnostic_msgs lifecycle_msgs)
-
-  # Node lifecycle / behaviour tests for the remaining subsystems.
-  foreach(node_test test_cabin_node test_crew_node test_ogs_node
-                    test_sabatier_node test_wrs_node)
-    ament_add_gtest(${node_test} test/ros/${node_test}.cpp)
-    target_link_libraries(${node_test} eclss_ros)
-    ament_target_dependencies(${node_test} rclcpp rclcpp_lifecycle
-      space_station_interfaces std_msgs diagnostic_msgs lifecycle_msgs)
-  endforeach()
 endif()
 
 ament_package()

@@ -1,17 +1,10 @@
 # WRS (urine processor + water processor) parameters for ssos_eclss/wrs_node.
-# Feed streams (urine, condensate) come from the crew node; the node maintains
-# the wastewater (UPA/WSTA) and potable water inventories.
 wrs_node:
   ros__parameters:
     use_sim_time: true
     step_rate_hz: 1.0
+    urine_kg_day: 6.0
+    condensate_kg_day: 3.0
     potable_limit_us: 100.0
-    wastewater_capacity_kg: 22.0      # WSTA urine tank capacity
-    potable_capacity_kg: 1000.0       # potable store (incl. stowed CWCs)
-    initial_potable_kg: 300.0         # starting potable inventory
-    max_urine_process_kg_day: 13.6    # UPA processing rate when running
-    upa_start_fraction: 0.70          # start batch at 70% full (WSTA trigger)
-    upa_stop_fraction: 0.05           # stop batch near empty
-    potable_reserve_kg: 5.0           # reserve below which OGS draw is starved
     # Faults are injected explicitly (sim fault-injection), not auto-tripped.
     enable_auto_faults: false

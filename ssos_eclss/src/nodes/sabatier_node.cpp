@@ -100,11 +100,7 @@ void SabatierNode::step()
   double dt = 1.0 / std::max(step_rate_hz_, 1.0e-3);
   if (!first_step_) {
     const double measured = (now - last_step_time_).seconds();
-    // Sim clock drives dt: elapsed sim time, 0 when the clock is paused/frozen
-    // (freezes the reactor); integrated in sub-steps below.
-    if (this->get_parameter("use_sim_time").as_bool()) {
-      dt = std::min(std::max(measured, 0.0), 1.0e6);
-    } else if (measured > 0.0 && measured < 1.0e6) {
+    if (measured > 0.0 && measured < 100.0) {
       dt = measured;
     }
   }
@@ -112,16 +108,8 @@ void SabatierNode::step()
   last_step_time_ = now;
 
   // Feed the reactor: all CO2 the ARS is desorbing, plus the OGS H2 stream.
-  // Sub-step the reactor thermal update (explicit heater loop needs dt < ~80 s).
   const double co2_in_mol_s = co2_available_kg_s_ / units::M_CO2;
-  constexpr double kMaxThermalDt = 30.0;
-  constexpr int kMaxChunks = 240;
-  const int chunks = std::clamp(
-    static_cast<int>(std::ceil(dt / kMaxThermalDt)), 1, kMaxChunks);
-  const double h = dt / static_cast<double>(chunks);
-  for (int i = 0; i < chunks; ++i) {
-    last_result_ = sabatier_->step(h, co2_in_mol_s, h2_available_mol_s_);
-  }
+  last_result_ = sabatier_->step(dt, co2_in_mol_s, h2_available_mol_s_);
 
   // CO2 split: what the reactor actually consumed goes to Sabatier; the rest of
   // the desorbed stream (H2-limited surplus + unconverted) is vented to space.

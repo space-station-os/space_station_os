@@ -99,8 +99,9 @@ private:
   bool first_step_{true};
   bool params_dirty_{false};
   bool was_healthy_{true};  // edge-trigger for the CO2-removal fault
-  // Auto-faults off by default; faults are injected explicitly. In the closed
-  // loop removal settles at the requirement, so a threshold check is a knife-edge.
+  // Auto-faults off by default: in the closed loop, removal settles at the crew
+  // production rate (== the requirement), so a threshold check there is a
+  // knife-edge. Faults are injected explicitly (sim fault-injection YAML).
   bool enable_auto_faults_{false};
 };
 

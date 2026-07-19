@@ -98,12 +98,29 @@ def generate_launch_description():
         launch_arguments={'autostart_delay_ms': '11000'}.items(),
     )
 
+    # ---- GNC / orbit (re-enabled: needed for the GNC panel's station model
+    # + orbit trajectory rendering) ----
+    gnc_core = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(
+            get_package_share_directory('space_station_gnc'),
+            'launch', 'gnc_core.launch.py')),
+        launch_arguments={'quiet_torque': 'true', 'quiet_control': 'true',
+                          'quiet_motion': 'true', 'quiet_sensor': 'true',
+                          'quiet_estimate': 'true'}.items())
+    orbit_dynamics = Node(
+        package='space_station_gnc', executable='orbit_dynamics',
+        name='orbit_dynamics_node', output='log',
+        parameters=[os.path.join(get_package_share_directory('space_station_gnc'),
+                                 'config', 'orbit_dynamics.yaml')])
+
     ld = LaunchDescription([
         gui,
         system_manager,
         sim_controller,
         activate_core_sim,
         eclss,
+        gnc_core,
+        orbit_dynamics,
     ])
     for handler in configure_core_sim:
         ld.add_action(handler)

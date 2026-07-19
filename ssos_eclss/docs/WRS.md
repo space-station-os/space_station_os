@@ -113,87 +113,47 @@ on activation.
 
 | Direction | Topic / service | Type |
 |-----------|-----------------|------|
-| sub | `/ssos/crew/urine_kg_day` | `std_msgs/Float64` — urine (+ flush) feed |
-| sub | `/ssos/crew/latent_water_kg_day` | `std_msgs/Float64` — humidity condensate feed |
-| sub | `/ssos/crew/potable_demand_kg_day` | `std_msgs/Float64` — crew drinking draw |
-| sub | `/ssos/ogs/water_demand_kg_day` | `std_msgs/Float64` — OGS electrolysis draw |
-| sub | `/ssos/sabatier/water_kg_day` | `std_msgs/Float64` — Sabatier product water |
-| pub | `/ssos/wrs/potable_kg_day` | `std_msgs/Float64` — instantaneous recovery rate |
-| pub | `/ssos/wrs/potable_available_kg` | `std_msgs/Float64` — **potable tank inventory** |
-| pub | `/ssos/wrs/wastewater_kg` | `std_msgs/Float64` — **wastewater (WSTA) inventory** |
-| pub | `/ssos/wrs/diagnostics` | `diagnostic_msgs/DiagnosticArray` (conductivity, recovery, VOC, tanks, `days_of_supply`, `upa_processing`) |
+| pub | `/ssos/wrs/potable_kg_day` | `std_msgs/Float64` |
+| pub | `/ssos/wrs/diagnostics` | `diagnostic_msgs/DiagnosticArray` (potable rate, conductivity, recovery, VOC conversion) |
 | pub | `/ssos/wrs/heartbeat` | `SubsystemHeartbeat` |
 | pub | `/ssos/fault_event` | `FaultEvent` |
 | client | `/ssos/register_subsystem` | `RegisterSubsystem` |
 
-### Water inventories & UPA batch cycle
-
-Unlike a pure flow model, the node maintains two inventories so the station-level
-water balance is explicit:
-
-- **Wastewater tank (WSTA)** — accumulates crew urine + flush. Capacity
-  `wastewater_capacity_kg` (default 22 kg).
-- **Potable tank** — filled by recovered water (UPA distillate + condensate +
-  Sabatier), drained by crew drinking and OGS feedwater. Capacity
-  `potable_capacity_kg` (default 1000 kg, starting `initial_potable_kg` = 300).
-
-The UPA runs as a **batch**, mirroring the ISS WSTA 70 % trigger:
-
-```
-if  wastewater ≥ upa_start_fraction · capacity   (0.70 → 15.4 kg)  → start UPA
-process at max_urine_process_kg_day (default 13.6) until
-    wastewater ≤ upa_stop_fraction · capacity     (0.05 → 1.1 kg)  → stop UPA
-```
-
-At the 4-crew urine load (~6 kg/day) this is roughly a ~2.4-day fill then a
-~2-day drain per batch in realtime (faster under `time_scale`). Recovered
-distillate (~85 % of processed urine) plus condensate and Sabatier water flow
-into the potable tank. `days_of_supply` = potable ÷ daily potable demand.
-
-Each tick: accumulate urine, run the UPA batch logic, advance
-`WaterRecoverySystem.step(urine_processed, condensate, voc)` for the quality
-physics, update both tanks, serve crew + OGS draws, publish rates + inventories.
-
-**Fault detection (opt-in).** Off by default. With `enable_auto_faults:=true`,
-product conductivity above `potable_limit_us` (or MF breakthrough) raises a
-`water_quality_out_of_spec` `CRITICAL` fault and an unhealthy heartbeat.
+Each tick converts the configured daily urine + condensate loads to per-second
+feeds, advances `WaterRecoverySystem.step(...)`, and publishes the potable rate
+and quality telemetry. **Fault detection:** product conductivity above
+`potable_limit_us` (or MF breakthrough) raises a `water_quality_out_of_spec`
+`CRITICAL` fault and an unhealthy heartbeat.
 
 ### Parameters
 
 ```
-step_rate_hz               # node step rate [Hz]
-potable_limit_us           # potable conductivity limit [uS/cm] (fault threshold)
-wastewater_capacity_kg     # WSTA tank capacity [kg] (default 22)
-potable_capacity_kg        # potable tank capacity [kg] (default 1000)
-initial_potable_kg         # starting potable inventory [kg] (default 300)
-max_urine_process_kg_day   # UPA throughput when running (default 13.6)
-upa_start_fraction         # WSTA fill fraction that starts a batch (default 0.70)
-upa_stop_fraction          # WSTA fraction that ends a batch (default 0.05)
-potable_reserve_kg         # reserve below which OGS draw is starved (default 5)
-enable_auto_faults         # opt-in threshold faults (default false)
+step_rate_hz         # node step rate [Hz]
+urine_kg_day         # urine + flush wastewater load [kg/day]
+condensate_kg_day    # humidity condensate load [kg/day]
+potable_limit_us     # potable conductivity limit [uS/cm] for fault detection
 ```
 
-Recovery fractions, BPA enable/recovery, MF capacity and catalytic parameters
-live in the physics factory defaults (extendable to the bridge).
+The recovery fractions, BPA enable/recovery, MF capacity and catalytic
+parameters live in the physics factory defaults (extendable to the bridge).
 
 ### How it emulates the ISS unit
 
-The node reproduces the WRM flow and the flight-control "water balance": crew
-urine and condensate (plus Sabatier water) fill the wastewater/potable tanks, the
-UPA batch-processes on the WSTA trigger through the UPA→BPA→WPA chain at the
-paper's recovery fractions and conductivity, and potable water is drawn by the
-crew and OGS. Toggling the BPA emulates the station before/after the
-brine-processor demonstration (87 % vs 98 % urine recovery).
+The node reproduces the WRM flow: urine and condensate (and, in the closed loop,
+Sabatier water) are fed in, the UPA→BPA→WPA chain processes them to potable water
+at the paper's recovery fractions and conductivity, and the result is published
+as it would be delivered to the potable bus. Toggling the BPA emulates the
+station before/after the brine-processor demonstration (87% vs 98% urine
+recovery).
 
 ---
 
 ## 5. Running & validating
 
 ```bash
-ros2 launch ssos_eclss eclss.launch.py           # full loop feeds the WRS
-ros2 topic echo /ssos/wrs/potable_available_kg   # watch the potable tank
-ros2 topic echo /ssos/wrs/wastewater_kg          # watch the WSTA fill/drain
-ros2 param set /wrs_node max_urine_process_kg_day 9.0
+ros2 launch ssos_eclss wrs_only.launch.py
+ros2 topic echo /ssos/wrs/potable_kg_day
+ros2 param set /wrs_node urine_kg_day 9.0
 ```
 
 Tests (`test_water_recovery`) include `UPARecoversConfiguredFraction` (87%),

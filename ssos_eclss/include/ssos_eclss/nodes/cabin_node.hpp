@@ -14,11 +14,11 @@
 #include "space_station_interfaces/srv/register_subsystem.hpp"
 
 #include "ssos_eclss/cabin/cabin_atmosphere.hpp"
+#include "ssos_eclss/cabin/crew_metabolic_model.hpp"
 #include "ssos_eclss/cabin/leak_model.hpp"
 
-// Lifecycle node for the cabin atmosphere. Closes the mass balance from crew
-// (CO2/O2), ARS (CO2 removal), OGS (O2) and leakage; publishes ppCO2, O2
-// fraction and total pressure.
+// Lifecycle node simulating the cabin atmosphere driven by crew metabolic loads
+// and leakage. Publishes ppCO2, O2 fraction and total pressure telemetry.
 
 namespace ssos_eclss
 {
@@ -50,6 +50,7 @@ private:
     const std::vector<rclcpp::Parameter> & params);
 
   std::unique_ptr<cabin::CabinAtmosphere> atmosphere_;
+  std::unique_ptr<cabin::CrewMetabolicModel> crew_;
   std::unique_ptr<cabin::LeakModel> leak_;
   double last_co2_ppm_{0.0};
 
@@ -63,17 +64,14 @@ private:
   rclcpp::TimerBase::SharedPtr autostart_timer_;
   OnSetParametersCallbackHandle::SharedPtr param_cb_handle_;
 
-  // Mass-balance inputs latched from topics.
-  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr crew_co2_sub_;
-  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr crew_o2_sub_;
+  // Closed-loop coupling: ARS removes CO2 from the cabin, OGS adds O2.
   rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr ars_removal_sub_;
   rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr ogs_o2_sub_;
-  double crew_co2_kg_s_{0.0};
-  double crew_o2_consumption_kg_s_{0.0};
   double ars_co2_removal_kg_s_{0.0};
   double ogs_o2_kg_s_{0.0};
 
   double step_rate_hz_{1.0};
+  int crew_size_{4};
   double cabin_volume_m3_{100.0};
   double cabin_temp_c_{22.0};
   double co2_alarm_ppm_{7000.0};

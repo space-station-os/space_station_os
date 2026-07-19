@@ -167,11 +167,7 @@ void ArsNode::step()
   double dt = 1.0 / std::max(step_rate_hz_, 1.0e-3);
   if (!first_step_) {
     const double measured = (now - last_step_time_).seconds();
-    // Sim clock drives dt: elapsed sim time, 0 when the clock is paused/frozen
-    // (freezes the bed cycle), capped for bed-PDE stability at high time_scale.
-    if (this->get_parameter("use_sim_time").as_bool()) {
-      dt = std::min(std::max(measured, 0.0), 1.0e6);
-    } else if (measured > 0.0 && measured < 1.0e6) {
+    if (measured > 0.0 && measured < 100.0) {
       dt = measured;
     }
   }
@@ -184,12 +180,11 @@ void ArsNode::step()
     params_dirty_ = false;
   }
 
-  // Split dt into <=5 s chunks for the bed PDE (CFL-respecting), bounding the
-  // chunk count so very high time-scales cannot stall the callback.
+  // Cap the physics step so accelerated sim time (large dt) stays stable: split
+  // dt into <=5 s chunks for the bed PDE (CFL-respecting) regardless of the
+  // simulator's time_scale.
   constexpr double kMaxPhysicsDt = 5.0;
-  constexpr int kMaxChunks = 240;
-  const int chunks = std::clamp(
-    static_cast<int>(std::ceil(dt / kMaxPhysicsDt)), 1, kMaxChunks);
+  const int chunks = std::max(1, static_cast<int>(std::ceil(dt / kMaxPhysicsDt)));
   const double h = dt / static_cast<double>(chunks);
   for (int i = 0; i < chunks; ++i) {
     last_result_ = ars_->step(h, cabin_);
