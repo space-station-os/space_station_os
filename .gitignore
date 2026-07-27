@@ -16,3 +16,6 @@ log/
 desktop/install.log
 desktop/last-run.log
 desktop/space-station-os.desktop.in
+
+#claude
+CLAUDE.md
