@@ -62,6 +62,32 @@ do not add the `defaults` channel (RoboStack is incompatible with it).
   keeps the environment lean. Swap to `ros-jazzy-desktop` only if you need the
   broader toolset.
 
+## Continuous integration
+
+SSOS uses two complementary continuous-integration validation paths:
+
+- the native ROS 2 Jazzy build and test workflow
+- the locked Pixi environment build and test workflow
+
+Both workflows run for pull requests. The Pixi workflow also runs after pushes
+to `main`, `v0.8.9-dev`, and development branches matching `v0.9.*-dev`; the
+existing native workflow retains its current trigger configuration.
+
+The Pixi CI job installs the environment from the committed `pixi.lock` in
+locked mode and then runs:
+
+```bash
+pixi run build
+pixi run test
+```
+
+If `pixi.toml` and `pixi.lock` are not synchronized, the Pixi CI job fails.
+CI does not regenerate or modify `pixi.lock`.
+
+The Pixi CI job is the normal compatibility check for changes affecting the
+Tier-1 desktop application. Graphical desktop behavior, Qt/OpenGL rendering,
+and full GUI interaction remain manual release-candidate smoke tests.
+
 ## Next step
 
 This environment is the foundation for packaging SSOS as an installable
