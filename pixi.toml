@@ -5,7 +5,7 @@
 # GUI's Python deps) is pinned by pixi.lock.
 #
 # Quick start (Linux):
-#   pixi install          # resolve + fetch the environment
+#   pixi install --locked # install the committed locked environment
 #   pixi run build        # colcon build the SSOS packages
 #   pixi run station      # launch the full stack (GUI + core + sim + eclss)
 #

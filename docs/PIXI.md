@@ -20,15 +20,19 @@ The current SSOS stack:
 
 - [pixi installed](https://pixi.sh/latest/#installation)
 - Linux (`linux-64`). macOS/Windows are not covered yet.
-- Network access to `prefix.dev` and `conda-forge` for the first `pixi install`.
+- Network access to `prefix.dev` and `conda-forge` for the first `pixi install --locked`.
 
 ## Usage
 
 ```bash
-pixi install        # resolve + fetch the environment (first run only)
-pixi run build      # colcon build the SSOS packages
-pixi run station    # launch GUI + core + sim + eclss
+pixi install --locked
+pixi run build
+pixi run test
+pixi run station
 ```
+
+`pixi install --locked` installs the environment defined by the committed
+`pixi.lock` and fails if `pixi.toml` and `pixi.lock` are not synchronized.
 
 | Task | What it does |
 |------|--------------|
@@ -47,9 +51,25 @@ the local `install/` overlay.
 `pixi.toml` uses `robostack-jazzy` (first) then `conda-forge`. Keep that order;
 do not add the `defaults` channel (RoboStack is incompatible with it).
 
+## Updating dependencies
+
+Normal setup must use the committed lock file and must not regenerate
+`pixi.lock`.
+
+If a contributor intentionally changes dependencies:
+
+1. Edit `pixi.toml`.
+2. Run `pixi lock` to regenerate `pixi.lock`.
+3. Run `pixi install --locked` to verify that `pixi.toml` and `pixi.lock` are synchronized.
+4. Run `pixi run build` and `pixi run test`.
+5. Commit `pixi.toml` and `pixi.lock` together.
+
+Use `pixi update` only when intentionally updating dependency versions within
+the constraints declared in `pixi.toml`.
+
 ## Notes and known risks
 
-- **RoboStack Jazzy coverage.** The first `pixi install` on a networked machine
+- **RoboStack Jazzy coverage.** The first `pixi install --locked` on a networked machine
   is what confirms every `ros-jazzy-*` dependency resolves. If a package is
   missing on `robostack-jazzy`, either add its correct name or fall back to
   `ros-jazzy-desktop` (broad meta) while the specific set is sorted out.
@@ -88,7 +108,8 @@ The Pixi CI job is the normal compatibility check for changes affecting the
 Tier-1 desktop application. Graphical desktop behavior, Qt/OpenGL rendering,
 and full GUI interaction remain manual release-candidate smoke tests.
 
-## Next step
+## Desktop application
 
-This environment is the foundation for packaging SSOS as an installable
-desktop app (click-to-launch GUI, pixi backend). See the desktop-app issue.
+The Tier-1 Ubuntu desktop application is implemented on top of this Pixi
+environment. See [DESKTOP_APP.md](DESKTOP_APP.md) for installation, launch,
+update, and troubleshooting instructions.
