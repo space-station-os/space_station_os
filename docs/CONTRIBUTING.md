@@ -32,50 +32,135 @@ If this is your first contribution, issues labeled `good first issue` are a grea
 
 ## Development setup
 
-### Prerequisites
+SSOS supports two development environments:
 
-- **OS:** Ubuntu 24.04
-- **ROS 2:** Jazzy (Desktop) — [installation guide](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html)
-- **Colcon:** `sudo apt install python3-colcon-common-extensions`
+- **Pixi** — recommended for reproducible development without a system ROS 2 installation
+- **Native ROS 2 Jazzy** — supported for system integration and development against a host ROS installation
 
-### Build from source
+Docker is maintained as an advanced environment and is not the primary
+development path for v0.9.
+
+### Recommended: Pixi
+
+Pixi provides the SSOS ROS 2 Jazzy environment through RoboStack and uses the
+committed `pixi.lock` to reproduce the development environment.
+
+Install Pixi if it is not already available:
+
+```bash
+curl -fsSL https://pixi.sh/install.sh | sh
+export PATH="$HOME/.pixi/bin:$PATH"
+```
+
+Clone your fork:
+
+```bash
+git clone https://github.com/<your-fork>/space_station_os.git
+cd space_station_os
+```
+
+Install the committed environment, build, and test:
+
+```bash
+pixi install --locked
+pixi run build
+pixi run test
+```
+
+Launch the full SSOS stack:
+
+```bash
+pixi run station
+```
+
+Normal development setup must use `pixi install --locked`. If you intentionally
+change dependencies in `pixi.toml`, follow the lock-file update procedure in
+[PIXI.md](PIXI.md).
+
+### Native ROS 2 Jazzy
+
+Use this path when developing or integrating SSOS against a system ROS 2
+installation.
+
+Prerequisites:
+
+- Ubuntu 24.04
+- ROS 2 Jazzy Desktop
+- ROS development tools
+
+Install ROS 2 Jazzy using the official
+[ROS 2 Jazzy installation guide](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html)
+before continuing.
+
+Create a workspace and clone your fork:
 
 ```bash
 mkdir -p ~/ssos_ws/src
 cd ~/ssos_ws/src
+
 git clone https://github.com/<your-fork>/space_station_os.git
 cd ~/ssos_ws
-
-# Install dependencies
-sudo rosdep init   # skip if already done
-rosdep update
-rosdep install --from-paths src --ignore-src -r -y
-
-# Build
-colcon build --symlink-install
-source install/setup.bash
 ```
 
-### Using Docker
+Install dependencies:
 
 ```bash
-docker pull ghcr.io/space-station-os/space_station_os:latest
+source /opt/ros/jazzy/setup.bash
 
-xhost +local:root
-
-docker run -it --rm \
-  --env="DISPLAY=$DISPLAY" \
-  --env="QT_X11_NO_MITSHM=1" \
-  --env="LIBGL_ALWAYS_SOFTWARE=1" \
-  --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
-  --network=host \
-  ghcr.io/space-station-os/space_station_os:latest
+sudo rosdep init   # Skip if rosdep has already been initialized.
+rosdep update
+rosdep install --from-paths src --ignore-src -r -y
 ```
+
+Build and test:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+
+colcon build --symlink-install
+source install/setup.bash
+
+colcon test
+colcon test-result --verbose
+```
+
+Launch SSOS:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source ~/ssos_ws/install/setup.bash
+
+ros2 launch space_station space_station.launch.py
+```
+
+Source both ROS 2 Jazzy and the workspace overlay in each new terminal before
+running ROS 2 commands.
+
+### Docker (advanced)
+
+Docker is maintained as an advanced, separately handled environment rather than
+the recommended development setup for v0.9.
+
+See the root [README](../README.md) for the current Docker workflow.
 
 ### Verify your setup
 
+For Pixi:
+
 ```bash
+pixi run build
+pixi run test
+pixi run station
+```
+
+For native ROS 2 Jazzy:
+
+```bash
+source /opt/ros/jazzy/setup.bash
 source ~/ssos_ws/install/setup.bash
+
+colcon test
+colcon test-result --verbose
 ros2 launch space_station space_station.launch.py
 ```
 
@@ -208,20 +293,57 @@ Examples:
 
 ## CI/CD pipeline
 
-The repository uses two GitHub Actions workflows:
+The repository uses three complementary GitHub Actions workflows:
 
-| Workflow | File | Triggers | Purpose |
-|----------|------|----------|---------|
-| **CI** | `ci.yml` | PRs + push to main | Build, test, lint |
-| **Docker Publish** | `docker-publish.yml` | Push to main + version tags | Build and publish Docker image to GHCR |
+| Workflow | File | Purpose |
+|----------|------|---------|
+| **Native ROS 2 CI** | `ci.yml` | Build and validation against ROS 2 Jazzy on Ubuntu 24.04 |
+| **Pixi CI** | `pixi.yml` | Reproduce the committed locked Pixi environment, build, test, and verify that `pixi.lock` remains unchanged |
+| **Docker Publish** | `docker-publish.yml` | Build and publish the container image from `main` and version tags |
 
-When you open a PR, the CI workflow runs automatically. It must pass before your PR can be merged. The CI workflow:
+Both Native ROS 2 CI and Pixi CI run for pull requests and are used as
+repository integration checks.
 
-1. Builds all packages with `colcon build` on ROS 2 Jazzy.
-2. Runs all tests with `colcon test`.
-3. Runs lint checks (`ament_cppcheck`, `ament_xmllint`).
+### Native ROS 2 CI
 
-Docker images are only built and published when code merges to `main` or a version tag is pushed.
+The native workflow builds the repository in a ROS 2 Jazzy environment on
+Ubuntu 24.04.
+
+It currently:
+
+1. installs the native ROS 2 and system dependencies
+2. builds the repository with `colcon build`
+3. runs `colcon test`
+4. reports the test results
+
+The native test execution is currently non-blocking within the workflow, while
+build failures still fail the job.
+
+### Pixi CI
+
+The Pixi workflow validates the reproducible development environment from the
+committed `pixi.lock`.
+
+It runs:
+
+```bash
+pixi run build
+pixi run test
+```
+
+and then verifies that the CI run did not modify `pixi.lock`.
+
+A mismatch between `pixi.toml` and `pixi.lock`, a Pixi build failure, or a Pixi
+test failure causes this workflow to fail.
+
+### Docker publishing
+
+Docker publishing is separate from pull-request validation. The publish
+workflow runs from `main` and version tags and publishes the generated image to
+GHCR.
+
+Before requesting review, make sure the required CI checks for your pull
+request are green.
 
 ---
 
