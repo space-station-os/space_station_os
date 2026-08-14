@@ -1,0 +1,36 @@
+scenario:
+  name: eclss_o2_sensor_fault
+  duration_s: 300
+  sim_rate_hz: 10
+
+  initial_conditions:
+    altitude_km: 408.0
+    orbital_velocity_mps: 7660.0
+    atmospheric_o2_pct: 20.9
+    atmospheric_co2_ppm: 400.0
+    cabin_pressure_kpa: 101.3
+    cabin_temp_celsius: 22.0
+    solar_flux_w_m2: 1361.0
+    in_eclipse: false
+
+  faults:
+    - name: o2_sensor_stuck
+      type: sensor_stuck_at
+      target_subsystem: eclss
+      target_interface: /eclss/o2_reading
+      trigger:
+        type: time
+        at_s: 120.0
+      params:
+        stuck_value: 0.0
+      duration_s: 0  # Permanent until cleared
+
+  expected_outcomes:
+    - state_transition:
+        from: NOMINAL
+        to: DEGRADED
+        before_s: 125.0
+    - state_transition:
+        from: DEGRADED
+        to: NOMINAL
+        before_s: 200.0

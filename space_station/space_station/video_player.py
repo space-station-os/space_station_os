@@ -1,6 +1,35 @@
-import cv2
+"""Qt-based fullscreen video splash.
+
+Frames are decoded with OpenCV's VideoCapture (always available) and shown in a
+fullscreen Qt QLabel driven by a QTimer -- we do NOT use cv2.imshow, which is
+absent in headless OpenCV builds and was silently failing. play() blocks (via a
+local QEventLoop) until the clip finishes, so it can be used as an intro splash
+before the main window and as an exit splash on close. Press Esc or click to
+skip. Crash-proof: any failure just returns.
+"""
+
 import os
-import time
+
+import cv2
+from PyQt5.QtWidgets import QLabel, QApplication
+from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtCore import Qt, QTimer, QEventLoop
+
+
+class _SplashLabel(QLabel):
+    def __init__(self, on_skip):
+        super().__init__()
+        self._on_skip = on_skip
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.setStyleSheet("background-color: black;")
+        self.setAlignment(Qt.AlignCenter)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            self._on_skip()
+
+    def mousePressEvent(self, event):
+        self._on_skip()
 
 
 class VideoPlayer:
@@ -9,69 +38,58 @@ class VideoPlayer:
         self.on_finished_callback = on_finished_callback
 
     def play(self):
-        # Wait until the file exists before starting
-        while not os.path.exists(self.video_path):
-            print(f"Waiting for video file to appear: {self.video_path}")
-            time.sleep(0.5)
-
-        cap = cv2.VideoCapture(self.video_path, cv2.CAP_FFMPEG)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        if not cap.isOpened():
-            print(f"Failed to open video: {self.video_path}")
-            if self.on_finished_callback:
+        try:
+            self._play()
+        except Exception:
+            pass
+        if self.on_finished_callback:
+            try:
                 self.on_finished_callback()
+            except Exception:
+                pass
+
+    def _play(self):
+        if QApplication.instance() is None or not os.path.exists(self.video_path):
+            return
+
+        cap = cv2.VideoCapture(self.video_path)
+        if not cap.isOpened():
             return
 
         fps = cap.get(cv2.CAP_PROP_FPS)
-        if fps <= 0:
-            fps = 60.0  # fallback default
-        delay = 1.0 / fps
+        if not fps or fps <= 0:
+            fps = 30.0
+        interval_ms = max(10, int(1000.0 / fps))
 
-        window_name = "Welcome to Space Station OS"
-        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+        loop = QEventLoop()
+        done = {"v": False}
 
-        while cap.isOpened():
-            start_time = time.time()
+        def finish():
+            if done["v"]:
+                return
+            done["v"] = True
+            timer.stop()
+            cap.release()
+            label.close()
+            loop.quit()
+
+        label = _SplashLabel(finish)
+        label.showFullScreen()
+
+        def next_frame():
             ret, frame = cap.read()
             if not ret:
-                break
+                finish()
+                return
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            h, w, ch = rgb.shape
+            img = QImage(rgb.data, w, h, ch * w, QImage.Format_RGB888)
+            pix = QPixmap.fromImage(img).scaled(
+                label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            label.setPixmap(pix)
 
-            cv2.imshow(window_name, frame)
+        timer = QTimer()
+        timer.timeout.connect(next_frame)
+        timer.start(interval_ms)
 
-            # Exit on ESC
-            if cv2.waitKey(1) & 0xFF == 27:
-                break
-
-            elapsed = time.time() - start_time
-            sleep_time = max(0, delay - elapsed)
-            time.sleep(sleep_time)
-
-        cap.release()
-        cv2.destroyAllWindows()
-
-        if self.on_finished_callback:
-            self.on_finished_callback()
-
-
-# ---- Auto-Play Example ----
-if __name__ == "__main__":
-    # Dynamically locate the video under the workspace or assets directory
-    workspace = os.path.dirname(os.path.abspath(__file__))
-    possible_paths = [
-        os.path.join(workspace, "assets", "Ssos_begin.mp4"),
-        os.path.join(workspace, "videos", "Ssos_begin.mp4"),
-        os.path.expanduser("~/Videos/Ssos_begin.mp4"),
-    ]
-
-    # Pick the first path that exists
-    video_path = next((p for p in possible_paths if os.path.exists(p)), None)
-    if not video_path:
-        print("Video not found in default locations, waiting for file...")
-        video_path = possible_paths[0]  # fallback — will wait for it to appear
-
-    def finished():
-        print("Video playback completed.")
-
-    player = VideoPlayer(video_path, on_finished_callback=finished)
-    player.play()
+        loop.exec_()

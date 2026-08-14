@@ -1,69 +1,25 @@
-from launch import LaunchDescription
-from launch_ros.actions import Node
-from ament_index_python.packages import get_package_share_directory
+"""Launch the high-fidelity ssos_eclss subsystems for the mission-control GUI.
+
+This replaces the legacy space_station_eclss nodes with the new ssos_eclss
+package (4BMS ARS, OGS, WRS, cabin) whose lifecycle nodes auto-configure and
+activate and publish the /ssos/* telemetry the GUI ECLSS panel subscribes to
+(/ssos/cabin/co2_ppm, /ssos/ars/co2_removal_kg_day, /ssos/ars/diagnostics,
+/ssos/ars/bed_states, /ssos/ars/cycle_phase).
+"""
 import os
 
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+
+
 def generate_launch_description():
-    CrewQuarterConfig = os.path.join(
-        get_package_share_directory('space_station_eclss'),
-        'config',
-        'CrewQuarter.yaml'
-    )
-    Ars_params_file = os.path.join(
-        get_package_share_directory('space_station_eclss'),
-        'config',
-        'ARS.yaml'
-    )
-    Wrs_params_file = os.path.join(
-        get_package_share_directory('space_station_eclss'),
-        'config',
-        'WRS.yaml'
-    )
-    Ogs_params_file = os.path.join(
-        get_package_share_directory('space_station_eclss'),
-        'config',
-        'OGS.yaml'
-    )
-
-    crew_quarters_node = Node(
-        package='space_station_eclss',
-        executable='crew_simulation.py',
-        name='crew_quarters_node',
-        output='screen',
-        parameters=[CrewQuarterConfig],
-        emulate_tty=True
-    )
-
-    ars_node = Node(
-        package='space_station_eclss',
-        executable='ars',
-        name='air_revitalisation',
-        output='screen',
-        parameters=[Ars_params_file],
-        emulate_tty=True
-    )
-
-    wrs_node = Node(
-        package='space_station_eclss',
-        executable='wrs',
-        name='water_recovery_system',
-        output='screen',
-        parameters=[Wrs_params_file],
-        emulate_tty=True
-    )
-
-    ogs_node = Node(
-        package='space_station_eclss',
-        executable='ogs',
-        name='oxygen_generation_system',
-        output='screen',
-        parameters=[Ogs_params_file],
-        emulate_tty=True
-    )
-
+    ssos_eclss_share = get_package_share_directory('ssos_eclss')
     return LaunchDescription([
-        ars_node,
-        ogs_node,
-        wrs_node,
-       
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(ssos_eclss_share, 'launch', 'eclss.launch.py')
+            ),
+        ),
     ])

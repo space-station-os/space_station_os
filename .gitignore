@@ -1,3 +1,13 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+
+# colcon build artifacts
+build/
+install/
+log/
+
+# pixi environment (keep pixi.toml and pixi.lock; ignore the resolved env)
+.pixi/
+.claude/
+/desktop/*.log
