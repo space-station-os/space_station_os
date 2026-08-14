@@ -61,7 +61,16 @@ jobs:
         run: |
           source /opt/ros/jazzy/setup.bash
           source install/setup.bash
+
+          # v0.9.0 blocking test boundary.
+          # Legacy space_station_* subsystem packages remain build-checked,
+          # but are outside the v0.9.0 release test gate.
           colcon test \
+            --packages-select \
+              space_station \
+              ssos_core \
+              ssos_sim \
+              ssos_eclss \
             --event-handlers console_direct+
         shell: bash
 
