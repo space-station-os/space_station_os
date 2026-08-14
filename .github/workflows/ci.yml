@@ -57,21 +57,20 @@ jobs:
             --cmake-args -DCMAKE_BUILD_TYPE=Release
         shell: bash
 
-      - name: Test (non-blocking)
+      - name: Test
         run: |
           source /opt/ros/jazzy/setup.bash
           source install/setup.bash
           colcon test \
             --event-handlers console_direct+
         shell: bash
-        continue-on-error: true
 
       - name: Test results
         if: always()
         run: |
           source /opt/ros/jazzy/setup.bash
           source install/setup.bash
-          colcon test-result --verbose || true
+          colcon test-result --verbose
         shell: bash
 
   # Lightweight lint check — runs in parallel with build
