@@ -63,18 +63,14 @@ jobs:
           source install/setup.bash
 
           # v0.9+ blocking test boundary:
-          # - current and future ssos_* packages
-          # - the top-level space_station application
-          # Legacy space_station_* subsystem packages remain build-checked
-          # but are outside the release test gate.
-
+          # all current and future ssos_* packages.
+          # The top-level space_station app and legacy space_station_* packages
+          # remain build-checked; application/lint validation is handled separately.
           colcon test \
-            --packages-select-regex \
-              '^ssos_.*$' \
-              '^space_station$' \
+            --packages-select-regex '^ssos_.*$' \
             --event-handlers console_direct+
         shell: bash
-        
+
       - name: Test results
         if: always()
         run: |
