@@ -14,7 +14,7 @@
 
 [workspace]
 name = "space-station-os"
-version = "0.8.9"
+version = "0.9.0"
 description = "Space Station OS -- reproducible ROS 2 Jazzy build/run environment (RoboStack)"
 channels = ["https://prefix.dev/robostack-jazzy", "conda-forge"]
 platforms = ["linux-64"]
