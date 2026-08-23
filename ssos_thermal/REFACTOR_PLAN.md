@@ -291,35 +291,131 @@ Julian-date/ECI sun-position math in `sun_vector.hpp`, and/or GNC's
 `orbit_dynamics` node) was mentioned as separate future work — no scope or
 approach decided yet; revisit once that's ready to plan.
 
-## Explicitly out of scope (this pass)
+## Also in scope: port `cooling_server` into `ssos_thermal` as `coolant_node`
 
-- [ ] `cooling_server`, `radiator`, `demand`, `array_absorptivity` stay as
-      plain `rclcpp::Node`s, unregistered — no GUI/roster surface
-      distinguishes them today.
-- [ ] `main_window.py` → `_init_global_subs()` still only subscribes
-      `("ars", "ogs", "wrs", "cabin")` heartbeats — adding `"thermal"` is a
-      separate GUI follow-up.
-- [ ] `space_station.launch.py` still doesn't launch
-      `space_station_thermal_control` at all (same situation GNC was in
-      before this session's earlier fix) — separate follow-up.
-- [ ] `docs/architecture.md` for this package (mirroring
-      `ssos_eclss/docs/architecture.md`) — worth adding once this lands,
-      not blocking it.
+**Why:** the mission-control GUI's `ThermalWidget` (Internal Temp / Ammonia
+Temp / Vented Heat cards) and `ThermalNetworkNode`'s own cooling client both
+depend on the `/coolant_heat_transfer` action, whose only server is
+`space_station_thermal_control`'s `cooling_server`. That executable wasn't
+launched anywhere in this migration, so those cards stayed on "NO DATA" and
+the log showed `Coolant action server unavailable; skipping goal`.
+`space_station_thermal_control` isn't edited (same rule as every other
+section here) — `ssos_thermal` gets a **new**, from-scratch port instead:
+`coolant_node`.
+
+**What was actually ported, and what wasn't.** Reading `cooling.cpp`
+end to end, the *only* code path anything downstream depends on is
+`CoolantActionServer::execute()` — the goal-driven cooldown loop that
+produces the `internal_temp_c`/`ammonia_temp_c`/`vented_heat_kj` feedback.
+Everything else in that class is inert:
+
+| Legacy member | Why it's dead code |
+|---|---|
+| `tickBehaviorTree()` + `isTempHigh()`/`isAmmoniaHot()` | Their condition variables (`current_temp_`, `ammonia_heat_kj_`) are never written anywhere else in the class — the BT always evaluates the same static branch |
+| `ventHeat()`/`refreshWater()` BT actions | Their clients (`vent_client_`, `wrs_client_`) are declared but never constructed — always `nullptr`, so these leaves always fail |
+| `recycleWater()` | Never called from anywhere |
+| `publishInternalLoop()` / `publishExternalLoop()` | Declared publishers, never actually published to |
+
+None of this was carried forward. `coolant_node` ports only the real
+behavior: the cooldown physics (extracted to `CoolantLoop`, zero ROS) and
+the action server wrapping it. `radiator_client_` *is* kept (it's the one
+thing `execute()` actually calls, best-effort, when venting occurs).
+
+**Files** (all new, under `ssos_thermal/`):
+
+- `include/ssos_thermal/coolant/coolant_loop.hpp` + `src/coolant/coolant_loop.cpp`
+  — `CoolantLoop::step(node_temp_c, target_temp_c)`, one physics step
+  (matches the legacy per-iteration body: ≤2.5 degC toward target, heat
+  transferred to ammonia at `heat_transfer_efficiency`, vent flag at
+  `vent_threshold_kj`).
+- `include/ssos_thermal/nodes/coolant_node.hpp` + `src/nodes/coolant_node.cpp`
+  — `CoolantNode : rclcpp_lifecycle::LifecycleNode`, same shape as
+  `ThermalNetworkNode`: `maybe_autostart`, register-as-`"coolant"`,
+  `/ssos/coolant/heartbeat` on a 1 Hz timer (goal execution is separate
+  from the heartbeat cadence, since cooling is goal-driven not periodic).
+- `src/main/coolant_main.cpp`.
+- `config/coolant.yaml`.
+- `test/unit/coolant/test_coolant_loop.cpp` (physics-only), `test/ros/test_coolant_node.cpp`
+  (lifecycle + autostart, mirrors `test_thermal_network_node.cpp`).
+
+**`ThermalDiagnostics` grew up:** now that two nodes register under
+different subsystem names, `make_heartbeat`/`make_fault` take
+`subsystem_name` as a parameter instead of hardcoding `"thermal"` —
+`thermal_network_node.cpp`'s call sites were updated to pass `"thermal"`
+explicitly. Same evolution `EclssDiagnostics` went through going from one
+caller to five.
+
+**A real bug this surfaced, and the fix (in `space_station`, not this
+package):** `ThermalWidget.__init__` sent its one-shot coolant test goal
+behind a single `wait_for_server(timeout_sec=2.0)` at GUI construction
+time — but `coolant_node`, like every other `ssos_thermal`/`ssos_eclss`
+node, self-activates on its own `autostart_delay_ms` (11s in the
+full-station launch), well after that 2s window closes. So even with
+`coolant_node` running, the cards would have stayed empty forever. Fixed by
+polling `ActionClient.server_is_ready()` (non-blocking) from the widget's
+existing 1 Hz update timer and sending the goal lazily once the server
+actually appears — see `space_station/space_station/thermal.py`.
+
+**Launch:** `coolant_node` added to `launch/thermal.launch.py` as a second
+`LifecycleNode` alongside `thermal_network`, same `autostart`/
+`autostart_delay_ms` treatment. `main_window.py`'s `_SUBSYS_ALIASES` maps
+both `"thermal"` and `"coolant"` to the roster's single "Thermal" row; its
+`_apply_heartbeat` aggregation was generalized (mirroring the existing
+ECLSS multi-node aggregation) so the two heartbeats don't just overwrite
+each other's roster status.
+
+**Verified live** via the full `space_station.launch.py`: `coolant_node`
+registers as `'coolant'`, the GUI's retried goal is accepted
+(`[ACTION] Cooling goal received for thermal_gui`), completes
+(`final node temp = 25.00 C`), and — since `radiator` isn't running in this
+launch — the venting step logs `[RADIATOR] VentHeat service not available`
+exactly as designed (graceful degradation, not a failure).
+
+## Explicitly out of scope (still true)
+
+- [ ] `radiator`, `demand` stay as plain `rclcpp::Node`s in
+      `space_station_thermal_control`, unregistered — no GUI/roster surface
+      distinguishes them today. (`cooling_server`/`array_absorptivity`/
+      `sun_vector` are done — ported above.)
+- [ ] `ssos_sim`/`/sim/world_state` coupling — `thermal_network` still has
+      no simulated-environment input (orbital day/night, cabin temp); its
+      heat sources are still purely the YAML `internal_power` values. A
+      physics decision, not wiring — not started.
+- [ ] Fault-injection scenario integration — no YAML-schedulable faults for
+      thermal/coolant, unlike `ssos_eclss`'s `FaultInjector`.
+- [ ] `CoolantNode` has no fault model (always `healthy=true`) — see
+      `docs/fault_catalog.md`.
+- [ ] Removal of the orbit-calculation piece in `sun_vector.hpp` — no scope
+      or approach decided yet.
 
 ## Verification checklist
 
-- [ ] `pixi run build` (or `colcon build --packages-select space_station_thermal_control`) compiles clean
-- [ ] `colcon test --packages-select space_station_thermal_control` passes (new unit + ros tests)
-- [ ] `ros2 launch space_station_thermal_control thermals.launch.py`, then
-      `ros2 lifecycle get /thermal_network` shows `active` within ~1s with
-      **no manual lifecycle call** (confirms `maybe_autostart` works)
-- [ ] `ros2 topic echo /ssos/thermal/heartbeat` shows periodic `healthy=true`, `lifecycle_state=2 (ACTIVE)`
-- [ ] With `ssos_core`'s `system_manager` also running: no
-      `"system_manager registration service unavailable"` warning in the
-      thermal_nodes log
-- [ ] `ros2 param set thermal_network enable_failure true` + lowered
+- [x] `pixi run build` compiles `ssos_thermal` clean (added to the pixi
+      task's `--packages-up-to` list)
+- [x] `colcon test --packages-select ssos_thermal` passes — 4 test binaries,
+      17 gtest cases (`test_thermal_network`, `test_coolant_loop`,
+      `test_thermal_network_node`, `test_coolant_node`)
+- [x] `ros2 launch ssos_thermal thermal.launch.py` (or the full
+      `space_station.launch.py`), then `ros2 lifecycle get /thermal_network`
+      and `/coolant_node` both show `active` within ~1s with **no manual
+      lifecycle call** (confirms `maybe_autostart` works for both)
+- [x] `ros2 topic echo /ssos/thermal/heartbeat` and `/ssos/coolant/heartbeat`
+      show periodic `healthy=true`, `lifecycle_state=2 (ACTIVE)`
+- [x] With `ssos_core`'s `system_manager` running via the full-station
+      launch: `Registered subsystem 'thermal'` and `'coolant'` both log, no
+      `"system_manager registration service unavailable"` warning, and
+      `SystemState` reaches `NOMINAL`
+- [x] `ros2 param set /thermal_network enable_failure true` + lowered
       `max_temp_threshold` → exactly **one** `FaultEvent` on
       `/ssos/fault_event` at the transition (not one per tick)
-- [ ] `/thermal/nodes/state` and `/thermal/links/flux` still publish
-      identical data shape to before (regression check — the GUI's
-      `ThermalWidget` must keep working unmodified)
+- [x] `/thermal/nodes/state` and `/thermal/links/flux` publish the same
+      data shape the legacy solver did — the GUI's `ThermalWidget` node/link
+      tables and plot work unmodified
+- [x] GUI roster shows "THERMAL — NOMINAL" (screenshot-verified), driven
+      live by `/ssos/thermal/heartbeat` + `/ssos/coolant/heartbeat`
+      aggregation, not a placeholder
+- [x] GUI's Internal Temp / Ammonia Temp / Vented Heat cards populate with
+      live data end-to-end (`coolant_node` receives the GUI's retried test
+      goal, executes the cooldown loop, publishes feedback) — this is what
+      exposed and led to fixing the `wait_for_server()` timing bug in
+      `thermal.py`

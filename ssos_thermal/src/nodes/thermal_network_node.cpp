@@ -214,11 +214,11 @@ void ThermalNetworkNode::updateSimulation()
 
   if (diag_.should_raise_fault(healthy)) {
     fault_pub_->publish(ThermalDiagnostics::make_fault(
-      now, "thermal_node_overheat", FaultEvent::SEVERITY_CRITICAL, status_message,
-      {"/thermal/nodes/state"}));
+      now, "thermal", "thermal_node_overheat", FaultEvent::SEVERITY_CRITICAL,
+      status_message, {"/thermal/nodes/state"}));
   }
   heartbeat_pub_->publish(ThermalDiagnostics::make_heartbeat(
-    now, SubsystemHeartbeat::LIFECYCLE_ACTIVE, healthy, status_message));
+    now, "thermal", SubsystemHeartbeat::LIFECYCLE_ACTIVE, healthy, status_message));
 }
 
 void ThermalNetworkNode::publishThermalNetworkDiag(

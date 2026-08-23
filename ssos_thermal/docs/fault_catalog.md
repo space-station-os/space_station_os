@@ -6,6 +6,11 @@
 direct threshold check — there's no fault-injection framework in this
 package yet.
 
+`CoolantNode` defines none: it always reports `healthy=true` on
+`/ssos/coolant/heartbeat`. Its most likely real fault condition -- venting
+triggered but the legacy `radiator`'s `VentHeat` service unavailable -- is
+only logged (`RCLCPP_ERROR`) today, not surfaced as a `FaultEvent`.
+
 | Type | Severity | Trigger | `description` |
 |------|----------|---------|----------------|
 | `thermal_node_overheat` | `SEVERITY_CRITICAL` | `enable_failure == true` AND hottest node's temperature > `max_temp_threshold` | `"overheating: <hottest_node_name>"` |

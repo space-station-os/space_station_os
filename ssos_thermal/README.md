@@ -11,23 +11,26 @@ under `src/network/` compiles with **zero ROS dependencies**, so the same
 physics code can run in simulation or on flight hardware. ROS lives only in
 `src/nodes/` and `src/main/`.
 
-> **Status:** `thermal_network_physics`/`thermal_network_ros` implemented
-> and passing tests (`colcon test --packages-select ssos_thermal`).
-> `space_station_thermal_control`'s equivalent executables keep running
-> unmodified — this package doesn't touch it and isn't wired into
-> `space_station.launch.py` yet.
+> **Status:** implemented, tested (`colcon test --packages-select
+> ssos_thermal`), and wired into `space_station.launch.py` (as of the
+> `thermal` + `coolant` `LifecycleNode` entries). `space_station_thermal_control`'s
+> equivalent executables keep running unmodified — this package doesn't
+> touch it.
 
 ## Nodes
 
 | Node | Executable | Model | Highlights |
 |------|-----------|-------|-----------|
 | **Thermal Network** | `thermal_network_node` | Lumped-node conductive/radiative network, `LifecycleNode` | RK4 integration over node/link graph loaded from YAML, coolant-loop feedback via `/coolant_heat_transfer` action, edge-triggered overheat fault |
+| **Coolant** | `coolant_node` | Internal-loop-to-ammonia cooldown model, `LifecycleNode` | Serves the `/coolant_heat_transfer` action both `thermal_network` and the mission-control GUI's `ThermalWidget` consume for Internal/Ammonia Temp feedback; best-effort vent via the legacy `radiator`'s `VentHeat` service |
 | **Sun Vector** | `sun_vector_node` | Low-precision solar ephemeris + body-frame rotation | Port of the legacy `sun_vector`, Bullet Physics dropped for [`math3d.hpp`](include/ssos_thermal/math3d.hpp) |
 | **Solar Heat** | `solar_heat_node` | Per-panel absorbed solar power | Port of the legacy `array_absorptivity`, same Bullet-free swap |
 
-Only these three are in scope — `space_station_thermal_control`'s
-`cooling_server`, `radiator`, and `demand` executables stay where they are;
-see [REFACTOR_PLAN.md](REFACTOR_PLAN.md) for why.
+Only these four are in scope — `space_station_thermal_control`'s
+`radiator` and `demand` executables stay where they are; see
+[REFACTOR_PLAN.md](REFACTOR_PLAN.md) for why, and for what was
+intentionally left behind when `cooling_server` was ported to `coolant_node`
+(an inert Behavior-Tree loop, dead publishers, unused service clients).
 
 ## Build & test
 
@@ -44,20 +47,23 @@ colcon test-result --verbose
 ros2 launch ssos_thermal thermal.launch.py
 ```
 
-The thermal network node is an `rclcpp_lifecycle::LifecycleNode`. It
-self-activates shortly after launch (no external lifecycle `ChangeState`
-call needed), registers with the `system_manager` via
-`/ssos/register_subsystem`, and publishes telemetry alongside heartbeats on
-`/ssos/thermal/heartbeat` and faults on `/ssos/fault_event`.
+`thermal_network` and `coolant_node` are `rclcpp_lifecycle::LifecycleNode`s.
+Each self-activates shortly after launch (no external lifecycle
+`ChangeState` call needed), registers with the `system_manager` via
+`/ssos/register_subsystem` (as `"thermal"` and `"coolant"` respectively —
+both roll up into the mission-control GUI's single "Thermal" roster row),
+and publishes heartbeats on `/ssos/<name>/heartbeat` and faults on
+`/ssos/fault_event`.
 
 ## Parameters
 
 Every physical parameter (`enable_failure`, `enable_cooling`,
 `cooling_trigger_threshold`, `max_temp_threshold`, `cooling_rate`,
-`thermal_update_dt`, `thermal_config_file`) is a ROS 2 parameter,
-live-tunable at runtime — no hardcoded thresholds in C++. See
-[docs/parameters.md](docs/parameters.md) for the full reference, including
-`sun_vector_node`/`solar_heat_node`.
+`thermal_update_dt`, `thermal_config_file`, plus `coolant_node`'s
+`mass_kg`/`specific_heat_j_per_kg_c`/`heat_transfer_efficiency`/
+`vent_threshold_kj`/`target_temp_c`) is a ROS 2 parameter, live-tunable at
+runtime — no hardcoded thresholds in C++. See
+[docs/parameters.md](docs/parameters.md) for the full reference.
 
 ## Documentation
 

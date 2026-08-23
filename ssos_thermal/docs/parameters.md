@@ -37,6 +37,34 @@ ros2 param set /thermal_network enable_failure true
 ros2 param set /thermal_network max_temp_threshold 25.0
 ```
 
+## `coolant_node`
+
+Read once in `on_configure`; a reconfigure cycle is needed to apply a
+change (unlike `thermal_network`'s params, these aren't live-applied
+mid-goal).
+
+| Parameter | Default | Meaning |
+|-----------|---------|---------|
+| `mass_kg` | `200.0` | [kg] internal coolant loop water mass |
+| `specific_heat_j_per_kg_c` | `4186.0` | [J/(kg*degC)] specific heat capacity of water |
+| `heat_transfer_efficiency` | `0.85` | Fraction of removed heat transferred to the ammonia loop |
+| `vent_threshold_kj` | `250.0` | [kJ] ammonia heat above this triggers a radiator vent (best-effort call to the legacy `radiator`'s `VentHeat` service) |
+| `target_temp_c` | `25.0` | [degC] coolant loop setpoint components cool toward |
+
+Plus the shared `autostart`/`autostart_delay_ms` lifecycle-autostart pair.
+Config lives in `config/coolant.yaml`.
+
+### Tuning at runtime
+
+```bash
+ros2 param set /coolant_node vent_threshold_kj 500.0
+# then reconfigure to apply:
+ros2 lifecycle set /coolant_node deactivate
+ros2 lifecycle set /coolant_node cleanup
+ros2 lifecycle set /coolant_node configure
+ros2 lifecycle set /coolant_node activate
+```
+
 ## `solar_heat_node`
 
 | Parameter | Default | Meaning |

@@ -66,7 +66,7 @@ casadi = ">=3.7.2,<4"   # casadi
 PYTHONNOUSERSITE = "1"
 
 [tasks]
-build = "colcon build --symlink-install --packages-up-to space_station ssos_core ssos_sim ssos_eclss"
+build = "colcon build --symlink-install --packages-up-to space_station ssos_core ssos_sim ssos_eclss ssos_thermal"
 test = { cmd = "colcon test --packages-select ssos_eclss && colcon test-result --verbose", depends-on = ["build"] }
 station = { cmd = "bash -c 'source install/setup.bash && ros2 launch space_station space_station.launch.py'", depends-on = ["build"] }
 gui = { cmd = "bash -c 'source install/setup.bash && ros2 run space_station space_station'", depends-on = ["build"] }

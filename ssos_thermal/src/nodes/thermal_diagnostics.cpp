@@ -9,12 +9,12 @@ namespace nodes
 {
 
 SubsystemHeartbeat ThermalDiagnostics::make_heartbeat(
-  const rclcpp::Time & stamp, uint8_t lifecycle_state, bool healthy,
-  const std::string & status_message)
+  const rclcpp::Time & stamp, const std::string & subsystem_name,
+  uint8_t lifecycle_state, bool healthy, const std::string & status_message)
 {
   SubsystemHeartbeat hb;
   hb.stamp = stamp;
-  hb.subsystem_name = "thermal";
+  hb.subsystem_name = subsystem_name;
   hb.lifecycle_state = lifecycle_state;
   hb.healthy = healthy;
   hb.status_message = status_message;
@@ -22,12 +22,13 @@ SubsystemHeartbeat ThermalDiagnostics::make_heartbeat(
 }
 
 FaultEvent ThermalDiagnostics::make_fault(
-  const rclcpp::Time & stamp, const std::string & fault_type, uint8_t severity,
+  const rclcpp::Time & stamp, const std::string & subsystem_name,
+  const std::string & fault_type, uint8_t severity,
   const std::string & description, const std::vector<std::string> & affected)
 {
   FaultEvent ev;
   ev.stamp = stamp;
-  ev.subsystem_name = "thermal";
+  ev.subsystem_name = subsystem_name;
   ev.fault_type = fault_type;
   ev.severity = severity;
   ev.description = description;

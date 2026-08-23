@@ -111,23 +111,16 @@ class ThermalWidget(QWidget):
             ThermalLinkFlowsArray, "/thermal/links/flux", self._link_cb, 10
         )
 
-        # Coolant Action Client (for feedback)
+        # Coolant Action Client (for feedback). The server (coolant_node) is a
+        # lifecycle node that self-activates on its own delay -- in the full
+        # station launch that can be well after this widget is constructed --
+        # so the goal is sent lazily once the server actually appears
+        # (see _maybe_send_coolant_goal, polled from _update_gui) rather than
+        # via a single blocking wait_for_server() at startup, which would
+        # give up long before the server comes up and silently leave the
+        # Internal/Ammonia Temp cards on "NO DATA" forever.
         self.coolant_client = ActionClient(self.node, Coolant, "coolant_heat_transfer")
-
-        goal_msg = Coolant.Goal()
-        goal_msg.component_id = "thermal_gui"
-        goal_msg.input_temperature_c = 30.0  # arbitrary test value
-
-        # timeout_sec keeps the GUI from blocking forever when no server is up
-        if self.coolant_client.wait_for_server(timeout_sec=2.0):
-            self.coolant_client.send_goal_async(
-                goal_msg,
-                feedback_callback=self._coolant_feedback_cb
-            )
-        else:
-            self.node.get_logger().warn(
-                "[ThermalWidget] Coolant action server unavailable; skipping goal"
-            )
+        self._coolant_goal_sent = False
 
     # ------------------- Callbacks -------------------
     def _node_cb(self, msg: ThermalNodeDataArray):
@@ -146,8 +139,24 @@ class ThermalWidget(QWidget):
             self.coolant_status["ammonia_temp_c"] = msg.ammonia_temp_c
             self.coolant_status["vented_heat_kj"] = msg.vented_heat_kj
 
+    def _maybe_send_coolant_goal(self):
+        """Send the one-shot coolant test goal as soon as the action server
+        actually appears. server_is_ready() is non-blocking, so this is safe
+        to poll from the 1 Hz GUI timer without stalling the UI thread."""
+        if self._coolant_goal_sent or not self.coolant_client.server_is_ready():
+            return
+        self._coolant_goal_sent = True
+        goal_msg = Coolant.Goal()
+        goal_msg.component_id = "thermal_gui"
+        goal_msg.input_temperature_c = 30.0  # arbitrary test value
+        self.coolant_client.send_goal_async(
+            goal_msg, feedback_callback=self._coolant_feedback_cb
+        )
+
     # ------------------- GUI Update -------------------
     def _update_gui(self):
+        self._maybe_send_coolant_goal()
+
         with self._lock:
             nodes = dict(self.thermal_nodes)
             links = list(self.thermal_links)

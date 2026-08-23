@@ -10,9 +10,11 @@
 #include "space_station_interfaces/msg/fault_event.hpp"
 #include "space_station_interfaces/msg/subsystem_heartbeat.hpp"
 
-// Heartbeat/fault helpers for the thermal subsystem, mirroring
-// ssos_eclss::nodes::EclssDiagnostics but sized for a single caller:
-// subsystem_name is baked in as "thermal" rather than a parameter.
+// Heartbeat/fault helpers shared by every ssos_thermal node, mirroring
+// ssos_eclss::nodes::EclssDiagnostics. Originally sized for a single caller
+// (subsystem_name baked in as "thermal"); parameterized once a second node
+// (CoolantNode, subsystem_name "coolant") needed its own identity -- same
+// growth EclssDiagnostics went through serving five subsystems.
 
 namespace ssos_thermal
 {
@@ -25,14 +27,15 @@ using FaultEvent = space_station_interfaces::msg::FaultEvent;
 class ThermalDiagnostics
 {
 public:
-  /// Build a heartbeat message for the thermal subsystem.
+  /// Build a heartbeat message.
   static SubsystemHeartbeat make_heartbeat(
-    const rclcpp::Time & stamp, uint8_t lifecycle_state, bool healthy,
-    const std::string & status_message);
+    const rclcpp::Time & stamp, const std::string & subsystem_name,
+    uint8_t lifecycle_state, bool healthy, const std::string & status_message);
 
-  /// Build a fault-event message for the thermal subsystem.
+  /// Build a fault-event message.
   static FaultEvent make_fault(
-    const rclcpp::Time & stamp, const std::string & fault_type, uint8_t severity,
+    const rclcpp::Time & stamp, const std::string & subsystem_name,
+    const std::string & fault_type, uint8_t severity,
     const std::string & description,
     const std::vector<std::string> & affected_interfaces = {});
 
