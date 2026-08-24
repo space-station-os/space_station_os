@@ -54,6 +54,10 @@ set(msg_files
   "sim/srv/InjectFault.srv"
   "sim/srv/RegisterSubsystem.srv"
 
+  # GNC
+  "gnc/msg/GncModeState.msg"
+  "gnc/srv/SetActuationMode.srv"
+
 
 )
 

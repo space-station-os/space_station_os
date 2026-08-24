@@ -1,0 +1,13 @@
+# Request a change of GNC actuation mode.
+#
+# Replaces the free-form string of space_station_gnc/SetGncModeActuation.srv.
+# Requests are guarded: one made inside the minimum dwell window, or for an
+# effector that is unavailable, is refused with a reason rather than ignored.
+
+uint8 MODE_CMG=0
+uint8 MODE_THRUSTER=1
+uint8 mode
+---
+bool success
+string message
+uint8 current_mode
