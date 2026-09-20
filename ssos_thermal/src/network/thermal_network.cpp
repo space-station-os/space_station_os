@@ -23,17 +23,25 @@ ThermalNetwork ThermalNetwork::load_from_yaml(
     node.temperature = reference_temp_c + std::rand() % 10;
 
     const std::string name = entry["node_name"].as<std::string>();
-    const std::string parent_link = entry["parent_link"].as<std::string>();
+    const std::string parent_link =
+      entry["parent_link"] ? entry["parent_link"].as<std::string>() : std::string();
     const double conductance = entry["conductance"].as<double>();
 
     net.nodes_[name] = node;
 
-    ThermalLinkState link;
-    link.from = name;
-    link.to = parent_link;
-    link.joint_name = name;
-    link.conductance = conductance;
-    net.links_.push_back(link);
+    // An empty parent_link marks the root of the tree (e.g. base_link):
+    // it has no parent to conduct to, so no link is created for it. Every
+    // other node's link.to must itself be a declared node_name for
+    // compute_dTdt() to actually exchange heat over it -- see the header
+    // comment on config/thermal_nodes.yaml.
+    if (!parent_link.empty()) {
+      ThermalLinkState link;
+      link.from = name;
+      link.to = parent_link;
+      link.joint_name = name;
+      link.conductance = conductance;
+      net.links_.push_back(link);
+    }
   }
 
   return net;

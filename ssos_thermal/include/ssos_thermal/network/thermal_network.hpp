@@ -40,9 +40,14 @@ public:
 
   // Loads node/link definitions from a YAML file shaped like
   // config/thermal_nodes.yaml: one entry per node with node_name,
-  // parent_link, heat_capacity, internal_power, conductance. Each node gets
-  // a link to its parent_link and an initial temperature randomized around
+  // parent_link, heat_capacity, internal_power, conductance. Each node with
+  // a non-empty parent_link gets a conductive link to it; an empty (or
+  // omitted) parent_link marks a root node (e.g. base_link) with no link of
+  // its own. Every node gets an initial temperature randomized around
   // reference_temp_c (matching the legacy solver's startup behavior).
+  //
+  // A link's "to" must itself be a declared node_name for compute_dTdt() to
+  // exchange heat over it -- a link pointing at an undeclared name is inert.
   static ThermalNetwork load_from_yaml(
     const std::string & filepath, double reference_temp_c = 20.0);
 

@@ -23,8 +23,17 @@ node: `autostart` (`false`), `autostart_delay_ms` (`300`) — see
 Config lives in `config/thermal_network.yaml` (these parameters) and
 `config/thermal_nodes.yaml` (the node/link graph: `node_name`,
 `parent_link`, `heat_capacity`, `internal_power`, `conductance` per entry —
-loaded by `ThermalNetwork::load_from_yaml`, unchanged shape from the legacy
-solver).
+same shape as the legacy solver, loaded by `ThermalNetwork::load_from_yaml`).
+
+`thermal_nodes.yaml` is now a 3-node star: `base_link` (`parent_link: ""`,
+the root — its `heat_capacity`/`internal_power` are the sums of the ~46
+individual equipment nodes this used to model, so the aggregate mass/power
+budget is unchanged) plus `SolarPanel1`/`SolarPanel2`, each linked to
+`base_link`. An empty `parent_link` means "no link" (the root case);
+`load_from_yaml` used to silently create an inert link whenever
+`parent_link` referenced a name that wasn't itself declared as a
+`node_name` (which is exactly what `"base_link"` was before this change) —
+see [REFACTOR_PLAN.md](../REFACTOR_PLAN.md) for the fix.
 
 ### Tuning at runtime
 
@@ -75,10 +84,9 @@ ros2 lifecycle set /coolant_node activate
 No default panel config is installed (none existed in the legacy
 `array_absorptivity` executable either) — panels must be supplied via a
 launch-time parameters file or `ros2 param set` before `/thermal/solar_heat`
-publishes any entries.
+publishes any entries. Even with panels configured, nothing publishes
+today: `solar_heat_node` only computes on receipt of `/sun_vector_body`,
+and the node that used to publish it (`sun_vector_node`, orbital-mechanics
+math) was removed from this package — see
+[architecture.md](architecture.md) and [REFACTOR_PLAN.md](../REFACTOR_PLAN.md).
 
-## `sun_vector_node`
-
-No declared parameters. Subscribes to `/gnc/pose_all`
-(`geometry_msgs/PoseStamped`) and publishes `/sun_vector_body`
-(`geometry_msgs/Vector3`) once a pose has been received.

@@ -21,12 +21,11 @@ physics code can run in simulation or on flight hardware. ROS lives only in
 
 | Node | Executable | Model | Highlights |
 |------|-----------|-------|-----------|
-| **Thermal Network** | `thermal_network_node` | Lumped-node conductive/radiative network, `LifecycleNode` | RK4 integration over node/link graph loaded from YAML, coolant-loop feedback via `/coolant_heat_transfer` action, edge-triggered overheat fault |
+| **Thermal Network** | `thermal_network_node` | Lumped-node conductive network, `LifecycleNode` | RK4 integration over a 3-node star (`base_link`, `SolarPanel1`, `SolarPanel2`) loaded from YAML, coolant-loop feedback via `/coolant_heat_transfer` action, edge-triggered overheat fault |
 | **Coolant** | `coolant_node` | Internal-loop-to-ammonia cooldown model, `LifecycleNode` | Serves the `/coolant_heat_transfer` action both `thermal_network` and the mission-control GUI's `ThermalWidget` consume for Internal/Ammonia Temp feedback; best-effort vent via the legacy `radiator`'s `VentHeat` service |
-| **Sun Vector** | `sun_vector_node` | Low-precision solar ephemeris + body-frame rotation | Port of the legacy `sun_vector`, Bullet Physics dropped for [`math3d.hpp`](include/ssos_thermal/math3d.hpp) |
-| **Solar Heat** | `solar_heat_node` | Per-panel absorbed solar power | Port of the legacy `array_absorptivity`, same Bullet-free swap |
+| **Solar Heat** | `solar_heat_node` | Per-panel absorbed solar power | Port of the legacy `array_absorptivity`, same Bullet-free swap; currently idle — its `/sun_vector_body` input has no publisher since `sun_vector_node` (orbital-mechanics math, out of scope for this package) was removed |
 
-Only these four are in scope — `space_station_thermal_control`'s
+Only these three are in scope — `space_station_thermal_control`'s
 `radiator` and `demand` executables stay where they are; see
 [REFACTOR_PLAN.md](REFACTOR_PLAN.md) for why, and for what was
 intentionally left behind when `cooling_server` was ported to `coolant_node`
@@ -76,8 +75,9 @@ runtime — no hardcoded thresholds in C++. See
 - [docs/fault_catalog.md](docs/fault_catalog.md) — the one fault type this
   package raises today, and how the edge-trigger works
 - [REFACTOR_PLAN.md](REFACTOR_PLAN.md) — the physics/ROS split and
-  `LifecycleNode` migration this package implements, step by step, plus the
-  Bullet Physics removal (`sun_vector`, `solar_heat_node`) in favor of small
-  std-only `Vector3`/`Quaternion` structs
+  `LifecycleNode` migration this package implements, step by step; the
+  Bullet Physics removal (`solar_heat_node`) in favor of a small std-only
+  `Vector3` struct; and the later removal of `sun_vector_node`'s
+  orbital-mechanics math as out of scope for this package
 - [ECLSS_PATTERN_REFERENCE.md](ECLSS_PATTERN_REFERENCE.md) — the
   `ssos_eclss` structure this package mirrors

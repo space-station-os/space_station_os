@@ -14,7 +14,7 @@ Jazzy env (`pixi run ...` or `pixi shell` first).
 
 | Phase | Command | Notes |
 |---|---|---|
-| Launch | `pixi run bash -c "source install/setup.bash && ros2 launch ssos_thermal thermal.launch.py"` | Starts `thermal_network_node` (autostarts to `ACTIVE`), `sun_vector_node`, `solar_heat_node`, `thermal_visualization.py` |
+| Launch | `pixi run bash -c "source install/setup.bash && ros2 launch ssos_thermal thermal.launch.py"` | Starts `thermal_network_node` + `coolant_node` (both autostart to `ACTIVE`), `solar_heat_node`, `thermal_visualization.py` |
 
 ## Inspect
 
@@ -43,10 +43,10 @@ Jazzy env (`pixi run ...` or `pixi shell` first).
 | Shutdown | `Ctrl+C` in the terminal running `ros2 launch` | Sends `SIGINT`, which cascades to all child processes and lets `thermal_network` run `on_deactivate`/`on_cleanup` before exit |
 | Force shutdown | `Ctrl+C` a second time in that same terminal | `ros2 launch`'s own escalation: if a node doesn't exit within its shutdown timeout after the first `SIGINT`, a second one force-kills the whole process tree immediately, skipping `on_deactivate`/`on_cleanup` |
 | Force shutdown | `pkill -9 -f "ros2 launch ssos_thermal"` | Use if the launch terminal itself is gone/unresponsive (e.g. killed the shell, not the launch) — kills the `ros2 launch` process outright; orphaned children usually follow, but verify with the next command |
-| Force shutdown | `pkill -9 -f "install/ssos_thermal/lib/ssos_thermal/"` | Belt-and-suspenders: force-kills `thermal_network_node`, `sun_vector_node`, `solar_heat_node` directly by install path if any survive the above |
+| Force shutdown | `pkill -9 -f "install/ssos_thermal/lib/ssos_thermal/"` | Belt-and-suspenders: force-kills `thermal_network_node`, `coolant_node`, `solar_heat_node` directly by install path if any survive the above |
 
 ## Verify
 
 | Phase | Command | Notes |
 |---|---|---|
-| Verify | `ps aux \| grep -E "ros2 launch\|thermal_network_node\|sun_vector_node\|solar_heat_node\|thermal_visualization" \| grep -v grep` | Lists the full process tree while running (`pixi run` wrapper -> `ros2 launch` -> the four node/script processes); **empty output after shutdown confirms everything actually exited** rather than assuming a signal worked |
+| Verify | `ps aux \| grep -E "ros2 launch\|thermal_network_node\|coolant_node\|solar_heat_node\|thermal_visualization" \| grep -v grep` | Lists the full process tree while running (`pixi run` wrapper -> `ros2 launch` -> the four node/script processes); **empty output after shutdown confirms everything actually exited** rather than assuming a signal worked |

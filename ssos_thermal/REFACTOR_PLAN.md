@@ -41,8 +41,9 @@ space_station_thermal_control/
 ├── test/                                [new] mirrors ssos_eclss/test/
 │   ├── unit/network/test_thermal_network.cpp
 │   └── ros/test_thermal_network_node.cpp
-└── config/thermal_nodes.yaml            unchanged — already close to
-                                          ssos_eclss's one-YAML-per-subsystem
+└── config/thermal_nodes.yaml            reduced to 3 nodes — see
+                                          "Also in scope: reduce the node
+                                          graph to 3 components" below
 ```
 
 ```
@@ -286,10 +287,10 @@ scoped to `thermal_network`, as above). `space_station_thermal_control`'s
 `sun_vector` and `array_absorptivity` executables are untouched and keep
 running as-is; nothing removes them.
 
-**Not yet planned:** removal of the orbit-calculation piece (the
-Julian-date/ECI sun-position math in `sun_vector.hpp`, and/or GNC's
-`orbit_dynamics` node) was mentioned as separate future work — no scope or
-approach decided yet; revisit once that's ready to plan.
+**Update — later removed:** the orbit-calculation piece (`sun_vector_node`,
+Julian-date/ECI sun-position math) was pulled back out of `ssos_thermal`
+entirely; see "Also in scope: remove the orbit-calculation piece
+(`sun_vector_node`)" below.
 
 ## Also in scope: port `cooling_server` into `ssos_thermal` as `coolant_node`
 
@@ -371,6 +372,78 @@ registers as `'coolant'`, the GUI's retried goal is accepted
 launch — the venting step logs `[RADIATOR] VentHeat service not available`
 exactly as designed (graceful degradation, not a failure).
 
+## Also in scope: reduce the node graph to 3 components, fix a dead-link bug
+
+`config/thermal_nodes.yaml` originally carried ~46 lumped equipment nodes
+plus `SolarPanel1`/`SolarPanel2`, mirroring the legacy solver's synthetic
+demo config. Reduced to 3 nodes: `base_link` (the station structure, one
+lumped mass standing in for every interior subsystem/avionics load the
+other 46 entries used to represent individually) plus the two solar panels.
+
+**Bug found and fixed in the process:** every one of the original 46
+entries pointed `parent_link` at `"base_link"` or at another entry, but
+`"base_link"` itself was never declared as a `node_name` anywhere in the
+file. `ThermalNetwork::compute_dTdt()` only exchanges heat between names
+present in its node map, so a link whose `to` isn't a declared node is
+inert — every top-level component's conduction to "the structure" was
+silently a no-op; only parent/child pairs *within* the equipment tree
+(e.g. `Camera1` → `MainComputer`) ever actually exchanged heat. This was
+invisible before because the network had enough internal complexity that
+nothing exercised the top-level case directly.
+
+Fixed two ways:
+- `base_link` is now a real declared node (`heat_capacity`/`internal_power`
+  are the **sums** of the previous 46 non-panel entries — 30300.0 J/°C and
+  1380.0 W — so the aggregate thermal mass and power budget this network
+  represents is unchanged, only the topology is simplified to a 3-node
+  star: `SolarPanel1`/`SolarPanel2` each conduct to `base_link`).
+- `ThermalNetwork::load_from_yaml()` now treats an empty (or omitted)
+  `parent_link` as "this is the root, no link" instead of creating a link
+  to an implicit, undeclared name — so a future root node can't silently
+  reproduce the same bug. `base_link`'s own `parent_link: ""` uses this.
+
+**Explicitly not done** in this pass (approved scope was the node-count
+reduction + the base_link fix only): `SolarPanel1`/`SolarPanel2` still use
+a constant YAML `internal_power` (10.0 W each, a stand-in for wiring
+resistive losses) rather than the real per-panel absorbed solar power
+`SolarHeatNode` already computes on `/thermal/solar_heat` — `ThermalNetworkNode`
+does not subscribe to that topic. No radiative heat-rejection term exists
+either, so nothing in this network can shed heat to space; the only heat
+sink for the whole graph remains the coolant-loop action's
+`set_all_temperatures()` snap-down, same as before this change. Both are
+natural follow-ups if solar-driven panel temperatures are wanted later.
+
+## Also in scope: remove the orbit-calculation piece (`sun_vector_node`)
+
+`sun_vector_node` (`include/ssos_thermal/nodes/sun_vector_node.hpp` +
+`src/nodes/sun_vector_node.cpp`) computed Julian date, Julian centuries
+since J2000.0, and a low-precision solar ephemeris (unit sun vector in the
+ECI frame) from ROS time, then rotated it into the spacecraft body frame
+using `/gnc/pose_all`. That's orbital-mechanics/spacecraft-attitude math,
+not thermal physics — it belongs with GNC (which already owns
+`orbit_dynamics` and spacecraft pose), not `ssos_thermal`. Removed
+entirely: `sun_vector_node.hpp`/`.cpp`, its `add_executable` and install
+entry in `CMakeLists.txt`, and its `Node` entry in `launch/thermal.launch.py`.
+
+`math3d::Quaternion` was removed from `include/ssos_thermal/math3d.hpp`
+alongside it — it existed solely for `sun_vector_node`'s body-frame
+rotation (`q_body_inv * s_quat * q_body`); nothing else in the package uses
+quaternions. `math3d::Vector3` stays — `solar_heat_node` still uses it for
+the panel-normal/sun-direction dot product.
+
+**Consequence:** `solar_heat_node` subscribes to `/sun_vector_body`, which
+nothing in `ssos_thermal` publishes anymore. It's still launched (the
+per-panel absorbed-solar-power calculation itself is a legitimate thermal
+concern, not an orbital one), but it now sits idle — `sunVectorCallback()`
+never fires, so `/thermal/solar_heat` never publishes — until some
+in-scope node (most likely GNC, eventually) publishes a sun vector. This
+was already effectively inert from `ThermalNetworkNode`'s point of view
+before this change too (see "Also in scope: reduce the node graph to 3
+components" above — `ThermalNetworkNode` never subscribed to
+`/thermal/solar_heat` in the first place), so no simulated behavior
+regresses; the difference is that `/sun_vector_body` now has zero
+publishers instead of one.
+
 ## Explicitly out of scope (still true)
 
 - [ ] `radiator`, `demand` stay as plain `rclcpp::Node`s in
@@ -381,6 +454,11 @@ exactly as designed (graceful degradation, not a failure).
       no simulated-environment input (orbital day/night, cabin temp); its
       heat sources are still purely the YAML `internal_power` values. A
       physics decision, not wiring — not started.
+- [ ] Wiring `/thermal/solar_heat` (already published by `SolarHeatNode`)
+      into `SolarPanel1`/`SolarPanel2`'s heat balance, and a radiative
+      heat-rejection term for the panels — see "Also in scope: reduce the
+      node graph to 3 components" above for why these were left out of the
+      node-count reduction.
 - [ ] Fault-injection scenario integration — no YAML-schedulable faults for
       thermal/coolant, unlike `ssos_eclss`'s `FaultInjector`.
 - [ ] `CoolantNode` has no fault model (always `healthy=true`) — see
@@ -393,7 +471,7 @@ exactly as designed (graceful degradation, not a failure).
 - [x] `pixi run build` compiles `ssos_thermal` clean (added to the pixi
       task's `--packages-up-to` list)
 - [x] `colcon test --packages-select ssos_thermal` passes — 4 test binaries,
-      17 gtest cases (`test_thermal_network`, `test_coolant_loop`,
+      18 gtest cases (`test_thermal_network`, `test_coolant_loop`,
       `test_thermal_network_node`, `test_coolant_node`)
 - [x] `ros2 launch ssos_thermal thermal.launch.py` (or the full
       `space_station.launch.py`), then `ros2 lifecycle get /thermal_network`

@@ -59,6 +59,8 @@ class ThermalNodeItem(QGraphicsEllipseItem):
     """
 
     SIZE_SCALE = 0.04
+    MIN_NODE_SIZE = 20.0
+    MAX_NODE_SIZE = 90.0
     DEFAULT_FONT_SIZE = 7
     MIN_TEMP = 0.0
     MAX_TEMP = 80.0
@@ -94,7 +96,9 @@ class ThermalNodeItem(QGraphicsEllipseItem):
 
     def _compute_size(self, heat_capacity):
         """Compute node size based on heat capacity."""
-        return heat_capacity * self.SIZE_SCALE
+        # Clamped so one high-heat_capacity node (e.g. base_link, an
+        # aggregate lumped mass) can't visually dwarf the rest of the graph.
+        return max(self.MIN_NODE_SIZE, min(self.MAX_NODE_SIZE, heat_capacity * self.SIZE_SCALE))
 
     def _tooltip_text(self):
         """Return tooltip summary for node."""
