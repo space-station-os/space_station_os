@@ -73,20 +73,3 @@ ros2 lifecycle set /coolant_node cleanup
 ros2 lifecycle set /coolant_node configure
 ros2 lifecycle set /coolant_node activate
 ```
-
-## `solar_heat_node`
-
-| Parameter | Default | Meaning |
-|-----------|---------|---------|
-| `solar_constant` | `1361.0` | [W/m²] Solar irradiance at 1 AU |
-| `panels_names` | `[]` | List of panel names; each name `<n>` requires `<n>.absorptivity`, `<n>.area`, `<n>.normal` (3-element list, body-frame unit vector) |
-
-No default panel config is installed (none existed in the legacy
-`array_absorptivity` executable either) — panels must be supplied via a
-launch-time parameters file or `ros2 param set` before `/thermal/solar_heat`
-publishes any entries. Even with panels configured, nothing publishes
-today: `solar_heat_node` only computes on receipt of `/sun_vector_body`,
-and the node that used to publish it (`sun_vector_node`, orbital-mechanics
-math) was removed from this package — see
-[architecture.md](architecture.md) and [REFACTOR_PLAN.md](../REFACTOR_PLAN.md).
-

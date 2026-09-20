@@ -431,40 +431,43 @@ rotation (`q_body_inv * s_quat * q_body`); nothing else in the package uses
 quaternions. `math3d::Vector3` stays — `solar_heat_node` still uses it for
 the panel-normal/sun-direction dot product.
 
-**Consequence:** `solar_heat_node` subscribes to `/sun_vector_body`, which
-nothing in `ssos_thermal` publishes anymore. It's still launched (the
-per-panel absorbed-solar-power calculation itself is a legitimate thermal
-concern, not an orbital one), but it now sits idle — `sunVectorCallback()`
-never fires, so `/thermal/solar_heat` never publishes — until some
-in-scope node (most likely GNC, eventually) publishes a sun vector. This
-was already effectively inert from `ThermalNetworkNode`'s point of view
-before this change too (see "Also in scope: reduce the node graph to 3
-components" above — `ThermalNetworkNode` never subscribed to
-`/thermal/solar_heat` in the first place), so no simulated behavior
-regresses; the difference is that `/sun_vector_body` now has zero
-publishers instead of one.
+**Update — `solar_heat_node` also later removed:** with nothing publishing
+`/sun_vector_body`, `solar_heat_node` had no way to ever produce output —
+`sunVectorCallback()` could never fire, so it was permanently idle, not
+just temporarily. Reviewing this doc's own architecture made that dead
+end obvious, so `solar_heat_node.hpp`/`.cpp` were removed too (along with
+their `add_executable`/install entries, its `Node` entry in
+`launch/thermal.launch.py`, and `find_package(geometry_msgs)`, which
+nothing else in the package needed). `math3d::Vector3` — its only
+remaining user — was removed alongside it, so `math3d.hpp` is gone
+entirely. `ssos_thermal` now has exactly two nodes: `thermal_network` and
+`coolant_node`. If solar heating is wanted later, both the sun-vector
+source and the panel-absorption calculation would need to be reintroduced
+together, ideally with `thermal_network` actually wired to consume the
+result this time (see the "Explicitly out of scope" item below).
 
 ## Explicitly out of scope (still true)
 
-- [ ] `radiator`, `demand` stay as plain `rclcpp::Node`s in
-      `space_station_thermal_control`, unregistered — no GUI/roster surface
-      distinguishes them today. (`cooling_server`/`array_absorptivity`/
-      `sun_vector` are done — ported above.)
+- [ ] `radiator`, `demand`, `sun_vector`, `array_absorptivity` stay as
+      plain `rclcpp::Node`s in `space_station_thermal_control`,
+      unregistered — no GUI/roster surface distinguishes them today.
+      (`cooling_server` is done — ported to `coolant_node` above;
+      `ssos_thermal`'s own Bullet-free ports of `sun_vector`/
+      `array_absorptivity` were built, then later removed again — see
+      "Also in scope: remove the orbit-calculation piece" above.)
 - [ ] `ssos_sim`/`/sim/world_state` coupling — `thermal_network` still has
       no simulated-environment input (orbital day/night, cabin temp); its
       heat sources are still purely the YAML `internal_power` values. A
       physics decision, not wiring — not started.
-- [ ] Wiring `/thermal/solar_heat` (already published by `SolarHeatNode`)
-      into `SolarPanel1`/`SolarPanel2`'s heat balance, and a radiative
-      heat-rejection term for the panels — see "Also in scope: reduce the
-      node graph to 3 components" above for why these were left out of the
-      node-count reduction.
+- [ ] Solar heating and radiative heat-rejection for `SolarPanel1`/
+      `SolarPanel2` — no sun-vector source or panel-absorption calculation
+      exists in `ssos_thermal` at all anymore (removed, see above); the
+      panels heat only from `internal_power` plus conduction to
+      `base_link`, same as any other node.
 - [ ] Fault-injection scenario integration — no YAML-schedulable faults for
       thermal/coolant, unlike `ssos_eclss`'s `FaultInjector`.
 - [ ] `CoolantNode` has no fault model (always `healthy=true`) — see
       `docs/fault_catalog.md`.
-- [ ] Removal of the orbit-calculation piece in `sun_vector.hpp` — no scope
-      or approach decided yet.
 
 ## Verification checklist
 

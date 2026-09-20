@@ -1,25 +1,3 @@
-# Reduced 3-node thermal network: base_link (the station structure, one
-# lumped mass standing in for every interior subsystem/avionics load that
-# used to be modeled as ~46 separate nodes) plus the two solar array wings.
-#
-# base_link's heat_capacity/internal_power are the *sums* of the previous
-# per-component config (46 nodes, excluding the two solar panels), so the
-# aggregate thermal mass and power budget this network represents is
-# unchanged -- only the graph topology is simplified from a multi-level
-# equipment tree down to a 3-node star.
-#
-# base_link has no parent_link (it's the root): load_from_yaml() only
-# creates a conductive link for entries with a non-empty parent_link, so
-# base_link gets none of its own. SolarPanel1/SolarPanel2 each link to it.
-#
-# Before this change, "base_link" was referenced as parent_link by many
-# nodes but never itself declared as a node_name entry -- since
-# compute_dTdt() only exchanges heat between names present in the node map,
-# every one of those links was silently inert (conduction to a link target
-# that isn't simulated contributes nothing). Declaring base_link here fixes
-# that: SolarPanel1/2 now actually conduct heat to/from the station
-# structure.
-
 - node_name: "base_link"
   parent_link: ""
   heat_capacity: 30300.0

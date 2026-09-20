@@ -1,12 +1,4 @@
-"""Launch the ssos_thermal nodes: thermal_network, coolant, solar_heat.
-
-solar_heat_node subscribes to `/sun_vector_body`, but nothing in this
-package publishes it -- the Julian-date/ECI sun-position math that used to
-live here (`sun_vector_node`) was orbital-mechanics logic that belongs to
-GNC, not thermal, and was removed. solar_heat_node is still launched (it's
-a legitimate thermal/radiometric calculation given a sun vector as input)
-but currently sits idle with nothing to consume until some in-scope node
-publishes `/sun_vector_body`.
+"""Launch the ssos_thermal nodes: thermal_network, coolant.
 
 thermal_network and coolant self-activate via their `autostart` parameter
 (set true here): each configures then activates itself
@@ -55,12 +47,6 @@ def generate_launch_description():
         parameters=[os.path.join(share, 'config', 'coolant.yaml'),
                     {'autostart': True, 'autostart_delay_ms': delay}])
 
-    solar_heat = Node(
-        package='ssos_thermal',
-        executable='solar_heat_node',
-        name='solar_heat_node',
-        output='screen')
-
     visualization = Node(
         package='ssos_thermal',
         executable='thermal_visualization.py',
@@ -80,6 +66,5 @@ def generate_launch_description():
                                           'whose own GUI already has a Thermal panel.'),
         thermal_network,
         coolant,
-        solar_heat,
         visualization,
     ])

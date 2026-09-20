@@ -16,7 +16,6 @@ find_package(ament_index_cpp REQUIRED)
 find_package(space_station_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(geometry_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(lifecycle_msgs REQUIRED)
 find_package(yaml-cpp REQUIRED)
@@ -53,15 +52,12 @@ add_executable(coolant_node src/main/coolant_main.cpp)
 target_link_libraries(coolant_node thermal_network_ros)
 ament_target_dependencies(coolant_node rclcpp rclcpp_lifecycle rclcpp_action)
 
-add_executable(solar_heat_node src/nodes/solar_heat_node.cpp)
-ament_target_dependencies(solar_heat_node rclcpp geometry_msgs space_station_interfaces)
-
 # ---- Install ----
 install(TARGETS thermal_network_physics thermal_network_ros
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
-install(TARGETS thermal_network_node coolant_node solar_heat_node
+install(TARGETS thermal_network_node coolant_node
   RUNTIME DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY include/ DESTINATION include)
 install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch)
