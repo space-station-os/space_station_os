@@ -1,0 +1,38 @@
+name: Pixi CI
+
+on:
+  push:
+    branches:
+      - main
+      - v0.8.9-dev
+      - 'v0.9.*-dev'
+  pull_request:
+
+concurrency:
+  group: pixi-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pixi-validation:
+    name: Pixi Locked Environment
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Pixi
+        uses: prefix-dev/setup-pixi@v0.10.0
+        with:
+          pixi-version: v0.73.0
+          locked: true
+          cache: true
+
+      - name: Build with Pixi
+        run: pixi run build
+
+      - name: Test with Pixi
+        run: pixi run test
+
+      - name: Verify lock file unchanged
+        run: git diff --exit-code -- pixi.lock

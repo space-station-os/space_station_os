@@ -19,3 +19,4 @@ desktop/space-station-os.desktop.in
 
 #claude
 CLAUDE.md
+/desktop/*.log

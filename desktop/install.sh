@@ -39,8 +39,8 @@ mkdir -p "$DESKTOP_DIR"
 # Emits progress (percent + '# label') on stdout; verbose output goes to LOG.
 run_steps() {
   echo 10;  echo "# Checking environment..."
-  echo 25;  echo "# Fetching ROS 2 environment (pixi install)..."
-  ( cd "$REPO_DIR" && pixi install ) >>"$LOG" 2>&1 || return 1
+  echo 25;  echo "# Fetching ROS 2 environment (pixi install --locked)..."
+  ( cd "$REPO_DIR" && pixi install --locked ) >>"$LOG" 2>&1 || return 1
   echo 65;  echo "# Building Space Station OS (this can take a minute)..."
   ( cd "$REPO_DIR" && pixi run build ) >>"$LOG" 2>&1 || return 1
   echo 85;  echo "# Installing desktop shortcut..."

@@ -57,21 +57,26 @@ jobs:
             --cmake-args -DCMAKE_BUILD_TYPE=Release
         shell: bash
 
-      - name: Test (non-blocking)
+      - name: Test
         run: |
           source /opt/ros/jazzy/setup.bash
           source install/setup.bash
+
+          # v0.9+ blocking test boundary:
+          # all current and future ssos_* packages.
+          # The top-level space_station app and legacy space_station_* packages
+          # remain build-checked; application/lint validation is handled separately.
           colcon test \
+            --packages-select-regex '^ssos_.*$' \
             --event-handlers console_direct+
         shell: bash
-        continue-on-error: true
 
       - name: Test results
         if: always()
         run: |
           source /opt/ros/jazzy/setup.bash
           source install/setup.bash
-          colcon test-result --verbose || true
+          colcon test-result --verbose
         shell: bash
 
   # Lightweight lint check — runs in parallel with build

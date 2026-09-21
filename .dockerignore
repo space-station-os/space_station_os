@@ -1,0 +1,12 @@
+# Keep local colcon/pixi artifacts out of the build context so `COPY . src/...`
+# never drops a stale install/ or build/ tree into the image.
+build/
+install/
+log/
+.pixi/
+__pycache__/
+*.py[cod]
+
+.git/
+.github/
+node_modules/
