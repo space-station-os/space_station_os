@@ -1,0 +1,16 @@
+eps_node:
+  ros__parameters:
+    use_sim_time: true
+
+    step_rate_hz: 1.0
+
+    solar_array_area_m2: 100.0
+    solar_array_efficiency: 0.30
+
+    load_demand_w: 20000.0
+
+    battery_capacity_wh: 50000.0
+    initial_battery_soc: 0.80
+    low_soc_threshold: 0.20
+
+    enable_auto_faults: true
