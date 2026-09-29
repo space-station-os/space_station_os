@@ -67,7 +67,11 @@ RUN mkdir -p src
 COPY . src/space_station_os
 
 # Install ROS dependencies
-RUN bash -c "source /opt/ros/jazzy/setup.bash && rosdep install --from-paths src --ignore-src -r -y"
+# apt lists were cleared above, and rosdep shells out to `apt-get install`
+# without refreshing them first, so update before resolving.
+RUN apt update \
+ && bash -c "source /opt/ros/jazzy/setup.bash && rosdep install --from-paths src --ignore-src -r -y" \
+ && rm -rf /var/lib/apt/lists/*
 RUN rosdep resolve gz-harmonic || true
 
 # Build workspace

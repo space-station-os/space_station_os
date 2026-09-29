@@ -18,7 +18,7 @@ Only the shortcut goes on the Desktop; everything else stays in the repo:
 | Desktop shortcut | `~/Desktop/SpaceStationOS.desktop` |
 | Launcher | `<repo>/desktop/launch.sh` |
 | Icon | `<repo>/assets/logo/ssosapplogo.png` |
-| pixi environment | `<repo>/.pixi/` (created by `pixi install`) |
+| pixi environment | `<repo>/.pixi/` (created by `pixi install --locked`) |
 
 The launcher `cd`s into the `space_station_os` folder before running
 `pixi run station`, because a Desktop double-click starts from an arbitrary
@@ -26,18 +26,33 @@ directory.
 
 ## Install
 
+On a clean Ubuntu 24.04 Desktop installation:
+
 ```bash
-cd <repo>/space_station_os
+sudo apt update
+sudo apt install -y curl git zenity
+
+curl -fsSL https://pixi.sh/install.sh | sh
+export PATH="$HOME/.pixi/bin:$PATH"
+
+git clone https://github.com/space-station-os/space_station_os.git
+cd space_station_os
+
 bash desktop/install.sh
 ```
 
-A progress popup steps through: check pixi -> `pixi install` (fetch ROS 2 Jazzy)
--> `pixi run build` -> create the Desktop shortcut. When it finishes, a
-"double-click the icon on your Desktop" popup appears.
+The installer runs `pixi install --locked`, builds SSOS, and creates the
+desktop shortcut.
 
-Prerequisite: [pixi installed](https://pixi.sh/latest/#installation). Ubuntu
-(GNOME) with `zenity` (present by default) shows the progress popups; on a
-headless machine the installer prints progress to the terminal instead.
+Pixi is installed into `~/.pixi/bin`. A new terminal will normally pick up the
+updated `PATH` automatically.
+
+During installation, the progress popup reports environment setup, build, and
+desktop-shortcut creation. When installation finishes, a confirmation popup
+instructs the user to double-click the Space Station OS icon.
+
+On Ubuntu Desktop, `zenity` provides the installation progress popups. On a
+headless machine, the installer prints progress to the terminal instead.
 
 ## Launch
 
@@ -62,7 +77,7 @@ most changes there is nothing special to do:
 | You changed... | To pick it up |
 |----------------|---------------|
 | Node / GUI **code** | `git pull` (or edit) — the next double-click rebuilds and runs the latest. Run `pixi run build` first if you want to catch build errors before launching. |
-| **Dependencies** in `pixi.toml` | `pixi install` (updates the env + `pixi.lock`). |
+| **Dependencies** in `pixi.toml` | Follow the dependency-update procedure in [PIXI.md](PIXI.md), regenerate `pixi.lock`, then verify with `pixi install --locked`. |
 | The **launcher, `.desktop` template, or icon** (`desktop/`, `assets/logo/`) | re-run `bash desktop/install.sh` to refresh the shortcut, icon, and trust flag. |
 | The **logo** source | regenerate `assets/logo/ssosapplogo.png` (256×256, see below), then re-run `bash desktop/install.sh`. |
 

@@ -5,7 +5,7 @@
 # GUI's Python deps) is pinned by pixi.lock.
 #
 # Quick start (Linux):
-#   pixi install          # resolve + fetch the environment
+#   pixi install --locked # install the committed locked environment
 #   pixi run build        # colcon build the SSOS packages
 #   pixi run station      # launch the full stack (GUI + core + sim + eclss)
 #
@@ -14,7 +14,7 @@
 
 [workspace]
 name = "space-station-os"
-version = "0.8.9"
+version = "0.9.0"
 description = "Space Station OS -- reproducible ROS 2 Jazzy build/run environment (RoboStack)"
 channels = ["https://prefix.dev/robostack-jazzy", "conda-forge"]
 platforms = ["linux-64"]
