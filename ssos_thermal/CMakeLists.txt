@@ -86,6 +86,11 @@ if(BUILD_TESTING)
   target_link_libraries(test_coolant_node thermal_network_ros)
   ament_target_dependencies(test_coolant_node rclcpp rclcpp_lifecycle rclcpp_action
     space_station_interfaces diagnostic_msgs lifecycle_msgs)
+
+  set_tests_properties(test_thermal_network_node PROPERTIES
+    ENVIRONMENT "ROS_DOMAIN_ID=214")
+  set_tests_properties(test_coolant_node PROPERTIES
+    ENVIRONMENT "ROS_DOMAIN_ID=215")
 endif()
 
 ament_package()
