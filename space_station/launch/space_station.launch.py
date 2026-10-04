@@ -1,16 +1,20 @@
 """SSOS mission-control launch.
 
-CURRENT TEST CONFIG: ECLSS only, with ssos_core (system_manager) and ssos_sim
-(simulation_controller). Sequencing:
+CURRENT TEST CONFIG: ECLSS + ssos_thermal + GNC/orbit, with ssos_core
+(system_manager) and ssos_sim (simulation_controller). Sequencing:
   - all processes start at t=0,
   - system_manager + simulation_controller are configured on start and ACTIVATED
     at t=10s,
-  - the ECLSS nodes self-activate at t=11s (autostart_delay_ms) -- i.e. after
-    core+sim are active, so registration with the system_manager succeeds and
-    the simulator's /sim/world_state is already flowing.
+  - the ECLSS and ssos_thermal nodes self-activate at t=11s (autostart_delay_ms)
+    -- i.e. after core+sim are active, so registration with the system_manager
+    succeeds. (ssos_thermal's thermal_network doesn't read /sim/world_state
+    today -- see ssos_thermal/docs/architecture.md -- so it isn't strictly
+    order-dependent on sim, but is timed the same as ECLSS for a clean
+    registration.)
+  - GNC/orbit start immediately (not lifecycle-managed).
 
-Thermal / EPS / GNC / orbit are commented out for this ECLSS-focused test;
-re-enable the blocks at the bottom to bring the full station back.
+EPS is commented out for this test; re-enable the block at the bottom to
+bring the full station back.
 """
 import os
 
@@ -98,6 +102,17 @@ def generate_launch_description():
         launch_arguments={'autostart_delay_ms': '11000'}.items(),
     )
 
+    # ---- ssos_thermal (self-activates at t=11s, after core+sim -- same
+    # pattern as ECLSS above). launch_visualization=false since the
+    # mission-control GUI's own Thermal panel already covers this. ----
+    thermal = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(
+            get_package_share_directory('ssos_thermal'),
+            'launch', 'thermal.launch.py')),
+        launch_arguments={'autostart_delay_ms': '11000',
+                          'launch_visualization': 'false'}.items(),
+    )
+
     # ---- GNC / orbit (re-enabled: needed for the GNC panel's station model
     # + orbit trajectory rendering) ----
     gnc_core = IncludeLaunchDescription(
@@ -119,6 +134,7 @@ def generate_launch_description():
         sim_controller,
         activate_core_sim,
         eclss,
+        thermal,
         gnc_core,
         orbit_dynamics,
     ])

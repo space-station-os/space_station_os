@@ -34,6 +34,7 @@ set(msg_files
   "eps/srv/Load.srv"
   "eps/msg/BCDUStatus.msg"
   # ATCS
+  "atcs/msg/CoolantStatus.msg"
   "atcs/msg/ExternalLoopStatus.msg"
   "atcs/msg/SolarPanelsQ.msg"
   "atcs/msg/TankStatus.msg"

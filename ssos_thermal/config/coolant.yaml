@@ -1,0 +1,7 @@
+coolant_node:
+  ros__parameters:
+    mass_kg: 200.0                        # [kg] internal coolant loop water mass
+    specific_heat_j_per_kg_c: 4186.0       # [J/(kg*degC)] specific heat capacity of water
+    heat_transfer_efficiency: 0.85         # fraction of removed heat transferred to ammonia loop
+    vent_threshold_kj: 250.0               # [kJ] ammonia heat above this triggers a radiator vent
+    target_temp_c: 25.0                    # [degC] coolant loop setpoint components cool toward

@@ -1,0 +1,17 @@
+- node_name: "base_link"
+  parent_link: ""
+  heat_capacity: 30300.0
+  internal_power: 1380.0
+  conductance: 0.0
+
+- node_name: "SolarPanel1"
+  parent_link: "base_link"
+  heat_capacity: 1200.0
+  internal_power: 10.0
+  conductance: 0.5
+
+- node_name: "SolarPanel2"
+  parent_link: "base_link"
+  heat_capacity: 1200.0
+  internal_power: 10.0
+  conductance: 0.5
