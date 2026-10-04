@@ -1,0 +1,38 @@
+attitude_control:
+  ros__parameters:
+    subsystem_name: "gnc"
+    step_rate_hz: 10.0
+    heartbeat_rate_hz: 1.0
+
+    thrusters:
+      table_path: ""
+      table_name: "sixdof_phys"
+
+    control:
+      cmg:
+        kp: 300000.0
+        kd: 300000.0
+      thruster:
+        kp: 1000000.0
+        kd: 1000000.0
+
+      filter:
+        angle_alpha: 0.0
+        rate_alpha: 0.0
+
+      dead_zone:
+        enabled: true
+        angle_on_deg: 0.150
+        angle_off_deg: 0.100
+        rate_on_dps: 0.250
+        rate_off_dps: 0.150
+
+      unload:
+        gain: 10.0
+        completion_threshold: 0.01
+
+    modes:
+      min_dwell_s: 1.0
+
+    actuators:
+      gimbal_rate_limit: 0.5
