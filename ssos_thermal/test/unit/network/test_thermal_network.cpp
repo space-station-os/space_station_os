@@ -132,3 +132,45 @@ TEST_F(ThermalNetworkRootTest, RootNodeActuallyReceivesConductedHeat)
   const double base_after = net.node_temperature("base_link");
   EXPECT_GT(base_after, base_before);
 }
+
+TEST_F(ThermalNetworkRootTest, LinkHeatFlowIsZeroAtEqualTemperatures)
+{
+  ThermalNetwork net = ThermalNetwork::load_from_yaml(path_);
+  net.set_all_temperatures(40.0);
+  ASSERT_EQ(net.links().size(), 1u);
+  EXPECT_DOUBLE_EQ(net.link_heat_flow(net.links().front()), 0.0);
+}
+
+TEST_F(ThermalNetworkRootTest, LinkHeatFlowUsesBothConnectedNodeTemperatures)
+{
+  // Regression test: telemetry used to compare each node against a fixed
+  // 20 degC reference instead of the node at the other end of the link.
+  // Panel (50 W) heats faster than base_link, so heat flows Panel -> base_link.
+  ThermalNetwork net = ThermalNetwork::load_from_yaml(path_);
+  net.set_all_temperatures(20.0);
+  for (int i = 0; i < 20; ++i) {
+    net.step(1.0);
+  }
+  const auto & link = net.links().front();
+  ASSERT_EQ(link.from, "Panel");
+  ASSERT_EQ(link.to, "base_link");
+
+  const double t_panel = net.node_temperature("Panel");
+  const double t_base = net.node_temperature("base_link");
+  ASSERT_GT(t_panel, t_base);
+  EXPECT_DOUBLE_EQ(net.link_heat_flow(link), link.conductance * (t_panel - t_base));
+  EXPECT_GT(net.link_heat_flow(link), 0.0);
+}
+
+TEST_F(ThermalNetworkTest, LinkToUndeclaredNodeCarriesNoHeat)
+{
+  // A's parent_link "base_link" is not a declared node in this fixture, so
+  // compute_dTdt() exchanges no heat over that link; telemetry must agree.
+  ThermalNetwork net = ThermalNetwork::load_from_yaml(path_);
+  net.set_all_temperatures(60.0);
+  for (const auto & link : net.links()) {
+    if (link.to == "base_link") {
+      EXPECT_DOUBLE_EQ(net.link_heat_flow(link), 0.0);
+    }
+  }
+}

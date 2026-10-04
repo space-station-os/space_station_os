@@ -199,10 +199,7 @@ void ThermalNetworkNode::updateSimulation()
     l.node_a = link.from;
     l.node_b = link.to;
     l.conductance = link.conductance;
-
-    const double t_a = network_->node_temperature(link.joint_name);
-    const double t_b = 20.0;  // Reference temp in Celsius
-    l.heat_flow = link.conductance * (t_a - t_b);
+    l.heat_flow = network_->link_heat_flow(link);
     link_msg.links.push_back(l);
   }
   link_pub_->publish(link_msg);

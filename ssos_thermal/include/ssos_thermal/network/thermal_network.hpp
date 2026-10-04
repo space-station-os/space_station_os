@@ -59,6 +59,12 @@ public:
 
   double node_temperature(const std::string & name) const;
 
+  // Heat flow over a link [W], positive when heat moves from link.from to
+  // link.to: conductance * (T_from - T_to). Same relation step() integrates,
+  // so telemetry and physics agree. 0 for an inert link (an end that isn't a
+  // declared node), matching compute_dTdt(), which skips such links.
+  double link_heat_flow(const ThermalLinkState & link) const;
+
   // Used for cooling-loop feedback: snaps every node to the same temperature.
   void set_all_temperatures(double temperature_c);
 

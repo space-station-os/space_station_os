@@ -116,6 +116,16 @@ double ThermalNetwork::node_temperature(const std::string & name) const
   return nodes_.count(name) ? nodes_.at(name).temperature : 0.0;
 }
 
+double ThermalNetwork::link_heat_flow(const ThermalLinkState & link) const
+{
+  const auto from = nodes_.find(link.from);
+  const auto to = nodes_.find(link.to);
+  if (from == nodes_.end() || to == nodes_.end()) {
+    return 0.0;
+  }
+  return link.conductance * (from->second.temperature - to->second.temperature);
+}
+
 void ThermalNetwork::set_all_temperatures(double temperature_c)
 {
   for (auto & [name, node] : nodes_) {
