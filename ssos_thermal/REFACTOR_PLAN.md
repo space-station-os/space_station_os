@@ -294,12 +294,11 @@ entirely; see "Also in scope: remove the orbit-calculation piece
 
 ## Also in scope: port `cooling_server` into `ssos_thermal` as `coolant_node`
 
-**Why:** the mission-control GUI's `ThermalWidget` (Internal Temp / Ammonia
-Temp / Vented Heat cards) and `ThermalNetworkNode`'s own cooling client both
-depend on the `/coolant_heat_transfer` action, whose only server is
-`space_station_thermal_control`'s `cooling_server`. That executable wasn't
-launched anywhere in this migration, so those cards stayed on "NO DATA" and
-the log showed `Coolant action server unavailable; skipping goal`.
+**Why:** `ThermalNetworkNode`'s cooling client depends on the
+`/coolant_heat_transfer` action, and the mission-control GUI's coolant
+cards (Internal Temp / Ammonia Temp / Vented Heat) need coolant-loop data.
+The only action server was `space_station_thermal_control`'s
+`cooling_server`, which wasn't launched anywhere in this migration.
 `space_station_thermal_control` isn't edited (same rule as every other
 section here) — `ssos_thermal` gets a **new**, from-scratch port instead:
 `coolant_node`.
@@ -337,7 +336,8 @@ thing `execute()` actually calls, best-effort, when venting occurs).
 - `src/main/coolant_main.cpp`.
 - `config/coolant.yaml`.
 - `test/unit/coolant/test_coolant_loop.cpp` (physics-only), `test/ros/test_coolant_node.cpp`
-  (lifecycle + autostart, mirrors `test_thermal_network_node.cpp`).
+  (lifecycle + autostart, idle status without any goal, active→idle status
+  around a real goal, deactivate mid-cycle aborts promptly).
 
 **`ThermalDiagnostics` grew up:** now that two nodes register under
 different subsystem names, `make_heartbeat`/`make_fault` take
@@ -346,16 +346,38 @@ different subsystem names, `make_heartbeat`/`make_fault` take
 explicitly. Same evolution `EclssDiagnostics` went through going from one
 caller to five.
 
-**A real bug this surfaced, and the fix (in `space_station`, not this
-package):** `ThermalWidget.__init__` sent its one-shot coolant test goal
-behind a single `wait_for_server(timeout_sec=2.0)` at GUI construction
-time — but `coolant_node`, like every other `ssos_thermal`/`ssos_eclss`
-node, self-activates on its own `autostart_delay_ms` (11s in the
-full-station launch), well after that 2s window closes. So even with
-`coolant_node` running, the cards would have stayed empty forever. Fixed by
-polling `ActionClient.server_is_ready()` (non-blocking) from the widget's
-existing 1 Hz update timer and sending the goal lazily once the server
-actually appears — see `space_station/space_station/thermal.py`.
+**GUI monitoring is separate from coolant command (`/thermal/coolant/status`).**
+The legacy `ThermalWidget` got its card data by *sending* a one-shot
+`Coolant` goal (`input_temperature_c = 30.0`) and reading the action
+feedback. That design had three problems, all found in review:
+
+- Opening the GUI actuated the coolant loop and, whenever venting
+  triggered, called the radiator's `VentHeat` — monitoring caused command.
+- The rclpy feedback callback receives the `FeedbackMessage` wrapper
+  (`goal_id` + `.feedback`), not the payload; the widget read fields off
+  the wrapper, so the callback failed and the cards stayed "NO DATA".
+- An interim "fix" here (polling `server_is_ready()` so the goal survived
+  `coolant_node`'s 11 s autostart delay) only made the actuation reliable;
+  it was wrongly recorded as verified on the strength of the server-side
+  `[ACTION] Cooling goal received` log, not the cards themselves.
+
+Replaced with a read-only status topic: `coolant_node` publishes
+`space_station_interfaces/msg/CoolantStatus` (`active`, `component_id`,
+`internal_temp_c`, `ammonia_temp_c`, `vented_heat_kj`) on
+`/thermal/coolant/status` at 1 Hz and on every cooldown step. Before the
+first goal it reports idle values (loop at `target_temp_c`, ammonia at
+`CoolantLoop::kAmmoniaBaseTempC`, nothing vented). `ThermalWidget` only
+subscribes — it has no action client — and its cards show "IDLE" or
+"COOLING". Only `thermal_network` sends `Coolant` goals.
+
+**Goal-execution thread is owned, not detached.** The legacy server ran
+`execute()` on a detached thread. After a cycle with venting, that thread
+waits on the radiator service; if the node was cleaned up or destroyed in
+the meantime, the thread used a freed object (found as a segfault at test
+exit). `execute_thread_` is now a member, joined on deactivate, cleanup and
+destruction; `stop_requested_` lets a running cycle exit at the next step
+and abort its goal, and the radiator waits poll that flag instead of
+blocking for their full timeout. A new goal is rejected while one runs.
 
 **Launch:** `coolant_node` added to `launch/thermal.launch.py` as a second
 `LifecycleNode` alongside `thermal_network`, same `autostart`/
@@ -365,12 +387,9 @@ both `"thermal"` and `"coolant"` to the roster's single "Thermal" row; its
 ECLSS multi-node aggregation) so the two heartbeats don't just overwrite
 each other's roster status.
 
-**Verified live** via the full `space_station.launch.py`: `coolant_node`
-registers as `'coolant'`, the GUI's retried goal is accepted
-(`[ACTION] Cooling goal received for thermal_gui`), completes
-(`final node temp = 25.00 C`), and — since `radiator` isn't running in this
-launch — the venting step logs `[RADIATOR] VentHeat service not available`
-exactly as designed (graceful degradation, not a failure).
+When a cycle vents and `radiator` isn't running (as in the full-station
+launch), the venting step logs `[RADIATOR] VentHeat service not available`
+— graceful degradation, not a failure.
 
 ## Also in scope: reduce the node graph to 3 components, fix a dead-link bug
 
@@ -473,9 +492,13 @@ result this time (see the "Explicitly out of scope" item below).
 
 - [x] `pixi run build` compiles `ssos_thermal` clean (added to the pixi
       task's `--packages-up-to` list)
-- [x] `colcon test --packages-select ssos_thermal` passes — 4 test binaries,
-      18 gtest cases (`test_thermal_network`, `test_coolant_loop`,
-      `test_thermal_network_node`, `test_coolant_node`)
+- [x] `colcon test --packages-select ssos_thermal` passes — 5 test binaries
+      (`test_thermal_network`, `test_coolant_loop`, `test_thermal_diagnostics`,
+      `test_thermal_network_node`, `test_coolant_node`); also part of
+      `pixi run test`
+- [x] ROS-based test binaries run on their own `ROS_DOMAIN_ID`s, so their
+      `/ssos/register_subsystem` calls can't reach another package's test
+      (found when CI ran `ssos_core` and `ssos_thermal` tests in parallel)
 - [x] `ros2 launch ssos_thermal thermal.launch.py` (or the full
       `space_station.launch.py`), then `ros2 lifecycle get /thermal_network`
       and `/coolant_node` both show `active` within ~1s with **no manual
@@ -488,15 +511,20 @@ result this time (see the "Explicitly out of scope" item below).
       `SystemState` reaches `NOMINAL`
 - [x] `ros2 param set /thermal_network enable_failure true` + lowered
       `max_temp_threshold` → exactly **one** `FaultEvent` on
-      `/ssos/fault_event` at the transition (not one per tick)
+      `/ssos/fault_event` at the transition (not one per tick); the edge
+      trigger is also unit-tested (`test_thermal_diagnostics`)
 - [x] `/thermal/nodes/state` and `/thermal/links/flux` publish the same
       data shape the legacy solver did — the GUI's `ThermalWidget` node/link
       tables and plot work unmodified
+- [x] `/thermal/links/flux` `heat_flow` is `k·(T_from − T_to)` from both
+      connected nodes (`ThermalNetwork::link_heat_flow`, the same relation
+      `step()` integrates), not a comparison against a fixed 20 °C
 - [x] GUI roster shows "THERMAL — NOMINAL" (screenshot-verified), driven
       live by `/ssos/thermal/heartbeat` + `/ssos/coolant/heartbeat`
       aggregation, not a placeholder
-- [x] GUI's Internal Temp / Ammonia Temp / Vented Heat cards populate with
-      live data end-to-end (`coolant_node` receives the GUI's retried test
-      goal, executes the cooldown loop, publishes feedback) — this is what
-      exposed and led to fixing the `wait_for_server()` timing bug in
-      `thermal.py`
+- [x] GUI's Internal Temp / Ammonia Temp / Vented Heat cards show live
+      `/thermal/coolant/status` data ("IDLE" before any cooling cycle), and
+      opening the GUI sends no `/coolant_heat_transfer` goal — checked on
+      the full-station launch: no `Cooling goal received` in the log, and a
+      `ThermalWidget` rendered against the live topics shows 25.0 °C /
+      5.0 °C / 0.0 kJ, all "IDLE"

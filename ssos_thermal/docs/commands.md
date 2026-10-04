@@ -30,11 +30,11 @@ Jazzy env (`pixi run ...` or `pixi shell` first).
 
 | Phase | Command | Notes |
 |---|---|---|
-| Test | `pixi run bash -c "colcon test --packages-select ssos_thermal"` | Runs both gtest binaries: `test_thermal_network` (physics-only) and `test_thermal_network_node` (lifecycle) |
+| Test | `pixi run bash -c "colcon test --packages-select ssos_thermal"` | Runs all 5 gtest binaries: physics-only (`test_thermal_network`, `test_coolant_loop`), diagnostics (`test_thermal_diagnostics`), and lifecycle/ROS (`test_thermal_network_node`, `test_coolant_node`, each on its own `ROS_DOMAIN_ID`) |
 | Test | `pixi run bash -c "colcon test-result --verbose"` | Pass/fail summary after a test run |
 | Test | `pixi run bash -c "colcon test --packages-select ssos_thermal --event-handlers console_direct+"` | Streams each gtest's `[ RUN ]`/`[ OK ]` output live, not just the summary |
 | Test | `pixi run bash -c "python3 -m py_compile ssos_thermal/scripts/thermal_visualization.py"` | Syntax-checks the viewer script (plain Python, not run via colcon/gtest) |
-| Test (repo-wide) | `pixi run test` | The project's own pixi task — currently `colcon test --packages-select ssos_eclss && colcon test-result --verbose`; does **not** cover `ssos_thermal` unless that task is updated |
+| Test (repo-wide) | `pixi run test` | The project's own pixi task — `colcon test --packages-select ssos_eclss ssos_thermal && colcon test-result --verbose` |
 
 ## Shutdown
 

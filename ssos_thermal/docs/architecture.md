@@ -62,6 +62,16 @@ exchanges heat over a link whose other end is itself a declared node —
 `base_link` has no `parent_link` (it's the root), so it gets no link of
 its own; `SolarPanel1`/`SolarPanel2` each link to it.
 
+The heat flow published per link on `/thermal/links/flux` is the same
+conduction term, computed by `ThermalNetwork::link_heat_flow()`:
+
+$$
+\dot{Q}_{a \to b} = k_{ab} \left( T_a - T_b \right)
+$$
+
+positive when heat moves from `node_a` to `node_b`, and 0 for a link whose
+other end isn't a declared node.
+
 There is no heat sink in this model (no radiation to space): total energy
 only rises until the coolant loop intervenes (below). `base_link`'s
 `heat_capacity`/`internal_power` are the *sums* of the ~46 individual
@@ -108,9 +118,19 @@ thermal_network --/thermal/nodes/state, /thermal/links/flux, /thermals/diagnosti
 thermal_network <--/coolant_heat_transfer (action)----------------------------------------  coolant_node
 
 coolant_node --/ssos/coolant/heartbeat, /ssos/register_subsystem-->  system_manager
-coolant_node --/coolant_heat_transfer (feedback)------------------>  thermal_network, GUI ThermalWidget
+coolant_node --/coolant_heat_transfer (feedback)------------------>  thermal_network
+coolant_node --/thermal/coolant/status (1 Hz + every cooling step)->  GUI ThermalWidget
 coolant_node <--/tcs/radiator_a/vent_heat (best-effort service)----  radiator (legacy pkg)
 ```
+
+Command and monitoring are separate: only `thermal_network` sends
+`Coolant` goals. The GUI reads `/thermal/coolant/status`
+(`CoolantStatus`: `active`, `component_id`, internal/ammonia temperature,
+vented heat) and never sends a goal, since a goal actuates the loop and can
+trigger radiator venting. Before the first cooling cycle the status reports
+idle values (loop at `target_temp_c`, nothing vented). One goal runs at a
+time; deactivating `coolant_node` mid-cycle aborts the goal at the next
+step.
 
 `thermal_network` does not subscribe to `/sim/world_state` — its only
 heat sources are the YAML `internal_power` values. `radiator` stays in

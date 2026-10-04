@@ -22,7 +22,7 @@ physics code can run in simulation or on flight hardware. ROS lives only in
 | Node | Executable | Model | Highlights |
 |------|-----------|-------|-----------|
 | **Thermal Network** | `thermal_network_node` | Lumped-node conductive network, `LifecycleNode` | RK4 integration over a 3-node star (`base_link`, `SolarPanel1`, `SolarPanel2`) loaded from YAML, coolant-loop feedback via `/coolant_heat_transfer` action, edge-triggered overheat fault |
-| **Coolant** | `coolant_node` | Internal-loop-to-ammonia cooldown model, `LifecycleNode` | Serves the `/coolant_heat_transfer` action both `thermal_network` and the mission-control GUI's `ThermalWidget` consume for Internal/Ammonia Temp feedback; best-effort vent via the legacy `radiator`'s `VentHeat` service |
+| **Coolant** | `coolant_node` | Internal-loop-to-ammonia cooldown model, `LifecycleNode` | Serves the `/coolant_heat_transfer` action `thermal_network` uses to command cooling; publishes read-only `/thermal/coolant/status` for the mission-control GUI's coolant cards; best-effort vent via the legacy `radiator`'s `VentHeat` service |
 
 Only these two are in scope — `space_station_thermal_control`'s
 `radiator`, `demand`, `sun_vector`, and `array_absorptivity` executables
