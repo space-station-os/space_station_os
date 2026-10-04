@@ -39,9 +39,12 @@ CallbackReturn ThermalNetworkNode::on_configure(const rclcpp_lifecycle::State &)
   thermal_config_file_ = this->get_parameter("thermal_config_file").as_string();
   cooling_active_ = false;
 
-  const std::string share_dir =
-    ament_index_cpp::get_package_share_directory("ssos_thermal");
-  const std::string config_path = share_dir + "/" + thermal_config_file_;
+  // An absolute path is used as-is (tests point at the source tree);
+  // a relative one resolves against the installed package share dir.
+  const std::string config_path =
+    !thermal_config_file_.empty() && thermal_config_file_.front() == '/' ?
+    thermal_config_file_ :
+    ament_index_cpp::get_package_share_directory("ssos_thermal") + "/" + thermal_config_file_;
   network_ = std::make_unique<network::ThermalNetwork>(
     network::ThermalNetwork::load_from_yaml(config_path));
 

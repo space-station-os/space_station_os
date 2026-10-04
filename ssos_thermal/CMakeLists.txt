@@ -84,6 +84,8 @@ if(BUILD_TESTING)
   target_link_libraries(test_thermal_network_node thermal_network_ros)
   ament_target_dependencies(test_thermal_network_node rclcpp rclcpp_lifecycle
     space_station_interfaces diagnostic_msgs lifecycle_msgs)
+  target_compile_definitions(test_thermal_network_node PRIVATE
+    SSOS_THERMAL_CONFIG_FILE="${CMAKE_CURRENT_SOURCE_DIR}/config/thermal_nodes.yaml")
 
   ament_add_gtest(test_coolant_node test/ros/test_coolant_node.cpp)
   target_link_libraries(test_coolant_node thermal_network_ros)

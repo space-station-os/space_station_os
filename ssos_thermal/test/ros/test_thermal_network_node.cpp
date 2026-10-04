@@ -28,6 +28,13 @@ void spin_node_for(
   }
 }
 
+// Load the graph from the source tree so the test does not depend on
+// install/ssos_thermal being on AMENT_PREFIX_PATH.
+rclcpp::Parameter source_config()
+{
+  return rclcpp::Parameter("thermal_config_file", std::string(SSOS_THERMAL_CONFIG_FILE));
+}
+
 }  // namespace
 
 class ThermalNetworkNodeTest : public ::testing::Test
@@ -38,7 +45,9 @@ protected:
     if (!rclcpp::ok()) {
       rclcpp::init(0, nullptr);
     }
-    node_ = std::make_shared<ThermalNetworkNode>();
+    rclcpp::NodeOptions options;
+    options.parameter_overrides({source_config()});
+    node_ = std::make_shared<ThermalNetworkNode>(options);
   }
 
   std::shared_ptr<ThermalNetworkNode> node_;
@@ -63,7 +72,8 @@ TEST(ThermalNetworkNodeAutostartTest, ConfiguresAndActivatesWithoutExternalCall)
 
   rclcpp::NodeOptions options;
   options.parameter_overrides(
-    {rclcpp::Parameter("autostart", true), rclcpp::Parameter("autostart_delay_ms", 50)});
+    {rclcpp::Parameter("autostart", true), rclcpp::Parameter("autostart_delay_ms", 50),
+      source_config()});
   auto node = std::make_shared<ThermalNetworkNode>(options);
 
   spin_node_for(node->get_node_base_interface(), 500ms);

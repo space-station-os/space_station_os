@@ -14,7 +14,7 @@ step timer at the new period).
 | `max_temp_threshold` | `420.0` | [°C] Hottest-node temperature above which the node reports unhealthy (only checked if `enable_failure`) |
 | `cooling_rate` | `0.05` | Fractional rate of heat removed during cooling (currently unused by `updateSimulation`, kept for parity with the legacy solver) |
 | `thermal_update_dt` | `0.5` | [s] Step timer period / RK4 integration step |
-| `thermal_config_file` | `"config/thermal_nodes.yaml"` | Path (relative to the package share dir) to the node/link graph |
+| `thermal_config_file` | `"config/thermal_nodes.yaml"` | Path to the node/link graph; relative paths resolve against the package share dir, absolute paths are used as-is |
 
 Plus the lifecycle-autostart parameters shared with every `ssos_eclss`-style
 node: `autostart` (`false`), `autostart_delay_ms` (`300`) — see
