@@ -36,6 +36,10 @@ struct CoolStepResult
 class CoolantLoop
 {
 public:
+  // Ammonia temperature with no heat transferred in -- the idle baseline of
+  // step()'s simplified ammonia_temp_c relation.
+  static constexpr double kAmmoniaBaseTempC = 5.0;
+
   explicit CoolantLoop(const CoolantParams & params);
 
   // One physics step of the cooldown process: node_temp_c moves at most

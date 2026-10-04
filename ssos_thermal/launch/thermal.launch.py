@@ -9,10 +9,10 @@ mirroring ssos_eclss/launch/eclss.launch.py. The delay is exposed as a
 launch argument so a parent launch can hold thermal activation until after
 other systems (e.g. system_manager) are up.
 
-coolant hosts the /coolant_heat_transfer action that both
-thermal_network's cooling client and the mission-control GUI's
-ThermalWidget (Internal/Ammonia Temp cards) consume -- without it running,
-those cards stay "NO DATA".
+coolant hosts the /coolant_heat_transfer action thermal_network uses to
+command cooling, and publishes /thermal/coolant/status, which the
+mission-control GUI's coolant cards read -- without it running, those
+cards stay "NO DATA".
 """
 import os
 

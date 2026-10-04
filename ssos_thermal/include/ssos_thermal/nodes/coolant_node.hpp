@@ -1,8 +1,11 @@
 #ifndef SSOS_THERMAL__NODES__COOLANT_NODE_HPP_
 #define SSOS_THERMAL__NODES__COOLANT_NODE_HPP_
 
+#include <atomic>
 #include <memory>
+#include <mutex>
 #include <string>
+#include <thread>
 
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
@@ -10,6 +13,7 @@
 #include "rclcpp_lifecycle/lifecycle_publisher.hpp"
 
 #include "space_station_interfaces/action/coolant.hpp"
+#include "space_station_interfaces/msg/coolant_status.hpp"
 #include "space_station_interfaces/msg/fault_event.hpp"
 #include "space_station_interfaces/msg/subsystem_heartbeat.hpp"
 #include "space_station_interfaces/srv/register_subsystem.hpp"
@@ -20,9 +24,12 @@
 
 // Lifecycle node wrapping the ROS-free CoolantLoop model. Serves the
 // Coolant action (goal: a component's temperature to cool; feedback:
-// internal/ammonia temperature + vented heat each physics step) that both
-// thermal_network_node's cooling client and the GUI's ThermalWidget consume
-// on /coolant_heat_transfer.
+// internal/ammonia temperature + vented heat each physics step) on
+// /coolant_heat_transfer, which thermal_network_node's cooling client uses
+// to command cooling. Monitoring is separate: /thermal/coolant/status
+// publishes the loop state at 1 Hz and on every cooldown step, so
+// observers like the GUI never need to send a goal (which actuates the
+// loop and can trigger radiator venting) just to see coolant data.
 //
 // Ported from space_station_thermal_control's CoolantActionServer, keeping
 // only the part anything actually depends on: the action's cooldown loop.
@@ -43,6 +50,7 @@ namespace nodes
 using RegisterSubsystem = space_station_interfaces::srv::RegisterSubsystem;
 using SubsystemHeartbeat = space_station_interfaces::msg::SubsystemHeartbeat;
 using FaultEvent = space_station_interfaces::msg::FaultEvent;
+using CoolantStatus = space_station_interfaces::msg::CoolantStatus;
 using CallbackReturn =
   rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
 
@@ -50,6 +58,7 @@ class CoolantNode : public rclcpp_lifecycle::LifecycleNode
 {
 public:
   explicit CoolantNode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
+  ~CoolantNode() override;
 
   CallbackReturn on_configure(const rclcpp_lifecycle::State & state) override;
   CallbackReturn on_activate(const rclcpp_lifecycle::State & state) override;
@@ -66,15 +75,25 @@ private:
     const std::shared_ptr<GoalHandleCoolant> goal_handle);
   void handleAccepted(const std::shared_ptr<GoalHandleCoolant> goal_handle);
   void execute(const std::shared_ptr<GoalHandleCoolant> goal_handle);
+  void stopExecution();
   void publishHeartbeat();
+  void publishStatus();
+  void updateStatus(
+    bool active, const std::string & component_id, double internal_temp_c,
+    double ammonia_temp_c, double vented_heat_kj);
   void registerWithManager();
 
   // Physics
   std::unique_ptr<coolant::CoolantLoop> loop_;
   double target_temp_c_ = 25.0;
 
-  // Action server
+  // Action server. execute() runs on execute_thread_, which the node owns
+  // and joins on deactivate/destruction so it can never outlive the node.
+  // One goal at a time: a new goal is rejected while one is running.
   rclcpp_action::Server<Coolant>::SharedPtr action_server_;
+  std::thread execute_thread_;
+  std::atomic<bool> goal_running_{false};
+  std::atomic<bool> stop_requested_{false};
 
   // Best-effort radiator vent-heat client (space_station_thermal_control's
   // `radiator` node, not part of this package -- see REFACTOR_PLAN.md for
@@ -85,6 +104,11 @@ private:
   // Publishers
   rclcpp_lifecycle::LifecyclePublisher<SubsystemHeartbeat>::SharedPtr heartbeat_pub_;
   rclcpp_lifecycle::LifecyclePublisher<FaultEvent>::SharedPtr fault_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<CoolantStatus>::SharedPtr status_pub_;
+
+  // Written by execute() on its own thread, read by the 1 Hz timer.
+  std::mutex status_mutex_;
+  CoolantStatus status_;
 
   ThermalDiagnostics diag_;
 

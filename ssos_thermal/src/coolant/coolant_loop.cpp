@@ -22,7 +22,7 @@ CoolStepResult CoolantLoop::step(double node_temp_c, double target_temp_c) const
   const double ammonia_heat_kj = q_kj * params_.heat_transfer_efficiency;
   // Dummy model, matching the legacy comment verbatim -- not a validated
   // ammonia thermodynamic relation, just enough to drive the feedback.
-  const double ammonia_temp_c = 5.0 + (ammonia_heat_kj / 1000.0);
+  const double ammonia_temp_c = kAmmoniaBaseTempC + (ammonia_heat_kj / 1000.0);
 
   CoolStepResult result;
   result.node_temp_c = new_temp;
