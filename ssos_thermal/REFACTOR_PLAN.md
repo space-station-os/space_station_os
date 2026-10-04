@@ -1,216 +1,196 @@
-# Refactor: bring `thermal_nodes` up to the `ssos_eclss` pattern
+# `ssos_thermal`: Thermal Control on the SSOS subsystem backbone
 
 ## TL;DR
 
-Two earlier passes at this plan only bolted a heartbeat/register/fault
-trio onto the existing `ThermalSolverNode`. This revision goes further, per
-[ECLSS_PATTERN_REFERENCE.md](ECLSS_PATTERN_REFERENCE.md): **adopt the actual
-ssos_eclss architecture** for the one node that matters to the GUI/roster —
-physics extracted into a ROS-free library, the node converted to a
-`LifecycleNode`, and a shared `ThermalDiagnostics` helper — not just the
-registration side-effect.
+`ssos_thermal` is a **new package**, added in parallel with the legacy
+`space_station_thermal_control`, which this work does not edit or remove.
+It follows the `ssos_eclss` pattern (see
+[ECLSS_PATTERN_REFERENCE.md](ECLSS_PATTERN_REFERENCE.md)):
 
-**Scope stays at one node**: `thermal_nodes` (currently `ThermalSolverNode`)
-is the only executable touched. `cooling_server`, `radiator`, `demand`, and
-`array_absorptivity` are untouched — nothing downstream (GUI, roster,
-`system_manager`) depends on them individually today, and converting five
-executables at once is a much bigger effort than this pass justifies. If
-that changes later, `ThermalDiagnostics` is already written to be reusable.
+- ROS-independent physics libraries for the thermal network and the
+  coolant loop
+- thin ROS 2 `LifecycleNode` wrappers: `thermal_network` and `coolant_node`
+- registration with `system_manager`, heartbeats, telemetry, and an
+  edge-triggered over-temperature fault
+- coolant command over the `/coolant_heat_transfer` action (only
+  `thermal_network` sends goals) and coolant monitoring over
+  `/thermal/coolant/status`
+- a reduced, representative 3-node thermal graph
+- a standalone launch file plus integration into the full-station launch
+- mission-control GUI compatibility (Thermal panel and subsystem roster)
+- unit tests for both physics models and ROS lifecycle tests on isolated
+  `ROS_DOMAIN_ID`s
 
-**Still not in this pass:** GUI wiring (`main_window.py`), and
-`space_station.launch.py` / `thermals.launch.py` changes — the executable
-and ROS node names stay the same (`thermal_nodes` / `thermal_network`), so
-existing launch files keep working unmodified.
+Target: v0.9.x, merging into `v0.9.1-dev`.
 
-## Target architecture
+## Package layout
 
 ```
-space_station_thermal_control/
-├── include/space_station_thermal_control/
-│   ├── network/thermal_network.hpp     Layer 2 — physics, NO ROS      \
-│   ├── nodes/thermal_network_node.hpp  Layer 3 — LifecycleNode wrapper |
-│   ├── nodes/thermal_diagnostics.hpp   Layer 3 — heartbeat/fault/     |
-│   │                                    autostart helper (shared)     |
-│   └── {cooling,radiators,...}.hpp     untouched legacy nodes         |
+ssos_thermal/
+├── include/ssos_thermal/
+│   ├── network/thermal_network.hpp     Layer 2 — thermal network physics, NO ROS
+│   ├── coolant/coolant_loop.hpp        Layer 2 — coolant loop physics, NO ROS
+│   └── nodes/
+│       ├── thermal_network_node.hpp    Layer 3 — LifecycleNode wrapper
+│       ├── coolant_node.hpp            Layer 3 — LifecycleNode wrapper
+│       └── thermal_diagnostics.hpp     Layer 3 — heartbeat/fault/autostart helper (shared)
 ├── src/
-│   ├── network/thermal_network.cpp     thermal_network_physics lib
-│   ├── nodes/thermal_network_node.cpp  \
-│   ├── nodes/thermal_diagnostics.cpp    thermal_network_ros lib
-│   ├── main/thermal_network_main.cpp   thermal_nodes executable
-│   └── {cooling,radiators,...}.cpp     untouched legacy executables
-├── test/                                [new] mirrors ssos_eclss/test/
+│   ├── network/thermal_network.cpp     \  thermal_network_physics library
+│   ├── coolant/coolant_loop.cpp        /
+│   ├── nodes/*.cpp                        thermal_network_ros library
+│   └── main/{thermal_network,coolant}_main.cpp   executables
+├── config/
+│   ├── thermal_network.yaml            thermal_network parameters
+│   ├── thermal_nodes.yaml              node/link graph (3 nodes)
+│   └── coolant.yaml                    coolant_node parameters
+├── launch/thermal.launch.py
+├── scripts/thermal_visualization.py    standalone PyQt5 network viewer
+├── test/
 │   ├── unit/network/test_thermal_network.cpp
-│   └── ros/test_thermal_network_node.cpp
-└── config/thermal_nodes.yaml            reduced to 3 nodes — see
-                                          "Also in scope: reduce the node
-                                          graph to 3 components" below
+│   ├── unit/coolant/test_coolant_loop.cpp
+│   ├── unit/diagnostics/test_thermal_diagnostics.cpp
+│   ├── ros/test_thermal_network_node.cpp
+│   └── ros/test_coolant_node.cpp
+└── docs/{architecture,parameters,commands,fault_catalog}.md
 ```
 
 ```
- thermal_network_physics  <───────────┐
- (zero ROS — yaml-cpp only)           │ link only this
-   ▲                                  │
-   │ link + wrap                       (future: standalone validation
-   │                                    tool, not needed yet)
- thermal_network_ros
- (rclcpp, rclcpp_lifecycle, rclcpp_action, space_station_interfaces)
+ thermal_network_physics   (yaml-cpp only — links nothing from ROS)
    ▲
+   │ link + wrap
+ thermal_network_ros       (rclcpp, rclcpp_lifecycle, rclcpp_action,
+   ▲                        ament_index_cpp, space_station_interfaces)
    │ link
- thermal_nodes  (executable — same name as today, launch files unchanged)
+ thermal_network_node, coolant_node   (executables)
 ```
 
-This mirrors `eclss_physics` / `eclss_ros` exactly, minus the multi-node
-sharing concern (ssos_eclss has 5 nodes sharing `eclss_ros`; thermal has 1
-in scope, so there's no separate library needed on the ROS side beyond what
-one executable needs — `thermal_network_ros` exists mainly to keep the
-mirror obvious and leave room to grow).
+This mirrors `eclss_physics` / `eclss_ros`. Only the ROS layer resolves the
+config file's path via `ament_index_cpp`; the physics library receives a
+plain path string, so the same models could run without ROS.
 
-## What moves where
+## 1. Physics libraries (no ROS)
 
-### 1. New physics library: `thermal_network` (no ROS)
+**`ssos_thermal::network::ThermalNetwork`**
 
-Extract from today's `ThermalSolverNode` into
-`include/.../network/thermal_network.hpp` + `src/network/thermal_network.cpp`,
-namespace `space_station_thermal_control::network`:
+- `load_from_yaml(filepath, reference_temp_c = 20.0)` loads nodes
+  (`node_name`, `heat_capacity`, `internal_power`) and one conductive link
+  per node to its `parent_link`. An empty `parent_link` marks the root (no
+  link). A link only conducts if both ends are declared nodes.
+- `step(dt)` integrates all nodes together with classic RK4:
+  `C_i · dT_i/dt = P_i + Σ_j k_ij · (T_j − T_i)`.
+- `link_heat_flow(link)` returns `k · (T_from − T_to)`, the same conduction
+  term, for `/thermal/links/flux` telemetry.
+- `average_temperature()` drives the cooling trigger; `hottest()` drives
+  diagnostics and the over-temperature fault; `set_all_temperatures()`
+  applies coolant feedback.
 
-- `struct ThermalNodeState { temperature, heat_capacity, internal_power; }`
-  and `struct ThermalLinkState { from, to, joint_name, conductance; }` —
-  same fields as today's `ThermalNode`/`ThermalLink` structs, just relocated.
-- `class ThermalNetwork` owning `nodes_`/`links_`, with:
-  - `static ThermalNetwork load_from_yaml(const std::string &filepath);` —
-    the existing `parseYAMLConfig` logic, moved here. This is legitimately
-    ROS-free: `yaml-cpp` has zero ROS dependency (only resolving the
-    package-share file *path* via `ament_index_cpp` stays in the node
-    layer, same split ssos_eclss uses for everything else).
-  - `void step(double dt);` — the existing RK4 integration
-    (`compute_dTdt` + the `k1..k4` loop from `updateSimulation()`), moved
-    here verbatim.
-  - `const std::unordered_map<std::string, ThermalNodeState> &nodes() const;`
-    and `const std::vector<ThermalLinkState> &links() const;` accessors.
-  - `struct Hottest { std::string name; double temperature; };` +
-    `Hottest hottest() const;` — replaces the duplicated hottest-node scan
-    that today happens twice (once in `updateSimulation()`, again in
-    `publishThermalNetworkDiag`).
+**`ssos_thermal::coolant::CoolantLoop`**
 
-Cooling-feedback and diagnostics/heartbeat message-building stay **out** of
-this library — they're ROS/action concerns, not physics.
+- `CoolantParams { mass_kg, specific_heat_j_per_kg_c,
+  heat_transfer_efficiency, vent_threshold_kj }`.
+- `step(node_temp_c, target_temp_c)` performs one cooldown step: moves the
+  temperature at most 2.5 °C toward the target, transfers the removed heat
+  to the ammonia loop at `heat_transfer_efficiency`, and flags venting at
+  `vent_threshold_kj`. Ported from the only code path of the legacy
+  `CoolantActionServer` that anything used (see change history item 2).
+- `kAmmoniaBaseTempC` is the ammonia temperature with no heat transferred,
+  used for the idle status.
 
-### 2. `ThermalSolverNode` → `ThermalNetworkNode`, a `LifecycleNode`
+The formulas are written out in [docs/architecture.md](docs/architecture.md).
 
-`include/.../nodes/thermal_network_node.hpp` +
-`src/nodes/thermal_network_node.cpp`, namespace
-`space_station_thermal_control::nodes`. Same shape as `ArsNode`:
+## 2. ROS wrappers (`LifecycleNode`)
 
-| Lifecycle callback | Does |
+Both nodes self-configure and self-activate via
+`ThermalDiagnostics::maybe_autostart` (gated on the `autostart` parameter,
+after `autostart_delay_ms`), so no launch file emits lifecycle
+`ChangeState` events — the same mechanism `ssos_eclss` uses.
+
+**`thermal_network`** (`ThermalNetworkNode`)
+
+| Callback | Does |
 |---|---|
-| Constructor | Declare parameters (`enable_failure`, `enable_cooling`, thresholds, `thermal_update_dt`, `thermal_config_file` — unchanged) + call `ThermalDiagnostics::maybe_autostart(this)` |
-| `on_configure()` | `network_ = ThermalNetwork::load_from_yaml(...)`; create all publishers as `LifecyclePublisher` (`node_pub_`, `link_pub_`, `diag_pub_`, `heartbeat_pub_`, `fault_pub_`); create `cooling_client_` (rclcpp_action, unaffected by lifecycle) and `register_client_`; add param-validation callback |
-| `on_activate()` | Activate all `LifecyclePublisher`s, start `timer_` → `updateSimulation()`, call `registerWithManager()` |
-| `on_deactivate()` | Deactivate publishers, cancel `timer_` |
-| `on_cleanup()` | Reset everything |
-| `updateSimulation()` | `network_->step(dt)`, run `coolingCallback()` against `network_->nodes()`, publish node/link/diag messages, then `healthy = !(enable_failure_ && network_->hottest().temperature > max_temp_threshold_)` → `heartbeat_pub_`/`fault_pub_` via `ThermalDiagnostics` |
-| `registerWithManager()` | Identical shape to `ArsNode::register_with_manager()` — wait ≤200ms for `/ssos/register_subsystem`, warn-and-continue if absent, send `{subsystem_name="thermal", published_topics, subscribed_topics={}, heartbeat_topic="/ssos/thermal/heartbeat"}` |
+| `on_configure` | Read parameters; load the network from `thermal_config_file`; create lifecycle publishers for node state, link flux, diagnostics, heartbeat, and faults; create the `Coolant` action client and the registration client |
+| `on_activate` | Activate publishers, start the step timer at `thermal_update_dt`, register as `"thermal"` |
+| `on_deactivate` | Cancel the timer, deactivate publishers |
+| `on_cleanup` | Release everything |
+| each tick | Send one cooling goal when `average_temperature() > cooling_trigger_threshold`; step the network unless a cooling goal is in flight; publish node state, link flux, and diagnostics; publish a heartbeat; publish a fault only on the healthy→unhealthy transition |
 
-**Why `maybe_autostart` instead of relying on an external orchestrator:**
-neither `thermals.launch.py` nor `space_station.launch.py` drives lifecycle
-`ChangeState` events for thermal nodes today (unlike
-`space_station.launch.py`'s `activate_core_sim` TimerAction for
-`system_manager`/`simulation_controller`). Using the same self-activating
-one-shot timer `ArsNode` uses means the `LifecycleNode` conversion needs
-**zero launch-file changes** — `ros2 launch space_station_thermal_control
-thermals.launch.py` keeps working exactly as before, just with the node
-spending its first ~300ms unconfigured before self-activating.
+**`coolant_node`** (`CoolantNode`)
 
-### 3. New shared helper: `ThermalDiagnostics`
+| Callback | Does |
+|---|---|
+| `on_configure` | Build `CoolantLoop` from parameters; create the `/coolant_heat_transfer` action server, the status/heartbeat/fault publishers, the best-effort radiator `VentHeat` client, and the registration client; set idle status |
+| `on_activate` | Activate publishers, start a 1 Hz heartbeat + status timer, register as `"coolant"` |
+| `on_deactivate` | Stop and join the goal thread (a running goal is aborted), cancel the timer, deactivate publishers |
+| `on_cleanup` | Same, then release everything |
+| goal | Rejected unless the node is `ACTIVE` and no goal is running. Runs on a node-owned thread: steps `CoolantLoop` until within 0.5 °C of `target_temp_c`, publishing action feedback and `/thermal/coolant/status` each step, then calls the radiator's `VentHeat` best-effort if heat was vented |
 
-`include/.../nodes/thermal_diagnostics.hpp` +
-`src/nodes/thermal_diagnostics.cpp` — same role as `EclssDiagnostics`, sized
-for one subsystem (so `subsystem_name` is baked in as `"thermal"` rather
-than a parameter, since there's only one caller today — unlike
-`EclssDiagnostics` which is shared across 5 differently-named subsystems):
+**`ThermalDiagnostics`** (shared): `make_heartbeat(stamp, subsystem_name,
+lifecycle_state, healthy, status_message)`, `make_fault(stamp,
+subsystem_name, fault_type, severity, description, affected_interfaces)`,
+`should_raise_fault(healthy)` (true once per healthy→unhealthy transition),
+and `maybe_autostart(node, delay_ms)`.
 
-```cpp
-class ThermalDiagnostics
-{
-public:
-  static space_station_interfaces::msg::SubsystemHeartbeat make_heartbeat(
-    const rclcpp::Time &stamp, bool healthy, const std::string &status_message);
+## 3. Interfaces
 
-  static space_station_interfaces::msg::FaultEvent make_fault(
-    const rclcpp::Time &stamp, const std::string &fault_type, uint8_t severity,
-    const std::string &description,
-    const std::vector<std::string> &affected_interfaces = {});
+| Name | Type | Direction |
+|---|---|---|
+| `/ssos/register_subsystem` | `RegisterSubsystem` srv | both nodes → `system_manager` |
+| `/ssos/thermal/heartbeat`, `/ssos/coolant/heartbeat` | `SubsystemHeartbeat` | → `system_manager`, GUI roster |
+| `/ssos/fault_event` | `FaultEvent` | `thermal_network` → `system_manager` |
+| `/thermal/nodes/state` | `ThermalNodeDataArray` | `thermal_network` → GUI |
+| `/thermal/links/flux` | `ThermalLinkFlowsArray` | `thermal_network` → GUI |
+| `/thermals/diagnostics` | `DiagnosticStatus` | `thermal_network` → telemetry |
+| `/coolant_heat_transfer` | `Coolant` action | `thermal_network` → `coolant_node` (command) |
+| `/thermal/coolant/status` | `CoolantStatus` (new) | `coolant_node` → GUI (monitoring) |
+| `/tcs/radiator_a/vent_heat` | `VentHeat` srv | `coolant_node` → legacy `radiator` (best-effort) |
 
-  // Edge-detection: call every tick, returns true exactly once per
-  // healthy->unhealthy transition (mirrors ArsNode's was_healthy_ member,
-  // but encapsulated so ThermalNetworkNode doesn't hand-roll it).
-  bool should_raise_fault(bool healthy);
+`CoolantStatus.msg` is the only new interface, added to
+`space_station_interfaces/atcs/msg/` as all interfaces are.
 
-private:
-  bool was_healthy_ = true;
-};
+## 4. Launch and integration
 
-  // One-shot timer: self-configure + self-activate shortly after
-  // construction, so a launch file doesn't need lifecycle ChangeState
-  // events. Same contract as ssos_eclss's EclssDiagnostics::maybe_autostart.
-  rclcpp::TimerBase::SharedPtr maybe_autostart(
-    rclcpp_lifecycle::LifecycleNode *node, int delay_ms = 300);
-```
+- `launch/thermal.launch.py` starts `thermal_network` and `coolant_node`
+  (`autostart: true`, `autostart_delay_ms` launch argument, default 300) and,
+  unless `launch_visualization:=false`, the standalone
+  `thermal_visualization.py` viewer.
+- `space_station/launch/space_station.launch.py` includes it with
+  `autostart_delay_ms: 11000` (after `system_manager` and
+  `simulation_controller` activate at t = 10 s) and
+  `launch_visualization: false`.
+- `pixi.toml`: `ssos_thermal` is part of both the `build` and `test` tasks.
+- Mission-control GUI: `space_station/space_station/thermal.py` subscribes to
+  node state, link flux, and coolant status (it sends no goals);
+  `main_window.py` rolls the `thermal` and `coolant` heartbeats into one
+  "THERMAL" roster row (unhealthy if either is).
 
-### 4. Build files
+## 5. Tests
 
-`CMakeLists.txt`:
+| Binary | Covers |
+|---|---|
+| `test_thermal_network` | YAML loading, root-node handling, conduction direction, `hottest()`, link heat flow sign and inert links |
+| `test_coolant_loop` | Step size cap, convergence to target, vent threshold |
+| `test_thermal_diagnostics` | Fault edge trigger: once per transition, silent while active, again after recovery |
+| `test_thermal_network_node` | configure/activate/deactivate/cleanup, autostart |
+| `test_coolant_node` | configure/activate/deactivate/cleanup, autostart, idle status without a goal, active→idle status around a goal, deactivate mid-goal aborts within 1 s |
 
-```cmake
-find_package(rclcpp_lifecycle REQUIRED)
-find_package(lifecycle_msgs REQUIRED)
+The two ROS-based binaries run on their own `ROS_DOMAIN_ID`s (214, 215) so
+their real `/ssos/register_subsystem` calls can't reach another package's
+test when CI runs packages in parallel.
 
-add_library(thermal_network_physics src/network/thermal_network.cpp)
-target_link_libraries(thermal_network_physics yaml-cpp)
-target_include_directories(thermal_network_physics PUBLIC include)
-# NOTE: thermal_network_physics links NOTHING from ROS
+## 6. Documentation
 
-add_library(thermal_network_ros
-  src/nodes/thermal_network_node.cpp
-  src/nodes/thermal_diagnostics.cpp
-)
-target_link_libraries(thermal_network_ros thermal_network_physics ${cpp_typesupport_target})
-ament_target_dependencies(thermal_network_ros
-  rclcpp rclcpp_lifecycle rclcpp_action ament_index_cpp
-  space_station_interfaces diagnostic_msgs lifecycle_msgs)
+[README.md](README.md), [docs/architecture.md](docs/architecture.md)
+(layers, model formulas, data flow, lifecycle),
+[docs/parameters.md](docs/parameters.md),
+[docs/commands.md](docs/commands.md), and
+[docs/fault_catalog.md](docs/fault_catalog.md).
 
-add_executable(thermal_nodes src/main/thermal_network_main.cpp)
-target_link_libraries(thermal_nodes thermal_network_ros)
-```
+## Change history
 
-This **replaces** the current `add_executable(thermal_nodes
-src/thermals_solver.cpp)` block. Executable name (`thermal_nodes`) and the
-`install(TARGETS ...)` destination are unchanged, so nothing outside this
-package needs to know the internals moved.
+The sections below record each scope change in the order it was made.
 
-`package.xml`: add `<depend>rclcpp_lifecycle</depend>` and
-`<depend>lifecycle_msgs</depend>` (new — the package doesn't use lifecycle
-today).
-
-### 5. Tests (new — package currently has none)
-
-Mirrors `ssos_eclss/test/unit/` and `test/ros/`:
-
-- `test/unit/network/test_thermal_network.cpp` — gtest, links
-  `thermal_network_physics` only. Covers: YAML loading produces the
-  expected node/link count, one `step()` moves temperature in the correct
-  direction for a simple 2-node conductive link, `hottest()` picks the
-  right node.
-- `test/ros/test_thermal_network_node.cpp` — gtest, links
-  `thermal_network_ros`. Covers: node reaches `ACTIVE` after
-  `maybe_autostart`'s delay without any external `ChangeState` call;
-  `on_activate()`/`on_deactivate()` transitions succeed cleanly (mirrors
-  `test_ars_node.cpp`).
-
-`CMakeLists.txt` `BUILD_TESTING` block gets two `ament_add_gtest(...)`
-entries analogous to ssos_eclss's.
-
-## Also in scope: port `sun_vector` / `array_absorptivity` into `ssos_thermal`, Bullet-free
+### 1. Port `sun_vector` / `array_absorptivity` Bullet-free (later removed, see 4)
 
 **`space_station_thermal_control` is not edited by this plan at all** —
 same rule as `ssos_eclss` never touching `space_station_eclss`. Its
@@ -289,10 +269,9 @@ running as-is; nothing removes them.
 
 **Update — later removed:** the orbit-calculation piece (`sun_vector_node`,
 Julian-date/ECI sun-position math) was pulled back out of `ssos_thermal`
-entirely; see "Also in scope: remove the orbit-calculation piece
-(`sun_vector_node`)" below.
+entirely; see change history item 4 below.
 
-## Also in scope: port `cooling_server` into `ssos_thermal` as `coolant_node`
+### 2. Port `cooling_server` as `coolant_node`
 
 **Why:** `ThermalNetworkNode`'s cooling client depends on the
 `/coolant_heat_transfer` action, and the mission-control GUI's coolant
@@ -391,7 +370,7 @@ When a cycle vents and `radiator` isn't running (as in the full-station
 launch), the venting step logs `[RADIATOR] VentHeat service not available`
 — graceful degradation, not a failure.
 
-## Also in scope: reduce the node graph to 3 components, fix a dead-link bug
+### 3. Reduce the node graph to 3 components, fix a dead-link bug
 
 `config/thermal_nodes.yaml` originally carried ~46 lumped equipment nodes
 plus `SolarPanel1`/`SolarPanel2`, mirroring the legacy solver's synthetic
@@ -432,7 +411,7 @@ sink for the whole graph remains the coolant-loop action's
 `set_all_temperatures()` snap-down, same as before this change. Both are
 natural follow-ups if solar-driven panel temperatures are wanted later.
 
-## Also in scope: remove the orbit-calculation piece (`sun_vector_node`)
+### 4. Remove the orbit and solar-heat nodes
 
 `sun_vector_node` (`include/ssos_thermal/nodes/sun_vector_node.hpp` +
 `src/nodes/sun_vector_node.cpp`) computed Julian date, Julian centuries
@@ -463,35 +442,51 @@ entirely. `ssos_thermal` now has exactly two nodes: `thermal_network` and
 `coolant_node`. If solar heating is wanted later, both the sun-vector
 source and the panel-absorption calculation would need to be reintroduced
 together, ideally with `thermal_network` actually wired to consume the
-result this time (see the "Explicitly out of scope" item below).
+result this time (see "Out of scope" below).
 
-## Explicitly out of scope (still true)
+## Out of scope
 
-- [ ] `radiator`, `demand`, `sun_vector`, `array_absorptivity` stay as
-      plain `rclcpp::Node`s in `space_station_thermal_control`,
-      unregistered — no GUI/roster surface distinguishes them today.
-      (`cooling_server` is done — ported to `coolant_node` above;
-      `ssos_thermal`'s own Bullet-free ports of `sun_vector`/
-      `array_absorptivity` were built, then later removed again — see
-      "Also in scope: remove the orbit-calculation piece" above.)
-- [ ] `ssos_sim`/`/sim/world_state` coupling — `thermal_network` still has
-      no simulated-environment input (orbital day/night, cabin temp); its
-      heat sources are still purely the YAML `internal_power` values. A
-      physics decision, not wiring — not started.
-- [ ] Solar heating and radiative heat-rejection for `SolarPanel1`/
-      `SolarPanel2` — no sun-vector source or panel-absorption calculation
-      exists in `ssos_thermal` at all anymore (removed, see above); the
-      panels heat only from `internal_power` plus conduction to
-      `base_link`, same as any other node.
+Matches the issue's out-of-scope list:
+
+- [ ] Full migration or removal of `space_station_thermal_control` — it
+      stays available and unmodified.
+- [ ] High-fidelity spacecraft thermal modeling — the network is a reduced,
+      representative 3-node conductive model.
+- [ ] Radiation-to-space modeling — no node has a radiative term; the only
+      heat sink is the coolant loop.
+- [ ] Detailed solar-heating or orbital-environment modeling — the solar
+      panels heat only from their YAML `internal_power` plus conduction to
+      `base_link`; the sun-vector and panel-absorption ports were removed
+      (see the change history above).
+- [ ] Direct `/sim/world_state` thermal-environment coupling —
+      `thermal_network` subscribes to no simulation input.
+- [ ] High-fidelity coolant or ammonia-loop validation — the ammonia
+      temperature relation is the legacy simplified model, not validated.
+- [ ] Migration of the legacy `radiator`, `demand`, `sun_vector`, or
+      `array_absorptivity` nodes — they stay in
+      `space_station_thermal_control`; `coolant_node` only calls the
+      `radiator` service best-effort.
+- [ ] Full thermal-control Behavior Tree migration — the legacy
+      `cooling_server` BT was inert and was not ported.
+- [ ] Complete replacement of legacy thermal functionality.
+
+Also not done in this package (follow-ups):
+
 - [ ] Fault-injection scenario integration — no YAML-schedulable faults for
       thermal/coolant, unlike `ssos_eclss`'s `FaultInjector`.
-- [ ] `CoolantNode` has no fault model (always `healthy=true`) — see
+- [ ] A fault model for `coolant_node` (always reports `healthy=true`) — see
       `docs/fault_catalog.md`.
 
 ## Verification checklist
 
+- [x] `space_station_thermal_control` is unchanged: `git diff
+      origin/v0.9.1-dev...HEAD -- space_station_thermal_control` is empty
+- [x] `thermal_network_physics` references no ROS symbols (`nm
+      --undefined-only` shows no `rclcpp`/`rcl`/`rmw`/interface symbols)
 - [x] `pixi run build` compiles `ssos_thermal` clean (added to the pixi
       task's `--packages-up-to` list)
+- [x] CI test set `colcon test --packages-select-regex '^ssos_.*$'` and
+      `pixi run test` both pass: 186 tests, 0 errors, 0 failures
 - [x] `colcon test --packages-select ssos_thermal` passes — 5 test binaries
       (`test_thermal_network`, `test_coolant_loop`, `test_thermal_diagnostics`,
       `test_thermal_network_node`, `test_coolant_node`); also part of
@@ -499,10 +494,10 @@ result this time (see the "Explicitly out of scope" item below).
 - [x] ROS-based test binaries run on their own `ROS_DOMAIN_ID`s, so their
       `/ssos/register_subsystem` calls can't reach another package's test
       (found when CI ran `ssos_core` and `ssos_thermal` tests in parallel)
-- [x] `ros2 launch ssos_thermal thermal.launch.py` (or the full
-      `space_station.launch.py`), then `ros2 lifecycle get /thermal_network`
-      and `/coolant_node` both show `active` within ~1s with **no manual
-      lifecycle call** (confirms `maybe_autostart` works for both)
+- [x] `ros2 launch ssos_thermal thermal.launch.py` (standalone) and the
+      full `space_station.launch.py` both bring `/thermal_network` and
+      `/coolant_node` to `active` with **no manual lifecycle call**
+      (confirms `maybe_autostart` works for both)
 - [x] `ros2 topic echo /ssos/thermal/heartbeat` and `/ssos/coolant/heartbeat`
       show periodic `healthy=true`, `lifecycle_state=2 (ACTIVE)`
 - [x] With `ssos_core`'s `system_manager` running via the full-station
@@ -528,3 +523,5 @@ result this time (see the "Explicitly out of scope" item below).
       the full-station launch: no `Cooling goal received` in the log, and a
       `ThermalWidget` rendered against the live topics shows 25.0 °C /
       5.0 °C / 0.0 kJ, all "IDLE"
+- [x] Docs cover architecture and model formulas, parameters, commands, and
+      fault behavior (`docs/`, `README.md`)
