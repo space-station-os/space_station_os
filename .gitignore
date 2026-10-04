@@ -10,13 +10,4 @@ log/
 # pixi environment (keep pixi.toml and pixi.lock; ignore the resolved env)
 .pixi/
 .claude/
-.log
-
-# local app log files
-desktop/install.log
-desktop/last-run.log
-desktop/space-station-os.desktop.in
-
-#claude
-CLAUDE.md
 /desktop/*.log
