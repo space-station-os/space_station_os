@@ -77,6 +77,9 @@ if(BUILD_TESTING)
   ament_add_gtest(test_coolant_loop test/unit/coolant/test_coolant_loop.cpp)
   target_link_libraries(test_coolant_loop thermal_network_physics)
 
+  ament_add_gtest(test_thermal_diagnostics test/unit/diagnostics/test_thermal_diagnostics.cpp)
+  target_link_libraries(test_thermal_diagnostics thermal_network_ros)
+
   ament_add_gtest(test_thermal_network_node test/ros/test_thermal_network_node.cpp)
   target_link_libraries(test_thermal_network_node thermal_network_ros)
   ament_target_dependencies(test_thermal_network_node rclcpp rclcpp_lifecycle
