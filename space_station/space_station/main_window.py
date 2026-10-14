@@ -77,12 +77,13 @@ _SEVERITY_NAMES = {0: "warning", 1: "critical", 2: "emergency"}
 # SubsystemHeartbeat.LIFECYCLE_* -> transition-mode word.
 _LIFECYCLE_NAMES = {0: "UNCONFIGURED", 1: "INACTIVE", 2: "ACTIVE", 3: "FINALIZED"}
 _ECLSS_NODES = ("ars", "ogs", "wrs", "cabin")
+_THERMAL_NODES = ("thermal", "coolant")
 
 # Map subsystem_name strings published by ssos nodes -> roster row names.
 _SUBSYS_ALIASES = {
     "ars": "ECLSS", "ogs": "ECLSS", "wrs": "ECLSS", "cabin": "ECLSS",
     "eclss": "ECLSS", "gnc": "GNC", "eps": "EPS",
-    "thermal": "Thermal", "comms": "Comms",
+    "thermal": "Thermal", "coolant": "Thermal", "comms": "Comms",
 }
 
 
@@ -126,6 +127,9 @@ class MainWindow(QMainWindow):
 
         # Per-node ECLSS lifecycle state cache (name -> (state_word, healthy)).
         self._eclss_states = {}
+        # Per-node Thermal state cache (name -> healthy), same reason: two
+        # subsystem_names (thermal, coolant) map to one "Thermal" roster row.
+        self._thermal_states = {}
 
         # ---- UI init ----
         self.central_widget = QWidget()
@@ -418,7 +422,7 @@ class MainWindow(QMainWindow):
                 SystemState, "/ssos/system_state", self._on_system_state, 10)
             self.node.create_subscription(
                 FaultEvent, "/ssos/fault_event", self._on_fault_event, 10)
-            for sub in ("ars", "ogs", "wrs", "cabin"):
+            for sub in ("ars", "ogs", "wrs", "cabin", "thermal", "coolant"):
                 self.node.create_subscription(
                     SubsystemHeartbeat, f"/ssos/{sub}/heartbeat",
                     self._on_heartbeat, 10)
@@ -471,6 +475,16 @@ class MainWindow(QMainWindow):
                 self.roster.set_status("ECLSS", "active")
             else:
                 self.roster.set_status("ECLSS", "degraded")
+        elif name in _THERMAL_NODES:
+            # Aggregate the "Thermal" row across its two subsystem_names
+            # (thermal, coolant) the same way ECLSS aggregates four --
+            # otherwise whichever heartbeat lands last silently overwrites
+            # the other's status.
+            self._thermal_states[name] = healthy
+            if any(not h for h in self._thermal_states.values()):
+                self.roster.set_status("Thermal", "fault")
+            else:
+                self.roster.set_status("Thermal", "nominal")
         else:
             self.roster.set_status(row, "nominal" if healthy else "fault")
 

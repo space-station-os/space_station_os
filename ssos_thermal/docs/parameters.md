@@ -1,0 +1,75 @@
+# Parameters
+
+## `thermal_network` node
+
+All dynamic; live-tunable via `ros2 param set` and applied on the next
+`updateSimulation()` tick (`thermal_update_dt` additionally restarts the
+step timer at the new period).
+
+| Parameter | Default | Meaning |
+|-----------|---------|---------|
+| `enable_failure` | `false` | Gate for overheat fault/heartbeat-unhealthy detection |
+| `enable_cooling` | `true` | Gate for sending `Coolant` action goals |
+| `cooling_trigger_threshold` | `330.0` | [°C] Average temperature above which a cooling goal is sent |
+| `max_temp_threshold` | `420.0` | [°C] Hottest-node temperature above which the node reports unhealthy (only checked if `enable_failure`) |
+| `cooling_rate` | `0.05` | Fractional rate of heat removed during cooling (currently unused by `updateSimulation`, kept for parity with the legacy solver) |
+| `thermal_update_dt` | `0.5` | [s] Step timer period / RK4 integration step |
+| `thermal_config_file` | `"config/thermal_nodes.yaml"` | Path to the node/link graph; relative paths resolve against the package share dir, absolute paths are used as-is |
+
+Plus the lifecycle-autostart parameters shared with every `ssos_eclss`-style
+node: `autostart` (`false`), `autostart_delay_ms` (`300`) — see
+[architecture.md](architecture.md#lifecycle).
+
+Config lives in `config/thermal_network.yaml` (these parameters) and
+`config/thermal_nodes.yaml` (the node/link graph: `node_name`,
+`parent_link`, `heat_capacity`, `internal_power`, `conductance` per entry —
+same shape as the legacy solver, loaded by `ThermalNetwork::load_from_yaml`).
+
+`thermal_nodes.yaml` is now a 3-node star: `base_link` (`parent_link: ""`,
+the root — its `heat_capacity`/`internal_power` are the sums of the ~46
+individual equipment nodes this used to model, so the aggregate mass/power
+budget is unchanged) plus `SolarPanel1`/`SolarPanel2`, each linked to
+`base_link`. An empty `parent_link` means "no link" (the root case);
+`load_from_yaml` used to silently create an inert link whenever
+`parent_link` referenced a name that wasn't itself declared as a
+`node_name` (which is exactly what `"base_link"` was before this change) —
+see [REFACTOR_PLAN.md](../REFACTOR_PLAN.md) for the fix.
+
+### Tuning at runtime
+
+```bash
+# Accepted (dynamic):
+ros2 param set /thermal_network max_temp_threshold 350.0
+
+# Force an overheat fault for testing:
+ros2 param set /thermal_network enable_failure true
+ros2 param set /thermal_network max_temp_threshold 25.0
+```
+
+## `coolant_node`
+
+Read once in `on_configure`; a reconfigure cycle is needed to apply a
+change (unlike `thermal_network`'s params, these aren't live-applied
+mid-goal).
+
+| Parameter | Default | Meaning |
+|-----------|---------|---------|
+| `mass_kg` | `200.0` | [kg] internal coolant loop water mass |
+| `specific_heat_j_per_kg_c` | `4186.0` | [J/(kg*degC)] specific heat capacity of water |
+| `heat_transfer_efficiency` | `0.85` | Fraction of removed heat transferred to the ammonia loop |
+| `vent_threshold_kj` | `250.0` | [kJ] ammonia heat above this triggers a radiator vent (best-effort call to the legacy `radiator`'s `VentHeat` service) |
+| `target_temp_c` | `25.0` | [degC] coolant loop setpoint components cool toward |
+
+Plus the shared `autostart`/`autostart_delay_ms` lifecycle-autostart pair.
+Config lives in `config/coolant.yaml`.
+
+### Tuning at runtime
+
+```bash
+ros2 param set /coolant_node vent_threshold_kj 500.0
+# then reconfigure to apply:
+ros2 lifecycle set /coolant_node deactivate
+ros2 lifecycle set /coolant_node cleanup
+ros2 lifecycle set /coolant_node configure
+ros2 lifecycle set /coolant_node activate
+```

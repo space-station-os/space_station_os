@@ -8,10 +8,10 @@ import threading
 
 import rclpy
 from rclpy.node import Node
-from rclpy.action import ActionClient
 
-from space_station_interfaces.msg import ThermalNodeDataArray, ThermalLinkFlowsArray
-from space_station_interfaces.action import Coolant
+from space_station_interfaces.msg import (
+    CoolantStatus, ThermalNodeDataArray, ThermalLinkFlowsArray
+)
 
 from space_station import theme
 from space_station.widgets import page_header, MetricCard, SpecRow, TelemetryPlot
@@ -27,11 +27,7 @@ class ThermalWidget(QWidget):
         self._lock = threading.Lock()
         self.thermal_nodes = {}   # {name: temperature °C}
         self.thermal_links = []   # [{"a":, "b":, "flow":}, ...]
-        self.coolant_status = {
-            "internal_temp_c": None,
-            "ammonia_temp_c": None,
-            "vented_heat_kj": None
-        }
+        self.coolant_status = None  # latest CoolantStatus, None until first message
 
         # histories for avg temp plot
         self.temp_time = deque(maxlen=300)
@@ -111,23 +107,12 @@ class ThermalWidget(QWidget):
             ThermalLinkFlowsArray, "/thermal/links/flux", self._link_cb, 10
         )
 
-        # Coolant Action Client (for feedback)
-        self.coolant_client = ActionClient(self.node, Coolant, "coolant_heat_transfer")
-
-        goal_msg = Coolant.Goal()
-        goal_msg.component_id = "thermal_gui"
-        goal_msg.input_temperature_c = 30.0  # arbitrary test value
-
-        # timeout_sec keeps the GUI from blocking forever when no server is up
-        if self.coolant_client.wait_for_server(timeout_sec=2.0):
-            self.coolant_client.send_goal_async(
-                goal_msg,
-                feedback_callback=self._coolant_feedback_cb
-            )
-        else:
-            self.node.get_logger().warn(
-                "[ThermalWidget] Coolant action server unavailable; skipping goal"
-            )
+        # Coolant loop status: monitoring only. The GUI must not send
+        # /coolant_heat_transfer goals -- that actuates the loop and can
+        # trigger radiator venting.
+        self.node.create_subscription(
+            CoolantStatus, "/thermal/coolant/status", self._coolant_status_cb, 10
+        )
 
     # ------------------- Callbacks -------------------
     def _node_cb(self, msg: ThermalNodeDataArray):
@@ -140,18 +125,16 @@ class ThermalWidget(QWidget):
                 {"a": l.node_a, "b": l.node_b, "flow": l.heat_flow} for l in msg.links
             ]
 
-    def _coolant_feedback_cb(self, msg: Coolant.Feedback):
+    def _coolant_status_cb(self, msg: CoolantStatus):
         with self._lock:
-            self.coolant_status["internal_temp_c"] = msg.internal_temp_c
-            self.coolant_status["ammonia_temp_c"] = msg.ammonia_temp_c
-            self.coolant_status["vented_heat_kj"] = msg.vented_heat_kj
+            self.coolant_status = msg
 
     # ------------------- GUI Update -------------------
     def _update_gui(self):
         with self._lock:
             nodes = dict(self.thermal_nodes)
             links = list(self.thermal_links)
-            coolant = dict(self.coolant_status)
+            coolant = self.coolant_status
 
         # Update nodes table
         self.nodes_table.setRowCount(len(nodes))
@@ -167,15 +150,13 @@ class ThermalWidget(QWidget):
             self.links_table.setItem(i, 2, QTableWidgetItem(f"{l['flow']:.2f}"))
 
         # Update coolant info
-        if coolant["internal_temp_c"] is not None:
-            self.card_internal.set_value(f"{coolant['internal_temp_c']:.1f}")
-            self.card_internal.set_footer("LIVE", "green")
-        if coolant["ammonia_temp_c"] is not None:
-            self.card_ammonia.set_value(f"{coolant['ammonia_temp_c']:.1f}")
-            self.card_ammonia.set_footer("LIVE", "green")
-        if coolant["vented_heat_kj"] is not None:
-            self.card_vented.set_value(f"{coolant['vented_heat_kj']:.1f}")
-            self.card_vented.set_footer("LIVE", "green")
+        if coolant is not None:
+            footer, color = ("COOLING", "amber") if coolant.active else ("IDLE", "green")
+            self.card_internal.set_value(f"{coolant.internal_temp_c:.1f}")
+            self.card_ammonia.set_value(f"{coolant.ammonia_temp_c:.1f}")
+            self.card_vented.set_value(f"{coolant.vented_heat_kj:.1f}")
+            for card in (self.card_internal, self.card_ammonia, self.card_vented):
+                card.set_footer(footer, color)
 
         # Update avg temp plot
         if nodes:
