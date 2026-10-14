@@ -1,16 +1,16 @@
 """SSOS mission-control launch.
 
-CURRENT TEST CONFIG: ECLSS only, with ssos_core (system_manager) and ssos_sim
+CURRENT TEST CONFIG: ECLSS + EPS, with ssos_core (system_manager) and ssos_sim
 (simulation_controller). Sequencing:
   - all processes start at t=0,
   - system_manager + simulation_controller are configured on start and ACTIVATED
     at t=10s,
-  - the ECLSS nodes self-activate at t=11s (autostart_delay_ms) -- i.e. after
-    core+sim are active, so registration with the system_manager succeeds and
-    the simulator's /sim/world_state is already flowing.
+  - the ECLSS nodes and eps_node self-activate at t=11s (autostart_delay_ms)
+    -- i.e. after core+sim are active, so registration with the system_manager
+    succeeds and the simulator's /sim/world_state is already flowing.
 
-Thermal / EPS / GNC / orbit are commented out for this ECLSS-focused test;
-re-enable the blocks at the bottom to bring the full station back.
+Thermal is commented out; re-enable the block at the bottom to bring the full
+station back.
 """
 import os
 
@@ -98,6 +98,14 @@ def generate_launch_description():
         launch_arguments={'autostart_delay_ms': '11000'}.items(),
     )
 
+    # ---- EPS (self-activates at t=11s, after core+sim) ----
+    eps = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(space_station_pkg, 'launch', 'eps.launch.py')
+        ),
+        launch_arguments={'autostart_delay_ms': '11000'}.items(),
+    )
+
     # ---- GNC / orbit (re-enabled: needed for the GNC panel's station model
     # + orbit trajectory rendering) ----
     gnc_core = IncludeLaunchDescription(
@@ -119,6 +127,7 @@ def generate_launch_description():
         sim_controller,
         activate_core_sim,
         eclss,
+        eps,
         gnc_core,
         orbit_dynamics,
     ])
@@ -128,14 +137,10 @@ def generate_launch_description():
 
     # =====================================================================
     # FULL STATION (re-enable for the complete system) -- commented out for
-    # the ECLSS-only test above.
+    # the ECLSS + EPS test above.
     #
     #   IncludeLaunchDescription(PythonLaunchDescriptionSource(
     #       os.path.join(space_station_pkg, 'launch', 'thermals.launch.py'))),
-    #   IncludeLaunchDescription(PythonLaunchDescriptionSource(
-    #       os.path.join(space_station_pkg, 'launch', 'eps.launch.py'))),
-    #   Node(package='space_station_eps', executable='solar_power',
-    #        name='solar_power_node', output='screen'),
     #   IncludeLaunchDescription(
     #       PythonLaunchDescriptionSource(os.path.join(
     #           get_package_share_directory('space_station_gnc'),

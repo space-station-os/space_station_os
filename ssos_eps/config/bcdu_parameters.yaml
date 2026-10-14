@@ -1,0 +1,19 @@
+# Battery charge/discharge unit parameters for ssos_eps/eps_node (per channel,
+# bus side).
+eps_node:
+  ros__parameters:
+    # SSU-voltage hysteresis for source availability.
+    bcdu.charge_enter_v: 158.0
+    bcdu.discharge_enter_v: 152.0
+
+    bcdu.regulation_voltage_v: 150.0
+    bcdu.regulation_min_v: 130.0
+    bcdu.regulation_max_v: 180.0
+
+    bcdu.max_charge_current_a: 65.0
+    bcdu.max_discharge_current_a: 127.0
+    bcdu.charge_efficiency: 0.95
+    bcdu.discharge_efficiency: 0.95
+
+    bcdu.deadband_w: 10.0
+    bcdu.unserved_tolerance_w: 1.0

@@ -418,7 +418,7 @@ class MainWindow(QMainWindow):
                 SystemState, "/ssos/system_state", self._on_system_state, 10)
             self.node.create_subscription(
                 FaultEvent, "/ssos/fault_event", self._on_fault_event, 10)
-            for sub in ("ars", "ogs", "wrs", "cabin"):
+            for sub in ("ars", "ogs", "wrs", "cabin", "eps"):
                 self.node.create_subscription(
                     SubsystemHeartbeat, f"/ssos/{sub}/heartbeat",
                     self._on_heartbeat, 10)
