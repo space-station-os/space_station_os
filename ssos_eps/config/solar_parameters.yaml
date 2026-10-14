@@ -1,0 +1,26 @@
+# Solar array, SARJ pointing and SSU parameters for ssos_eps/eps_node.
+eps_node:
+  ros__parameters:
+    # ~84 kW at 1361 W/m^2.
+    solar.array.area_m2: 375.0
+    solar.array.cell_efficiency: 0.165
+    solar.array.degradation_factor: 1.0
+    solar.array.sunrise_ramp_s: 480.0
+
+    solar.array.derate_with_beta_cosine: true
+    solar.array.beta_max_deg: 75.0
+    solar.array.beta_precession_orbits: 10
+    solar.array.beta_lock_limit_deg: 72.0
+    solar.array.gimbal_lock_derate: 0.6
+    solar.array.use_fixed_beta: false
+    solar.array.fixed_beta_deg: 0.0
+
+    solar.thermal.ambient_temp_c: 20.0
+    solar.thermal.temp_rise_per_kw_c: 0.4
+    solar.thermal.time_constant_s: 300.0
+
+    solar.ssu.voltage_setpoint_v: 160.0
+    solar.ssu.voltage_ripple_v: 0.6
+    solar.ssu.ripple_period_s: 1350.0
+    solar.ssu.efficiency: 0.985
+    solar.ssu.min_input_power_w: 1.0
