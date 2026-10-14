@@ -1,17 +1,4 @@
-"""SSOS mission-control launch.
 
-CURRENT TEST CONFIG: ECLSS + EPS, with ssos_core (system_manager) and ssos_sim
-(simulation_controller). Sequencing:
-  - all processes start at t=0,
-  - system_manager + simulation_controller are configured on start and ACTIVATED
-    at t=10s,
-  - the ECLSS nodes and eps_node self-activate at t=11s (autostart_delay_ms)
-    -- i.e. after core+sim are active, so registration with the system_manager
-    succeeds and the simulator's /sim/world_state is already flowing.
-
-Thermal is commented out; re-enable the block at the bottom to bring the full
-station back.
-"""
 import os
 
 from ament_index_python.packages import get_package_share_directory
@@ -135,23 +122,4 @@ def generate_launch_description():
         ld.add_action(handler)
     return ld
 
-    # =====================================================================
-    # FULL STATION (re-enable for the complete system) -- commented out for
-    # the ECLSS + EPS test above.
-    #
-    #   IncludeLaunchDescription(PythonLaunchDescriptionSource(
-    #       os.path.join(space_station_pkg, 'launch', 'thermals.launch.py'))),
-    #   IncludeLaunchDescription(
-    #       PythonLaunchDescriptionSource(os.path.join(
-    #           get_package_share_directory('space_station_gnc'),
-    #           'launch', 'gnc_core.launch.py')),
-    #       launch_arguments={'quiet_torque': 'true', 'quiet_control': 'true',
-    #                         'quiet_motion': 'true', 'quiet_sensor': 'true',
-    #                         'quiet_estimate': 'true'}.items()),
-    #   Node(package='space_station_gnc', executable='orbit_dynamics',
-    #        name='orbit_dynamics_node', output='log',
-    #        parameters=[os.path.join(get_package_share_directory('space_station_gnc'),
-    #                                 'config', 'orbit_dynamics.yaml')]),
-    #   Node(package='space_station_gnc', executable='orbit_dynamics_mock',
-    #        name='orbit_dynamics_mock', output='log'),
-    # =====================================================================
+   
