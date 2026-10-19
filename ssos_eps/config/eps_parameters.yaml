@@ -1,16 +1,21 @@
+# EPS node-level and topology parameters for ssos_eps/eps_node.
 eps_node:
   ros__parameters:
     use_sim_time: true
-
     step_rate_hz: 1.0
 
-    solar_array_area_m2: 100.0
-    solar_array_efficiency: 0.30
-
-    load_demand_w: 20000.0
-
-    battery_capacity_wh: 50000.0
-    initial_battery_soc: 0.80
-    low_soc_threshold: 0.20
+    # Station load on the primary bus. Shared evenly across channels until
+    # MBSU/DDCU load distribution is modelled.
+    load_demand_w: 30000.0
 
     enable_auto_faults: true
+
+    # Physics fault hooks for what-if testing (-1 = none).
+    faults.failed_oru: -1
+    faults.faulted_bcdu: -1
+
+    # Topology (static: reconfigure to apply).
+    eps.n_channels: 12
+    eps.orus_per_channel: 2
+
+    eps.low_soc_threshold: 0.20
