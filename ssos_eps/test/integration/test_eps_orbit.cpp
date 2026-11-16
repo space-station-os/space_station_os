@@ -15,13 +15,12 @@ namespace
 constexpr double kPeriodS = 5546.0;
 constexpr double kEclipseFraction = 0.35;
 
-EpsInput environment(double t, double load_w)
+EpsInput environment(double t)
 {
   EpsInput in{};
   const double phase = std::fmod(t, kPeriodS) / kPeriodS;
   in.in_eclipse = phase > (1.0 - kEclipseFraction);
   in.solar_flux_w_m2 = in.in_eclipse ? 0.0 : 1361.0;
-  in.load_demand_w = load_w;
   return in;
 }
 
@@ -46,7 +45,7 @@ TEST(EpsOrbit, DefaultTopologyMatchesLegacyStation)
 TEST(EpsOrbit, SunlightCarriesLoadAndChargesBatteries)
 {
   EpsSystem eps(zero_beta());
-  const EpsState & s = eps.step(1.0, EpsInput{1361.0, false, 30000.0});
+  const EpsState & s = eps.step(1.0, EpsInput{1361.0, false});
   EXPECT_GT(s.generation_w, 80000.0);
   EXPECT_NEAR(s.load_served_w, 30000.0, 1.0e-6);
   EXPECT_GT(s.battery_charge_w, 0.0);
@@ -64,7 +63,7 @@ TEST(EpsOrbit, EclipseDischargesBatteries)
   const double soc0 = eps.state().battery_soc;
   EpsState s{};
   for (int i = 0; i < 600; ++i) {
-    s = eps.step(1.0, EpsInput{0.0, true, 30000.0});
+    s = eps.step(1.0, EpsInput{0.0, true});
   }
   EXPECT_DOUBLE_EQ(s.generation_w, 0.0);
   EXPECT_NEAR(s.load_served_w, 30000.0, 1.0e-6);
@@ -86,7 +85,7 @@ TEST(EpsOrbit, SocCyclesOverAnOrbitWithoutLoadShedding)
   bool prev_eclipse = false;
   double unserved_wh = 0.0;
   for (double t = 0.0; t < 3.0 * kPeriodS; t += dt) {
-    const EpsInput in = environment(t, 30000.0);
+    const EpsInput in = environment(t);
     const EpsState & s = eps.step(dt, in);
     if (in.in_eclipse && !prev_eclipse) {
       soc_at_entry.push_back(s.battery_soc);
@@ -111,7 +110,7 @@ TEST(EpsOrbit, BusPowerBalancesEveryStep)
 {
   EpsSystem eps;
   for (double t = 0.0; t < kPeriodS; t += 5.0) {
-    const EpsState & s = eps.step(5.0, environment(t, 30000.0));
+    const EpsState & s = eps.step(5.0, environment(t));
     double bus_discharge = 0.0;
     double bus_charge = 0.0;
     for (const auto & ch : s.channels) {
@@ -120,7 +119,7 @@ TEST(EpsOrbit, BusPowerBalancesEveryStep)
     }
     const double source = s.channels.front().source_available ? s.available_power_w : 0.0;
     EXPECT_NEAR(source + bus_discharge,
-                s.load_served_w + bus_charge + s.shunted_power_w, 1.0e-3);
+                s.primary_load_w + bus_charge + s.shunted_power_w, 1.0e-3);
   }
 }
 
@@ -132,8 +131,8 @@ TEST(EpsOrbit, EclipseEnergyIsConserved)
   double loss_wh = 0.0;
   double heat_wh = 0.0;
   for (int i = 0; i < 2000; ++i) {
-    const EpsState & s = eps.step(1.0, EpsInput{0.0, true, 30000.0});
-    load_wh += s.load_served_w / 3600.0;
+    const EpsState & s = eps.step(1.0, EpsInput{0.0, true});
+    load_wh += s.primary_load_w / 3600.0;
     loss_wh += s.conversion_loss_w / 3600.0;
     for (const auto & o : s.orus) {
       heat_wh += o.heat_w / 3600.0;
@@ -147,11 +146,12 @@ TEST(EpsOrbit, OverloadDrainsBankAndDegrades)
 {
   EpsParameters p = zero_beta();
   p.battery.initial_soc = 0.3;
+  p.demand_scale = 2.0;
   EpsSystem eps(p);
   bool saw_low_soc = false;
   bool saw_unserved = false;
   for (int i = 0; i < 4 * 3600; i += 10) {
-    const EpsState & s = eps.step(10.0, EpsInput{0.0, true, 60000.0});
+    const EpsState & s = eps.step(10.0, EpsInput{0.0, true});
     saw_low_soc = saw_low_soc || s.low_soc;
     saw_unserved = saw_unserved || s.load_unserved;
   }
@@ -164,9 +164,10 @@ TEST(EpsOrbit, OverloadDrainsBankAndDegrades)
 TEST(EpsOrbit, ArrayDegradationReducesGeneration)
 {
   EpsSystem eps(zero_beta());
-  const double full = eps.step(1.0, EpsInput{1361.0, false, 0.0}).generation_w;
+  eps.set_demand_scale(0.0);
+  const double full = eps.step(1.0, EpsInput{1361.0, false}).generation_w;
   eps.set_array_degradation(0.5);
-  const double half = eps.step(1.0, EpsInput{1361.0, false, 0.0}).generation_w;
+  const double half = eps.step(1.0, EpsInput{1361.0, false}).generation_w;
   EXPECT_NEAR(half, 0.5 * full, 1.0e-6);
 }
 
@@ -176,8 +177,8 @@ TEST(EpsOrbit, GimbalLockReducesGeneration)
   EpsSystem nominal(p);
   p.solar.array.fixed_beta_deg = 74.0;
   EpsSystem locked(p);
-  const EpsState & a = nominal.step(1.0, EpsInput{1361.0, false, 30000.0});
-  const EpsState & b = locked.step(1.0, EpsInput{1361.0, false, 30000.0});
+  const EpsState & a = nominal.step(1.0, EpsInput{1361.0, false});
+  const EpsState & b = locked.step(1.0, EpsInput{1361.0, false});
   EXPECT_TRUE(b.array.gimbal_locked);
   EXPECT_LT(b.generation_w, 0.2 * a.generation_w);
 }
@@ -186,22 +187,24 @@ TEST(EpsOrbit, BcduFaultIsReportedAndCleared)
 {
   EpsSystem eps(zero_beta());
   eps.set_bcdu_fault(3, true);
-  const EpsState & s = eps.step(1.0, EpsInput{0.0, true, 30000.0});
+  const EpsState & s = eps.step(1.0, EpsInput{0.0, true});
   EXPECT_TRUE(s.bcdu_fault);
-  EXPECT_TRUE(s.load_unserved);
   EXPECT_FALSE(s.healthy);
   EXPECT_EQ(s.channels[3].mode, bcdu::BcduMode::FAULT);
-  EXPECT_NEAR(s.unserved_load_w, 30000.0 / 12.0, 1.0e-6);
+  // MBSU 1 reroutes channel 3's share onto channels 4 and 5.
+  EXPECT_FALSE(s.load_unserved);
+  EXPECT_DOUBLE_EQ(s.channels[3].load_served_w, 0.0);
+  EXPECT_GT(s.channels[4].load_served_w, s.channels[0].load_served_w);
 
   eps.set_bcdu_fault(3, false);
-  EXPECT_TRUE(eps.step(1.0, EpsInput{0.0, true, 30000.0}).healthy);
+  EXPECT_TRUE(eps.step(1.0, EpsInput{0.0, true}).healthy);
 }
 
 TEST(EpsOrbit, FailedOruIsReportedWithoutLoadShedding)
 {
   EpsSystem eps(zero_beta());
   eps.set_oru_failed(5, true);
-  const EpsState & s = eps.step(1.0, EpsInput{0.0, true, 30000.0});
+  const EpsState & s = eps.step(1.0, EpsInput{0.0, true});
   EXPECT_TRUE(s.oru_failed);
   EXPECT_FALSE(s.load_unserved);
   EXPECT_FALSE(s.healthy);
@@ -213,27 +216,27 @@ TEST(EpsOrbit, LiveParameterUpdateKeepsBatteryState)
 {
   EpsSystem eps(zero_beta());
   for (int i = 0; i < 600; ++i) {
-    eps.step(1.0, EpsInput{0.0, true, 30000.0});
+    eps.step(1.0, EpsInput{0.0, true});
   }
   const double soc = eps.state().battery_soc;
   EpsParameters p = eps.parameters();
   p.bcdu.discharge_efficiency = 0.9;
   eps.set_parameters(p);
   EXPECT_NEAR(eps.state().battery_soc, soc, 1.0e-12);
-  eps.step(1.0, EpsInput{0.0, true, 30000.0});
-  EXPECT_NEAR(eps.state().battery_discharge_w, 30000.0 / 0.9, 1.0);
+  eps.step(1.0, EpsInput{0.0, true});
+  EXPECT_NEAR(eps.state().battery_discharge_w, eps.state().primary_load_w / 0.9, 1.0);
 }
 
 TEST(EpsOrbit, OruOverTemperatureMakesEpsUnhealthy)
 {
   EpsSystem eps(zero_beta());
-  EXPECT_TRUE(eps.step(1.0, EpsInput{1361.0, false, 30000.0}).healthy);
+  EXPECT_TRUE(eps.step(1.0, EpsInput{1361.0, false}).healthy);
 
   // Limit below the ORUs' current temperature.
   EpsParameters p = eps.parameters();
   p.battery.max_temp_c = eps.state().orus.front().temperature_c - 5.0;
   eps.set_parameters(p);
-  const EpsState & hot = eps.step(1.0, EpsInput{1361.0, false, 30000.0});
+  const EpsState & hot = eps.step(1.0, EpsInput{1361.0, false});
   EXPECT_EQ(hot.orus.front().health, battery::BatteryHealth::OVERHEAT);
   EXPECT_TRUE(hot.oru_overheat);
   EXPECT_FALSE(hot.oru_failed);
@@ -242,7 +245,7 @@ TEST(EpsOrbit, OruOverTemperatureMakesEpsUnhealthy)
 
   p.battery.max_temp_c = 35.0;
   eps.set_parameters(p);
-  const EpsState & cool = eps.step(1.0, EpsInput{1361.0, false, 30000.0});
+  const EpsState & cool = eps.step(1.0, EpsInput{1361.0, false});
   EXPECT_FALSE(cool.oru_overheat);
   EXPECT_TRUE(cool.healthy);
 }

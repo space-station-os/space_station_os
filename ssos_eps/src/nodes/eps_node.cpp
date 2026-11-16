@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <chrono>
 #include <functional>
+#include <iomanip>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -24,10 +26,12 @@ EpsNode::EpsNode(const rclcpp::NodeOptions & options)
 : rclcpp_lifecycle::LifecycleNode("eps_node", options)
 {
   this->declare_parameter("step_rate_hz", step_rate_hz_);
-  this->declare_parameter("load_demand_w", load_demand_w_);
   this->declare_parameter("enable_auto_faults", enable_auto_faults_);
   this->declare_parameter("faults.failed_oru", failed_oru_);
   this->declare_parameter("faults.faulted_bcdu", faulted_bcdu_);
+  this->declare_parameter("faults.faulted_ddcu", faulted_ddcu_);
+  this->declare_parameter("faults.faulted_mbsu", faulted_mbsu_);
+  this->declare_parameter("faults.offline_channel", offline_channel_);
 
   bridge_ = std::make_unique<EpsParameterBridge>(this);
   bridge_->declare_parameters(system::default_eps_parameters());
@@ -38,10 +42,12 @@ EpsNode::EpsNode(const rclcpp::NodeOptions & options)
 CallbackReturn EpsNode::on_configure(const rclcpp_lifecycle::State &)
 {
   step_rate_hz_ = this->get_parameter("step_rate_hz").as_double();
-  load_demand_w_ = this->get_parameter("load_demand_w").as_double();
   enable_auto_faults_ = this->get_parameter("enable_auto_faults").as_bool();
   failed_oru_ = static_cast<int>(this->get_parameter("faults.failed_oru").as_int());
   faulted_bcdu_ = static_cast<int>(this->get_parameter("faults.faulted_bcdu").as_int());
+  faulted_ddcu_ = static_cast<int>(this->get_parameter("faults.faulted_ddcu").as_int());
+  faulted_mbsu_ = static_cast<int>(this->get_parameter("faults.faulted_mbsu").as_int());
+  offline_channel_ = static_cast<int>(this->get_parameter("faults.offline_channel").as_int());
 
   eps_ = std::make_unique<system::EpsSystem>(bridge_->read_parameters());
   apply_fault_hooks();
@@ -63,6 +69,16 @@ CallbackReturn EpsNode::on_configure(const rclcpp_lifecycle::State &)
     oru_pubs_.push_back(this->create_publisher<sensor_msgs::msg::BatteryState>(
         "/ssos/eps/battery/oru_" + std::to_string(i) + "/state", 10));
   }
+  mbsu_pubs_.clear();
+  for (int m = 0; m < eps_->n_mbsu(); ++m) {
+    mbsu_pubs_.push_back(this->create_publisher<MBSUStatus>(
+        "/ssos/eps/mbsu/mbsu_" + std::to_string(m) + "/status", 10));
+  }
+  ddcu_pubs_.clear();
+  for (int d = 0; d < eps_->n_ddcu(); ++d) {
+    ddcu_pubs_.push_back(this->create_publisher<DDCUStatus>(
+        "/ssos/eps/ddcu/ddcu_" + std::to_string(d) + "/status", 10));
+  }
   soc_pub_ = this->create_publisher<Float64>("/ssos/eps/battery/soc", 10);
   power_balance_pub_ = this->create_publisher<Float64>("/ssos/eps/power_balance_w", 10);
   array_power_pub_ = this->create_publisher<Float64>("/ssos/eps/solar/array_power_w", 10);
@@ -76,6 +92,9 @@ CallbackReturn EpsNode::on_configure(const rclcpp_lifecycle::State &)
   world_state_sub_ = this->create_subscription<WorldState>(
     "/sim/world_state", 10, std::bind(&EpsNode::on_world_state, this, _1));
   register_client_ = this->create_client<RegisterSubsystem>("/ssos/register_subsystem");
+  load_srv_ = this->create_service<Load>(
+    "/ssos/eps/load_request",
+    std::bind(&EpsNode::handle_load_request, this, _1, std::placeholders::_2));
   param_cb_handle_ = this->add_on_set_parameters_callback(
     std::bind(&EpsNode::on_set_parameters, this, _1));
 
@@ -84,10 +103,17 @@ CallbackReturn EpsNode::on_configure(const rclcpp_lifecycle::State &)
   bcdu_fault_reported_ = false;
   oru_failed_reported_ = false;
   oru_overheat_reported_ = false;
+  ddcu_fault_reported_ = false;
+  ddcu_overload_reported_ = false;
+  mbsu_unstable_reported_ = false;
+  redundancy_reported_ = false;
   params_dirty_ = false;
 
-  RCLCPP_INFO(get_logger(), "Configured: %d channels x %d ORUs, %.0f W load",
-              eps_->n_channels(), eps_->parameters().orus_per_channel, load_demand_w_);
+  RCLCPP_INFO(get_logger(),
+              "Configured: %d channels x %d ORUs, %d MBSUs, %d DDCUs, %zu loads (%.0f W)",
+              eps_->n_channels(), eps_->parameters().orus_per_channel, eps_->n_mbsu(),
+              eps_->n_ddcu(), eps_->loads().loads().size(),
+              eps_->loads().total_requested_w());
   return CallbackReturn::SUCCESS;
 }
 
@@ -101,6 +127,12 @@ CallbackReturn EpsNode::on_activate(const rclcpp_lifecycle::State &)
     p->on_activate();
   }
   for (auto & p : oru_pubs_) {
+    p->on_activate();
+  }
+  for (auto & p : mbsu_pubs_) {
+    p->on_activate();
+  }
+  for (auto & p : ddcu_pubs_) {
     p->on_activate();
   }
   for (auto & p : {soc_pub_, power_balance_pub_, array_power_pub_, ssu_voltage_pub_,
@@ -134,6 +166,12 @@ CallbackReturn EpsNode::on_deactivate(const rclcpp_lifecycle::State &)
   for (auto & p : oru_pubs_) {
     p->on_deactivate();
   }
+  for (auto & p : mbsu_pubs_) {
+    p->on_deactivate();
+  }
+  for (auto & p : ddcu_pubs_) {
+    p->on_deactivate();
+  }
   for (auto & p : {soc_pub_, power_balance_pub_, array_power_pub_, ssu_voltage_pub_,
       ssu_power_pub_, ssu_current_pub_, panel_temp_pub_, beta_pub_})
   {
@@ -151,6 +189,8 @@ CallbackReturn EpsNode::on_cleanup(const rclcpp_lifecycle::State &)
   bcdu_pub_.reset();
   channel_pubs_.clear();
   oru_pubs_.clear();
+  mbsu_pubs_.clear();
+  ddcu_pubs_.clear();
   soc_pub_.reset();
   power_balance_pub_.reset();
   array_power_pub_.reset();
@@ -161,6 +201,7 @@ CallbackReturn EpsNode::on_cleanup(const rclcpp_lifecycle::State &)
   beta_pub_.reset();
   world_state_sub_.reset();
   register_client_.reset();
+  load_srv_.reset();
   param_cb_handle_.reset();
   eps_.reset();
   return CallbackReturn::SUCCESS;
@@ -176,14 +217,7 @@ rcl_interfaces::msg::SetParametersResult EpsNode::on_set_parameters(
   }
   for (const auto & p : params) {
     const std::string & n = p.get_name();
-    if (n == "load_demand_w") {
-      if (p.as_double() < 0.0) {
-        result.successful = false;
-        result.reason = "load_demand_w must be >= 0";
-        return result;
-      }
-      load_demand_w_ = p.as_double();
-    } else if (n == "step_rate_hz") {
+    if (n == "step_rate_hz") {
       if (p.as_double() <= 0.0) {
         result.successful = false;
         result.reason = "step_rate_hz must be > 0";
@@ -197,6 +231,15 @@ rcl_interfaces::msg::SetParametersResult EpsNode::on_set_parameters(
       params_dirty_ = true;
     } else if (n == "faults.faulted_bcdu") {
       faulted_bcdu_ = static_cast<int>(p.as_int());
+      params_dirty_ = true;
+    } else if (n == "faults.faulted_ddcu") {
+      faulted_ddcu_ = static_cast<int>(p.as_int());
+      params_dirty_ = true;
+    } else if (n == "faults.faulted_mbsu") {
+      faulted_mbsu_ = static_cast<int>(p.as_int());
+      params_dirty_ = true;
+    } else if (n == "faults.offline_channel") {
+      offline_channel_ = static_cast<int>(p.as_int());
       params_dirty_ = true;
     } else if (EpsParameterBridge::is_static_parameter(n)) {
       RCLCPP_INFO(get_logger(), "Static parameter '%s' changed; reconfigure to apply",
@@ -215,6 +258,13 @@ void EpsNode::apply_fault_hooks()
   }
   for (int c = 0; c < eps_->n_channels(); ++c) {
     eps_->set_bcdu_fault(c, c == faulted_bcdu_);
+    eps_->set_channel_offline(c, c == offline_channel_);
+  }
+  for (int d = 0; d < eps_->n_ddcu(); ++d) {
+    eps_->set_ddcu_fault(d, d == faulted_ddcu_);
+  }
+  for (int m = 0; m < eps_->n_mbsu(); ++m) {
+    eps_->set_mbsu_fault(m, m == faulted_mbsu_);
   }
 }
 
@@ -255,7 +305,6 @@ void EpsNode::step()
   system::EpsInput input{};
   input.solar_flux_w_m2 = solar_flux_w_m2_;
   input.in_eclipse = in_eclipse_;
-  input.load_demand_w = load_demand_w_;
   last_state_ = eps_->step(dt, input);
 
   publish_telemetry(now);
@@ -353,9 +402,13 @@ void EpsNode::publish_telemetry(const rclcpp::Time & now)
   eps.hardware_id = "ssos_eps/eps";
   EpsDiagnostics::add_value(eps, "generation_w", s.generation_w, 1);
   EpsDiagnostics::add_value(eps, "available_power_w", s.available_power_w, 1);
+  EpsDiagnostics::add_value(eps, "supply_capability_w", s.supply_capability_w, 1);
+  EpsDiagnostics::add_value(eps, "primary_load_w", s.primary_load_w, 1);
   EpsDiagnostics::add_value(eps, "load_demand_w", s.load_demand_w, 1);
   EpsDiagnostics::add_value(eps, "load_served_w", s.load_served_w, 1);
   EpsDiagnostics::add_value(eps, "unserved_load_w", s.unserved_load_w, 1);
+  EpsDiagnostics::add_value(eps, "shed_loads", std::to_string(s.shed_loads));
+  EpsDiagnostics::add_value(eps, "distribution_loss_w", s.distribution_loss_w, 1);
   EpsDiagnostics::add_value(eps, "power_balance_w", s.power_balance_w, 1);
   EpsDiagnostics::add_value(eps, "battery_power_w", s.battery_power_w, 1);
   EpsDiagnostics::add_value(eps, "battery_charge_w", s.battery_charge_w, 1);
@@ -425,6 +478,74 @@ void EpsNode::publish_telemetry(const rclcpp::Time & now)
     s.low_soc ? "state of charge below threshold" : "nominal";
   diag.status.push_back(battery);
 
+  int mbsu_unstable = 0;
+  int mbsu_single_source = 0;
+  DiagnosticStatus mbsu;
+  mbsu.name = "eps/mbsu";
+  mbsu.hardware_id = "ssos_eps/mbsu";
+  for (std::size_t m = 0; m < s.mbsus.size(); ++m) {
+    const auto & st = s.mbsus[m];
+    mbsu_pubs_[m]->publish(EpsDiagnostics::make_mbsu_status(
+        now, "mbsu_" + std::to_string(m), st));
+    EpsDiagnostics::add_value(
+      mbsu, "mbsu_" + std::to_string(m),
+      std::to_string(st.available_sources) + "/" + std::to_string(st.source_channels.size()) +
+      " sources, " + std::to_string(static_cast<int>(st.supplied_w)) + " W");
+    mbsu_unstable += st.unstable ? 1 : 0;
+    mbsu_single_source += !st.unstable && st.redundancy_lost ? 1 : 0;
+  }
+  mbsu.level = mbsu_unstable > 0 ? DiagnosticStatus::ERROR :
+    mbsu_single_source > 0 ? DiagnosticStatus::WARN : DiagnosticStatus::OK;
+  mbsu.message = mbsu_unstable > 0 ? std::to_string(mbsu_unstable) + " MBSU(s) unstable" :
+    mbsu_single_source > 0 ? std::to_string(mbsu_single_source) + " MBSU(s) on one source" :
+    "nominal";
+  diag.status.push_back(mbsu);
+
+  std::vector<int> active(s.ddcus.size(), 0);
+  std::vector<int> shed(s.ddcus.size(), 0);
+  DiagnosticStatus loads;
+  loads.name = "eps/loads";
+  loads.hardware_id = "ssos_eps/loads";
+  for (const auto & l : s.loads) {
+    if (l.ddcu >= 0 && static_cast<std::size_t>(l.ddcu) < s.ddcus.size()) {
+      (l.shed ? shed : active)[static_cast<std::size_t>(l.ddcu)]++;
+    }
+    std::ostringstream value;
+    value << std::fixed << std::setprecision(1) << l.served_w << "/" << l.requested_w <<
+      " W, p" << l.priority << ", ddcu " << l.ddcu << (l.shed ? ", shed" : "");
+    EpsDiagnostics::add_value(loads, "load:" + l.id, value.str());
+  }
+  loads.level = s.load_shed ? DiagnosticStatus::WARN : DiagnosticStatus::OK;
+  loads.message = s.load_shed ? std::to_string(s.shed_loads) + " load(s) shed" :
+    std::to_string(s.loads.size()) + " loads supplied";
+  diag.status.push_back(loads);
+
+  int ddcu_faulted = 0;
+  int ddcu_overloaded = 0;
+  DiagnosticStatus ddcu;
+  ddcu.name = "eps/ddcu";
+  ddcu.hardware_id = "ssos_eps/ddcu";
+  const auto & params = eps_->parameters();
+  for (std::size_t d = 0; d < s.ddcus.size(); ++d) {
+    const auto & st = s.ddcus[d];
+    ddcu_pubs_[d]->publish(EpsDiagnostics::make_ddcu_status(
+        now, "ddcu_" + std::to_string(d), st, params.ddcu_mbsu[d], params.ddcu.rated_power_w,
+        active[d], shed[d]));
+    EpsDiagnostics::add_value(
+      ddcu, "ddcu_" + std::to_string(d),
+      ddcu::to_string(st.mode) + ", " + std::to_string(static_cast<int>(st.output_power_w)) +
+      " W, " + std::to_string(static_cast<int>(st.temperature_c)) + " C");
+    ddcu_faulted += st.mode == ddcu::DdcuMode::TRIPPED ? 1 : 0;
+    ddcu_overloaded += st.mode == ddcu::DdcuMode::OVERLOAD ? 1 : 0;
+  }
+  EpsDiagnostics::add_value(ddcu, "loss_w", s.distribution_loss_w, 1);
+  ddcu.level = ddcu_faulted > 0 || s.ddcu_fault ? DiagnosticStatus::ERROR :
+    ddcu_overloaded > 0 ? DiagnosticStatus::WARN : DiagnosticStatus::OK;
+  ddcu.message = ddcu_faulted > 0 ? std::to_string(ddcu_faulted) + " DDCU(s) tripped" :
+    s.ddcu_fault ? "DDCU without primary power" :
+    ddcu_overloaded > 0 ? std::to_string(ddcu_overloaded) + " DDCU(s) overloaded" : "nominal";
+  diag.status.push_back(ddcu);
+
   telemetry_pub_->publish(diag);
 }
 
@@ -460,6 +581,20 @@ void EpsNode::publish_faults(const rclcpp::Time & now)
        FaultEvent::SEVERITY_CRITICAL,
        "A battery ORU is above its temperature limit",
        {"/ssos/eps/diagnostics"});
+  edge(s.ddcu_fault, ddcu_fault_reported_, "ddcu_fault", FaultEvent::SEVERITY_CRITICAL,
+       "A DDCU carrying loads is tripped or without primary power",
+       {"/ssos/eps/diagnostics"});
+  edge(s.ddcu_overload, ddcu_overload_reported_, "ddcu_overload", FaultEvent::SEVERITY_WARNING,
+       "Requested load on a DDCU exceeds its rating",
+       {"/ssos/eps/diagnostics"});
+  edge(s.mbsu_unstable, mbsu_unstable_reported_, "mbsu_bus_unstable",
+       FaultEvent::SEVERITY_CRITICAL,
+       "An MBSU has no usable source channel",
+       {"/ssos/eps/diagnostics"});
+  edge(s.redundancy_lost, redundancy_reported_, "mbsu_redundancy_lost",
+       FaultEvent::SEVERITY_WARNING,
+       "An MBSU is running on a single source channel",
+       {"/ssos/eps/diagnostics"});
 }
 
 void EpsNode::register_with_manager()
@@ -473,10 +608,45 @@ void EpsNode::register_with_manager()
   req->published_topics = {
     "/ssos/eps/diagnostics", "/ssos/eps/bcdu/status", "/ssos/eps/battery/soc",
     "/ssos/eps/power_balance_w", "/ssos/eps/solar/array_power_w",
-    "/ssos/eps/solar/ssu_voltage_v"};
+    "/ssos/eps/solar/ssu_voltage_v", "/ssos/eps/mbsu/mbsu_<n>/status",
+    "/ssos/eps/ddcu/ddcu_<n>/status"};
   req->subscribed_topics = {"/sim/world_state"};
   req->heartbeat_topic = "/ssos/eps/heartbeat";
   register_client_->async_send_request(req);
+}
+
+void EpsNode::handle_load_request(const Load::Request::SharedPtr req,
+                                  Load::Response::SharedPtr res)
+{
+  res->ddcu_index = -1;
+  res->granted_power_w = 0.0;
+  res->supply_voltage = 0.0;
+  if (!eps_) {
+    res->success = false;
+    res->message = "EPS is not configured";
+    return;
+  }
+
+  system::LoadResult r{};
+  if (req->action == Load::Request::ACTION_RELEASE) {
+    r = eps_->release_load(req->load_id);
+  } else if (req->action == Load::Request::ACTION_REQUEST) {
+    r = eps_->request_load(req->load_id, req->power_w, req->priority, req->ddcu_index);
+  } else {
+    r.message = "unknown action " + std::to_string(req->action);
+  }
+
+  res->success = r.accepted;
+  res->message = r.message;
+  res->ddcu_index = r.accepted ? r.ddcu : -1;
+  res->granted_power_w = r.granted_w;
+  res->supply_voltage = r.supply_voltage_v;
+  if (r.accepted) {
+    RCLCPP_INFO(get_logger(), "Load request: %s", r.message.c_str());
+  } else {
+    RCLCPP_WARN(get_logger(), "Load request '%s' rejected: %s", req->load_id.c_str(),
+                r.message.c_str());
+  }
 }
 
 }  // namespace nodes

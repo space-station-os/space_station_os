@@ -12,9 +12,11 @@
 
 // The single mapping between ROS 2 parameters and the EPS physics structs.
 // Parameter names mirror the struct layout (solar.array.*, solar.ssu.*,
-// battery.*, bcdu.*, eps.*). Static parameters change the channel/ORU
-// topology or the battery's initial state and are read in on_configure;
-// everything else is live-tunable and validated before acceptance.
+// battery.*, bcdu.*, mbsu.*, ddcu.*, eps.*); baseline loads are the parallel
+// arrays loads.ids / loads.power_w / loads.priority / loads.ddcu. Static
+// parameters change the topology, the baseline loads or the battery's initial
+// state and are read in on_configure; everything else is live-tunable and
+// validated before acceptance.
 
 namespace ssos_eps
 {
@@ -48,6 +50,12 @@ private:
                          const std::vector<rclcpp::Parameter> & params) const;
   std::vector<double> proposed_array(const std::string & name,
                                      const std::vector<rclcpp::Parameter> & params) const;
+  int64_t proposed_int(const std::string & name,
+                       const std::vector<rclcpp::Parameter> & params) const;
+  std::vector<int64_t> proposed_int_array(
+    const std::string & name, const std::vector<rclcpp::Parameter> & params) const;
+  std::vector<std::string> proposed_string_array(
+    const std::string & name, const std::vector<rclcpp::Parameter> & params) const;
 
   rclcpp_lifecycle::LifecycleNode * node_;
 };

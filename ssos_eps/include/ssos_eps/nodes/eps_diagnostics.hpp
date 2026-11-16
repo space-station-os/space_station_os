@@ -10,11 +10,15 @@
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
 #include "sensor_msgs/msg/battery_state.hpp"
 #include "space_station_interfaces/msg/bcdu_status.hpp"
+#include "space_station_interfaces/msg/ddcu_status.hpp"
+#include "space_station_interfaces/msg/mbsu_status.hpp"
 #include "space_station_interfaces/msg/fault_event.hpp"
 #include "space_station_interfaces/msg/subsystem_heartbeat.hpp"
 
 #include "ssos_eps/battery/battery_oru_model.hpp"
 #include "ssos_eps/bcdu/bcdu_model.hpp"
+#include "ssos_eps/ddcu/ddcu_model.hpp"
+#include "ssos_eps/mbsu/mbsu_model.hpp"
 
 // Helpers for building heartbeat, fault-event and telemetry messages from the
 // EPS physics state.
@@ -27,6 +31,8 @@ namespace nodes
 using SubsystemHeartbeat = space_station_interfaces::msg::SubsystemHeartbeat;
 using FaultEvent = space_station_interfaces::msg::FaultEvent;
 using BCDUStatus = space_station_interfaces::msg::BCDUStatus;
+using MBSUStatus = space_station_interfaces::msg::MBSUStatus;
+using DDCUStatus = space_station_interfaces::msg::DDCUStatus;
 using BatteryState = sensor_msgs::msg::BatteryState;
 
 class EpsDiagnostics
@@ -46,6 +52,16 @@ public:
   static BCDUStatus make_bcdu_status(const rclcpp::Time & stamp,
                                      const std::string & frame_id,
                                      const bcdu::BcduState & state);
+
+  static MBSUStatus make_mbsu_status(const rclcpp::Time & stamp,
+                                     const std::string & frame_id,
+                                     const mbsu::MbsuState & state);
+
+  static DDCUStatus make_ddcu_status(const rclcpp::Time & stamp,
+                                     const std::string & frame_id,
+                                     const ddcu::DdcuState & state,
+                                     int mbsu_index, double rated_power_w,
+                                     int active_loads, int shed_loads);
 
   static BatteryState make_battery_state(const rclcpp::Time & stamp,
                                          const std::string & id,

@@ -19,7 +19,7 @@ import re
 from std_msgs.msg import Bool
 from ament_index_python.packages import get_package_share_directory
 from sensor_msgs.msg import BatteryState
-from space_station_interfaces.msg import BCDUStatus 
+from space_station_interfaces.msg import BCDUStatus, DDCUStatus 
 
 _THERMAL_MSGS_OK = True
 try:
@@ -251,16 +251,17 @@ class SsosAIAgent(QObject):
             self.sub_bcdu = None
 
         # DDCU
-        self.sub_ddcu_vin  = self.node.create_subscription(Float64, "/ddcu/input_voltage", self._on_ddcu_vin, qos)
-        self.sub_ddcu_vout = self.node.create_subscription(Float64, "/ddcu/output_voltage", self._on_ddcu_vout, qos)
-        self.sub_ddcu_temp = self.node.create_subscription(Float64, "/ddcu/temperature", self._on_ddcu_temp, qos)
+        try:
+            self.sub_ddcu = self.node.create_subscription(DDCUStatus, "/ssos/eps/ddcu/ddcu_0/status", self._on_ddcu_status, qos)
+        except Exception:
+            self.sub_ddcu = None
 
-        # MBSU (12 channels)
+        # Channel bus voltages feeding the MBSUs (12 channels)
         self.sub_mbsu = []
         for i in range(12):
-            topic = f"/mbsu/channel_{i}/voltage"
+            topic = f"/ssos/eps/bcdu/channel_{i}/status"
             try:
-                sub = self.node.create_subscription(Float64, topic, lambda m, idx=i: self._on_mbsu(idx, m), qos)
+                sub = self.node.create_subscription(BCDUStatus, topic, lambda m, idx=i: self._on_mbsu(idx, m), qos)
                 self.sub_mbsu.append(sub)
             except Exception:
                 pass
@@ -421,21 +422,15 @@ class SsosAIAgent(QObject):
                 "status": getattr(msg, "fault_message", "") or "nominal"
             }
 
-    def _on_ddcu_vin(self, msg: Float64):
+    def _on_ddcu_status(self, msg: Any):
         with self._lock:
-            self._cache["eps"]["ddcu"]["vin"] = float(msg.data)
+            self._cache["eps"]["ddcu"]["vin"] = float(msg.input_voltage)
+            self._cache["eps"]["ddcu"]["vout"] = float(msg.output_voltage)
+            self._cache["eps"]["ddcu"]["temp_c"] = float(msg.temperature)
 
-    def _on_ddcu_vout(self, msg: Float64):
+    def _on_mbsu(self, idx: int, msg: Any):
         with self._lock:
-            self._cache["eps"]["ddcu"]["vout"] = float(msg.data)
-
-    def _on_ddcu_temp(self, msg: Float64):
-        with self._lock:
-            self._cache["eps"]["ddcu"]["temp_c"] = float(msg.data)
-
-    def _on_mbsu(self, idx: int, msg: Float64):
-        with self._lock:
-            self._cache["eps"]["mbsu"]["channels"][f"ch{idx}"] = float(msg.data)
+            self._cache["eps"]["mbsu"]["channels"][f"ch{idx}"] = float(msg.bus_voltage)
 
     def _on_eps_diag(self, msg: DiagnosticStatus):
         with self._lock:

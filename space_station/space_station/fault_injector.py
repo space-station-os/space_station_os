@@ -86,11 +86,28 @@ FAULTS = [
     },
     {
         "label": "Load Spike (EPS)",
-        "desc": "Station load → 90 kW, above peak array output. The batteries "
-                "discharge even in daylight and the bank heads toward low SOC.",
-        "target": "eps", "type": "load_spike", "params_json": '{"load_w": 90000}',
-        "apply": [("eps_node", "load_demand_w", 90000.0)],
-        "restore": [("eps_node", "load_demand_w", 30000.0)],
+        "desc": "Every station load doubles (60 kW requested). DDCUs above their "
+                "6.25 kW rating shed their least critical loads first, and the "
+                "batteries discharge even in daylight.",
+        "target": "eps", "type": "load_spike", "params_json": '{"demand_scale": 2.0}',
+        "apply": [("eps_node", "loads.demand_scale", 2.0)],
+        "restore": [("eps_node", "loads.demand_scale", 1.0)],
+    },
+    {
+        "label": "DDCU Fault (EPS)",
+        "desc": "DDCU 0 trips. The loads it carries lose power and are reported "
+                "shed; new load requests are placed on the other DDCUs.",
+        "target": "eps", "type": "ddcu_fault", "params_json": '{"ddcu": 0}',
+        "apply": [("eps_node", "faults.faulted_ddcu", 0)],
+        "restore": [("eps_node", "faults.faulted_ddcu", -1)],
+    },
+    {
+        "label": "Channel Loss (EPS)",
+        "desc": "The feeder from power channel 0 to MBSU 0 opens. The MBSU "
+                "reroutes its demand onto channels 1 and 2, so no load is lost.",
+        "target": "eps", "type": "channel_loss", "params_json": '{"channel": 0}',
+        "apply": [("eps_node", "faults.offline_channel", 0)],
+        "restore": [("eps_node", "faults.offline_channel", -1)],
     },
     {
         "label": "O₂ Sensor Stuck (inject)",

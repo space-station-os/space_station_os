@@ -48,7 +48,10 @@ def generate_launch_description():
         parameters=[config('eps_parameters.yaml'),
                     config('solar_parameters.yaml'),
                     config('battery_parameters.yaml'),
-                    config('bcdu_parameters.yaml')])
+                    config('bcdu_parameters.yaml'),
+                    config('mbsu_parameters.yaml'),
+                    config('ddcu_parameters.yaml'),
+                    config('loads_parameters.yaml')])
 
     all_nodes = [system_manager, sim_controller, eps]
 

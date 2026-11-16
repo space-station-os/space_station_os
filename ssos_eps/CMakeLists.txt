@@ -27,6 +27,11 @@ add_library(eps_physics
   src/battery/battery_oru_model.cpp
   src/bcdu/bcdu_parameters.cpp
   src/bcdu/bcdu_model.cpp
+  src/mbsu/mbsu_parameters.cpp
+  src/mbsu/mbsu_model.cpp
+  src/ddcu/ddcu_parameters.cpp
+  src/ddcu/ddcu_model.cpp
+  src/loads/load_registry.cpp
   src/system/eps_parameters.cpp
   src/system/eps_system.cpp
 )
@@ -84,9 +89,21 @@ if(BUILD_TESTING)
   ament_add_gtest(test_bcdu test/unit/bcdu/test_bcdu.cpp)
   target_link_libraries(test_bcdu eps_physics)
 
+  ament_add_gtest(test_mbsu test/unit/mbsu/test_mbsu.cpp)
+  target_link_libraries(test_mbsu eps_physics)
+
+  ament_add_gtest(test_ddcu test/unit/ddcu/test_ddcu.cpp)
+  target_link_libraries(test_ddcu eps_physics)
+
+  ament_add_gtest(test_load_registry test/unit/loads/test_load_registry.cpp)
+  target_link_libraries(test_load_registry eps_physics)
+
   # ---- Integration tests ----
   ament_add_gtest(test_eps_orbit test/integration/test_eps_orbit.cpp)
   target_link_libraries(test_eps_orbit eps_physics)
+
+  ament_add_gtest(test_eps_distribution test/integration/test_eps_distribution.cpp)
+  target_link_libraries(test_eps_distribution eps_physics)
 
   # ---- ROS lifecycle / parameter tests ----
   # Own DDS domains so /clock and /sim/world_state from other packages' tests
