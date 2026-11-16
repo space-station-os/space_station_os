@@ -77,6 +77,7 @@ _LOAD_RE = re.compile(
     r"([\d.]+)/([\d.]+) W, p(\d+), ddcu (-?\d+)(, shed)?")
 ARRAY_PEAK_KW = 84.0
 LOW_SOC_PCT = 20.0
+PLOT_MIN_HEIGHT = 280
 
 _MODE_TAGS = {
     "charging": ("CHG", "green"),
@@ -221,6 +222,7 @@ class EPSWidget(QWidget):
         sl.addWidget(_card_header("BATTERY STATE OF CHARGE"))
         self.plot_soc = TelemetryPlot(max_points=600, y_range=(0, 100),
                                       setpoint=LOW_SOC_PCT, y_label="%")
+        self.plot_soc.setMinimumHeight(PLOT_MIN_HEIGHT)
         sl.addWidget(self.plot_soc)
         plots.addWidget(soc_card, 1)
 
@@ -231,6 +233,7 @@ class EPSWidget(QWidget):
         gl.addWidget(_card_header("ARRAY GENERATION"))
         self.plot_gen = TelemetryPlot(max_points=600, y_range=(0, ARRAY_PEAK_KW * 1.05),
                                       y_label="kW")
+        self.plot_gen.setMinimumHeight(PLOT_MIN_HEIGHT)
         gl.addWidget(self.plot_gen)
         plots.addWidget(gen_card, 1)
         root.addLayout(plots)
