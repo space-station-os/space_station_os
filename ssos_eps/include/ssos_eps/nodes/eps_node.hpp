@@ -102,6 +102,7 @@ private:
   bool load_unserved_reported_{false};
   bool bcdu_fault_reported_{false};
   bool oru_failed_reported_{false};
+  bool oru_overheat_reported_{false};
 
   rclcpp::Time last_step_time_;
   bool first_step_{true};

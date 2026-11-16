@@ -60,6 +60,50 @@ double BcduModel::distribute(double dt, double power_w,
   return exchanged;
 }
 
+bool BcduModel::source_after(double ssu_voltage_v) const
+{
+  if (ssu_voltage_v >= params_.charge_enter_v) {
+    return true;
+  }
+  if (ssu_voltage_v <= params_.discharge_enter_v) {
+    return false;
+  }
+  return state_.source_available;
+}
+
+double BcduModel::supply_capability_w(double dt, const BcduInput & input,
+                                      const std::vector<battery::BatteryOruModel> & orus) const
+{
+  const double source = source_after(input.ssu_voltage_v) ?
+    std::max(input.source_power_w, 0.0) : 0.0;
+  if (faulted_) {
+    return source;
+  }
+  const double regulation_v = std::clamp(params_.regulation_voltage_v,
+                                         params_.regulation_min_v,
+                                         params_.regulation_max_v);
+  const double eta_d = std::clamp(params_.discharge_efficiency, 1.0e-6, 1.0);
+  double battery_w = 0.0;
+  for (const auto & oru : orus) {
+    battery_w += oru.max_discharge_power_w(dt);
+  }
+  const double bus_limit_w = std::max(params_.max_discharge_current_a * regulation_v, 0.0);
+  return source + std::min(battery_w * eta_d, bus_limit_w);
+}
+
+double BcduModel::expected_bus_voltage_v(double dt, const BcduInput & input,
+                                         const std::vector<battery::BatteryOruModel> & orus) const
+{
+  if (source_after(input.ssu_voltage_v) && input.source_power_w > 0.0) {
+    return input.ssu_voltage_v;
+  }
+  if (!faulted_ && supply_capability_w(dt, input, orus) > 0.0) {
+    return std::clamp(params_.regulation_voltage_v, params_.regulation_min_v,
+                      params_.regulation_max_v);
+  }
+  return 0.0;
+}
+
 const BcduState & BcduModel::step(double dt, const BcduInput & input,
                                   std::vector<battery::BatteryOruModel> & orus)
 {

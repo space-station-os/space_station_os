@@ -1,4 +1,15 @@
-float64 load_voltage
+# Request or release electrical power for a named load on the EPS secondary bus.
+uint8 ACTION_REQUEST=0
+uint8 ACTION_RELEASE=1
+
+string load_id          # unique load name; requesting an existing id updates it
+uint8 action            # ACTION_REQUEST or ACTION_RELEASE
+float64 power_w         # requested power [W] (ignored on release)
+uint8 priority          # 0 = most critical; higher numbers are shed first
+int32 ddcu_index        # preferred DDCU, -1 = least loaded
 ---
 bool success
 string message
+float64 granted_power_w # power allocated to the load [W]
+float64 supply_voltage  # regulated DDCU output voltage [V]
+int32 ddcu_index        # DDCU the load is assigned to (-1 if rejected)
