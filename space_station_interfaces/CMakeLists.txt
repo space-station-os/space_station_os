@@ -33,6 +33,8 @@ set(msg_files
   # EPS
   "eps/srv/Load.srv"
   "eps/msg/BCDUStatus.msg"
+  "eps/msg/MBSUStatus.msg"
+  "eps/msg/DDCUStatus.msg"
   # ATCS
   "atcs/msg/CoolantStatus.msg"
   "atcs/msg/ExternalLoopStatus.msg"

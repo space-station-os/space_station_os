@@ -1,0 +1,24 @@
+# Li-ion battery ORU parameters for ssos_eps/eps_node (one ORU; every ORU in
+# the bank uses the same set).
+eps_node:
+  ros__parameters:
+    # Static: reconfigure to apply.
+    battery.n_series_cells: 30
+    battery.capacity_ah: 134.0
+    battery.soc_points: [0.0, 0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90, 1.00]
+    battery.cell_ocv_v: [3.00, 3.30, 3.45, 3.55, 3.62, 3.67, 3.72, 3.80, 3.88, 3.95, 4.03, 4.10]
+    battery.initial_soc: 0.80
+    battery.initial_temp_c: 10.0
+
+    battery.state_of_health: 1.0
+    battery.internal_resistance_ohm: 0.05
+    battery.coulombic_efficiency: 0.99
+    battery.max_charge_current_a: 40.0
+    battery.max_discharge_current_a: 100.0
+    battery.max_cell_voltage_v: 4.10
+    battery.min_cell_voltage_v: 3.00
+
+    battery.thermal_mass_j_k: 200000.0
+    battery.heat_transfer_w_k: 20.0
+    battery.coldplate_temp_c: 10.0
+    battery.max_temp_c: 35.0

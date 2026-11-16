@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fault-injection dialog.
 
-A small operator tool to trigger a chosen ECLSS fault. Each fault maps to a
+A small operator tool to trigger a chosen ECLSS or EPS fault. Each fault maps to a
 recipe of (a) an announcement via the simulation controller's /sim/inject_fault
 service (published as a FaultEvent the system manager + event feed pick up) and
 (b) live parameter changes on the target node that produce the actual physical
@@ -59,6 +59,55 @@ FAULTS = [
         "restore": [("ars_node", "ars.efficiency.capture_efficiency", 0.84),
                     ("ars_node", "enable_auto_faults", False),
                     ("cabin_node", "enable_auto_faults", False)],
+    },
+    {
+        "label": "Solar Array Degradation (EPS)",
+        "desc": "Array output → 30% of beginning-of-life. Daylight surplus shrinks, "
+                "the batteries stop recovering and the bank drains orbit by orbit.",
+        "target": "eps", "type": "solar_array_degraded", "params_json": "{}",
+        "apply": [("eps_node", "solar.array.degradation_factor", 0.3)],
+        "restore": [("eps_node", "solar.array.degradation_factor", 1.0)],
+    },
+    {
+        "label": "Battery ORU Failure (EPS)",
+        "desc": "Battery ORU 0 fails and is isolated. Its channel partner carries "
+                "the channel load alone; EPS reports degraded.",
+        "target": "eps", "type": "battery_oru_failed", "params_json": '{"oru": 0}',
+        "apply": [("eps_node", "faults.failed_oru", 0)],
+        "restore": [("eps_node", "faults.failed_oru", -1)],
+    },
+    {
+        "label": "BCDU Fault (EPS)",
+        "desc": "BCDU on channel 0 isolates its batteries. In eclipse that channel's "
+                "share of the station load goes unserved.",
+        "target": "eps", "type": "bcdu_fault", "params_json": '{"channel": 0}',
+        "apply": [("eps_node", "faults.faulted_bcdu", 0)],
+        "restore": [("eps_node", "faults.faulted_bcdu", -1)],
+    },
+    {
+        "label": "Load Spike (EPS)",
+        "desc": "Every station load doubles (60 kW requested). DDCUs above their "
+                "6.25 kW rating shed their least critical loads first, and the "
+                "batteries discharge even in daylight.",
+        "target": "eps", "type": "load_spike", "params_json": '{"demand_scale": 2.0}',
+        "apply": [("eps_node", "loads.demand_scale", 2.0)],
+        "restore": [("eps_node", "loads.demand_scale", 1.0)],
+    },
+    {
+        "label": "DDCU Fault (EPS)",
+        "desc": "DDCU 0 trips. The loads it carries lose power and are reported "
+                "shed; new load requests are placed on the other DDCUs.",
+        "target": "eps", "type": "ddcu_fault", "params_json": '{"ddcu": 0}',
+        "apply": [("eps_node", "faults.faulted_ddcu", 0)],
+        "restore": [("eps_node", "faults.faulted_ddcu", -1)],
+    },
+    {
+        "label": "Channel Loss (EPS)",
+        "desc": "The feeder from power channel 0 to MBSU 0 opens. The MBSU "
+                "reroutes its demand onto channels 1 and 2, so no load is lost.",
+        "target": "eps", "type": "channel_loss", "params_json": '{"channel": 0}',
+        "apply": [("eps_node", "faults.offline_channel", 0)],
+        "restore": [("eps_node", "faults.offline_channel", -1)],
     },
     {
         "label": "O₂ Sensor Stuck (inject)",
