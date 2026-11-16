@@ -227,3 +227,38 @@ TEST_F(EpsNodeTest, RejectsInvalidLiveParameter)
       rclcpp::Parameter("solar.array.degradation_factor", 0.5)).successful);
   tear_down();
 }
+
+TEST_F(EpsNodeTest, OruOverTemperatureReachesHeartbeatAndFaultEvent)
+{
+  int overtemp_faults = 0;
+  std::vector<SubsystemHeartbeat> heartbeats;
+  auto fault_sub = probe_->create_subscription<FaultEvent>(
+    "/ssos/fault_event", 10, [&](FaultEvent::SharedPtr m) {
+      if (m->subsystem_name == "eps" && m->fault_type == "battery_oru_overtemp") {
+        ++overtemp_faults;
+      }
+    });
+  auto hb_sub = probe_->create_subscription<SubsystemHeartbeat>(
+    "/ssos/eps/heartbeat", 10,
+    [&](SubsystemHeartbeat::SharedPtr m) {heartbeats.push_back(*m);});
+
+  node_->set_parameter(rclcpp::Parameter("step_rate_hz", 30.0));
+  bring_up();
+  spin_for(200ms);
+  ASSERT_FALSE(heartbeats.empty());
+  EXPECT_TRUE(heartbeats.back().healthy);
+
+  // Same reproduction as review: limit below the ORU temperature (~10 C).
+  ASSERT_TRUE(node_->set_parameter(rclcpp::Parameter("battery.max_temp_c", 5.0)).successful);
+  spin_for(300ms);
+  EXPECT_TRUE(node_->last_state().oru_overheat);
+  EXPECT_FALSE(heartbeats.back().healthy);
+  EXPECT_EQ(heartbeats.back().status_message, "battery ORU over temperature");
+  EXPECT_EQ(overtemp_faults, 1);
+
+  ASSERT_TRUE(node_->set_parameter(rclcpp::Parameter("battery.max_temp_c", 35.0)).successful);
+  spin_for(300ms);
+  EXPECT_TRUE(heartbeats.back().healthy);
+
+  tear_down();
+}

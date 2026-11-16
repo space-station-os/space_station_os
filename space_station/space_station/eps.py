@@ -499,9 +499,10 @@ class EPSWidget(QWidget):
                 "red" if min_soc * 100.0 < LOW_SOC_PCT else "green")
         max_t = _to_float(b.get("max_temperature_c"))
         if max_t is not None:
+            hot = int(b.get("overheated_orus", "0") or 0)
             self.card_batt_t.set_value(f"{max_t:.1f}")
-            self.card_batt_t.set_footer("NOMINAL" if max_t < 35.0 else "OVER TEMP",
-                                        "green" if max_t < 35.0 else "red")
+            self.card_batt_t.set_footer(f"{hot} OVER TEMP" if hot else "NOMINAL",
+                                        "red" if hot else "green")
         failed = b.get("failed_orus")
         if failed is not None:
             self.card_failed.set_value(failed)

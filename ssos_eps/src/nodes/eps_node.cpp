@@ -83,6 +83,7 @@ CallbackReturn EpsNode::on_configure(const rclcpp_lifecycle::State &)
   load_unserved_reported_ = false;
   bcdu_fault_reported_ = false;
   oru_failed_reported_ = false;
+  oru_overheat_reported_ = false;
   params_dirty_ = false;
 
   RCLCPP_INFO(get_logger(), "Configured: %d channels x %d ORUs, %.0f W load",
@@ -325,6 +326,7 @@ void EpsNode::publish_telemetry(const rclcpp::Time & now)
   bcdu_pub_->publish(EpsDiagnostics::make_bcdu_status(now, "bcdu", summary));
 
   int failed_orus = 0;
+  int overheated_orus = 0;
   double max_temp_c = -1.0e9;
   double sum_temp_c = 0.0;
   const auto & battery_params = eps_->parameters().battery;
@@ -336,6 +338,8 @@ void EpsNode::publish_telemetry(const rclcpp::Time & now)
         now, "oru_" + std::to_string(i), oru, battery_params, capacity_ah));
     if (oru.health == battery::BatteryHealth::FAILED) {
       ++failed_orus;
+    } else if (oru.health == battery::BatteryHealth::OVERHEAT) {
+      ++overheated_orus;
     }
     max_temp_c = std::max(max_temp_c, oru.temperature_c);
     sum_temp_c += oru.temperature_c;
@@ -412,8 +416,12 @@ void EpsNode::publish_telemetry(const rclcpp::Time & now)
   EpsDiagnostics::add_value(battery, "mean_temperature_c",
                             s.orus.empty() ? 0.0 : sum_temp_c / s.orus.size(), 2);
   EpsDiagnostics::add_value(battery, "failed_orus", std::to_string(failed_orus));
-  battery.level = failed_orus > 0 || s.low_soc ? DiagnosticStatus::WARN : DiagnosticStatus::OK;
-  battery.message = failed_orus > 0 ? std::to_string(failed_orus) + " ORU(s) failed" :
+  EpsDiagnostics::add_value(battery, "overheated_orus", std::to_string(overheated_orus));
+  battery.level = overheated_orus > 0 ? DiagnosticStatus::ERROR :
+    failed_orus > 0 || s.low_soc ? DiagnosticStatus::WARN : DiagnosticStatus::OK;
+  battery.message = overheated_orus > 0 ?
+    std::to_string(overheated_orus) + " ORU(s) over temperature" :
+    failed_orus > 0 ? std::to_string(failed_orus) + " ORU(s) failed" :
     s.low_soc ? "state of charge below threshold" : "nominal";
   diag.status.push_back(battery);
 
@@ -447,6 +455,10 @@ void EpsNode::publish_faults(const rclcpp::Time & now)
   edge(s.oru_failed, oru_failed_reported_, "battery_oru_failed",
        FaultEvent::SEVERITY_WARNING,
        "A battery ORU has failed and is isolated",
+       {"/ssos/eps/diagnostics"});
+  edge(s.oru_overheat, oru_overheat_reported_, "battery_oru_overtemp",
+       FaultEvent::SEVERITY_CRITICAL,
+       "A battery ORU is above its temperature limit",
        {"/ssos/eps/diagnostics"});
 }
 

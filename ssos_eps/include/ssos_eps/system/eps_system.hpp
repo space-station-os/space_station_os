@@ -53,6 +53,7 @@ struct EpsState
   bool load_unserved;          // some load could not be supplied
   bool bcdu_fault;             // at least one BCDU faulted
   bool oru_failed;             // at least one ORU failed
+  bool oru_overheat;           // at least one ORU above its temperature limit
   bool healthy;                // none of the above
   std::string status_message;
 };

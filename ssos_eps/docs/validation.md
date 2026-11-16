@@ -15,8 +15,8 @@ ros2 run ssos_eps eps_orbit_validation 10 30000 eps.csv
 | `test_ssu` | regulation and efficiency, dropout, ripple band |
 | `test_battery_oru` | OCV table, coulomb counting, coulombic efficiency, current limits, CV taper, SOC bounds, failure isolation, I²R heating, over-temperature, stored-energy integral, discharge energy conservation |
 | `test_bcdu` | charge from surplus, discharge in eclipse and for daylight deficit, hysteresis, idle + shunt when full, bus charge limit, fault isolation, failed-ORU degradation, empty bank, current sharing, bus power balance |
-| `test_eps_orbit` | 12 × 2 topology, sunlight/eclipse modes, SOC cycling over three orbits without load shedding, per-step bus balance, eclipse energy conservation, overload → low SOC + unserved load, degradation, gimbal lock, BCDU fault and ORU failure, live parameter update |
-| `test_eps_node` | lifecycle, frozen sim time, BCDU / BatteryState / heartbeat telemetry, world-state eclipse switching, single low-SOC fault, live fault hook, parameter rejection |
+| `test_eps_orbit` | 12 × 2 topology, sunlight/eclipse modes, SOC cycling over three orbits without load shedding, per-step bus balance, eclipse energy conservation, overload → low SOC + unserved load, degradation, gimbal lock, BCDU fault, ORU failure and ORU over-temperature, live parameter update |
+| `test_eps_node` | lifecycle, frozen sim time, BCDU / BatteryState / heartbeat telemetry, world-state eclipse switching, single low-SOC fault, ORU over-temperature heartbeat + fault event, live fault hook, parameter rejection |
 | `test_eps_parameter_bridge` | defaults round-trip, overrides, range and cross-parameter validation, static classification |
 
 ## Orbit behaviour (defaults, 30 kW load)

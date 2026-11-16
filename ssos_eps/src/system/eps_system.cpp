@@ -138,6 +138,7 @@ void EpsSystem::summarise(const EpsInput & input)
   state_.battery_discharge_w = 0.0;
   state_.stored_energy_wh = 0.0;
   state_.oru_failed = false;
+  state_.oru_overheat = false;
   state_.min_oru_soc = state_.orus.empty() ? 0.0 : std::numeric_limits<double>::max();
   double weighted_soc = 0.0;
   double total_capacity = 0.0;
@@ -148,6 +149,7 @@ void EpsSystem::summarise(const EpsInput & input)
     state_.stored_energy_wh += s.stored_energy_wh;
     state_.min_oru_soc = std::min(state_.min_oru_soc, s.soc);
     state_.oru_failed = state_.oru_failed || s.health == battery::BatteryHealth::FAILED;
+    state_.oru_overheat = state_.oru_overheat || s.health == battery::BatteryHealth::OVERHEAT;
     const double capacity = orus_[i]->usable_capacity_ah();
     weighted_soc += s.soc * capacity;
     total_capacity += capacity;
@@ -158,7 +160,7 @@ void EpsSystem::summarise(const EpsInput & input)
   state_.low_soc = state_.battery_soc < params_.low_soc_threshold;
   state_.load_unserved = state_.unserved_load_w > tolerance;
   state_.healthy = !state_.low_soc && !state_.load_unserved &&
-    !state_.bcdu_fault && !state_.oru_failed;
+    !state_.bcdu_fault && !state_.oru_failed && !state_.oru_overheat;
 
   if (state_.load_unserved) {
     state_.status_message = "station load not fully supplied";
@@ -166,6 +168,8 @@ void EpsSystem::summarise(const EpsInput & input)
     state_.status_message = "BCDU fault";
   } else if (state_.low_soc) {
     state_.status_message = "battery state of charge below threshold";
+  } else if (state_.oru_overheat) {
+    state_.status_message = "battery ORU over temperature";
   } else if (state_.oru_failed) {
     state_.status_message = "battery ORU failed";
   } else {
