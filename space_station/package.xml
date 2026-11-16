@@ -29,6 +29,7 @@
   <exec_depend>space_station_communication</exec_depend>
   <exec_depend>space_station_gnc</exec_depend>
   <exec_depend>ssos_eclss</exec_depend>
+  <exec_depend>ssos_eps</exec_depend>
   <exec_depend>ssos_core</exec_depend>
   <exec_depend>ssos_sim</exec_depend>
 

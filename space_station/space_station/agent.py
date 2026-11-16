@@ -237,7 +237,7 @@ class SsosAIAgent(QObject):
             # Batteries (0–23)
         self.sub_batteries = []
         for i in range(24):
-            topic = f"/battery/battery_bms_{i}/health"
+            topic = f"/ssos/eps/battery/oru_{i}/state"
             try:
                 sub = self.node.create_subscription(BatteryState, topic, lambda m, idx=i: self._on_battery(idx, m), qos)
                 self.sub_batteries.append(sub)
@@ -246,7 +246,7 @@ class SsosAIAgent(QObject):
 
             # BCDU
         try:
-            self.sub_bcdu = self.node.create_subscription(BCDUStatus, "/bcdu/status", self._on_bcdu_status, qos)
+            self.sub_bcdu = self.node.create_subscription(BCDUStatus, "/ssos/eps/bcdu/status", self._on_bcdu_status, qos)
         except Exception:
             self.sub_bcdu = None
 
@@ -418,7 +418,7 @@ class SsosAIAgent(QObject):
         with self._lock:
             self._cache["eps"]["bcdu"] = {
                 "mode": getattr(msg, "mode", ""),
-                "status": getattr(msg, "status", "")
+                "status": getattr(msg, "fault_message", "") or "nominal"
             }
 
     def _on_ddcu_vin(self, msg: Float64):

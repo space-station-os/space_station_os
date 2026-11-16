@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Live parameter editor dialog.
 
-Discovers parameters from the running sim + ECLSS nodes via the ROS 2 parameter
+Discovers parameters from the running sim, ECLSS and EPS nodes via the ROS 2 parameter
 services (list/get/set_parameters) and pushes edits live. Service futures are
 resolved by pumping the GUI's executor with a bounded timeout; safe because the
 dialog runs in Qt event context, not inside a ROS spin.
@@ -27,6 +27,7 @@ _TARGET_NODES = [
     "ogs_node",
     "wrs_node",
     "sabatier_node",
+    "eps_node",
 ]
 
 _TYPE_NAMES = {

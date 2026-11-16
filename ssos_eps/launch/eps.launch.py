@@ -1,70 +1,39 @@
-"""Launch the SSOS EPS lifecycle node and activate it automatically."""
+"""Launch the ssos_eps generation and storage node.
 
+The node self-activates via its `autostart` parameter: it configures then
+activates itself `autostart_delay_ms` after startup, so no lifecycle
+ChangeState events are emitted from the launch. A parent launch can raise the
+delay to hold EPS until system_manager and simulation_controller are active.
+"""
 import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import EmitEvent, LogInfo, RegisterEventHandler
-from launch.event_handlers import OnProcessStart
-from launch.events import matches_action
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import LifecycleNode
-from launch_ros.event_handlers import OnStateTransition
-from launch_ros.events.lifecycle import ChangeState
-import lifecycle_msgs.msg
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
-    config = os.path.join(
-        get_package_share_directory("ssos_eps"),
-        "config",
-        "eps_parameters.yaml",
-    )
+    share = get_package_share_directory('ssos_eps')
+    delay = ParameterValue(LaunchConfiguration('autostart_delay_ms'), value_type=int)
+
+    def config(name):
+        return os.path.join(share, 'config', name)
 
     eps = LifecycleNode(
-        package="ssos_eps",
-        executable="eps_node",
-        name="eps_node",
-        namespace="",
-        output="screen",
-        parameters=[config],
-    )
+        package='ssos_eps', executable='eps_node', name='eps_node',
+        namespace='', output='screen',
+        parameters=[config('eps_parameters.yaml'),
+                    config('solar_parameters.yaml'),
+                    config('battery_parameters.yaml'),
+                    config('bcdu_parameters.yaml'),
+                    {'autostart': True, 'autostart_delay_ms': delay}])
 
-    configure = EmitEvent(
-        event=ChangeState(
-            lifecycle_node_matcher=matches_action(eps),
-            transition_id=lifecycle_msgs.msg.Transition.TRANSITION_CONFIGURE,
-        )
-    )
-
-    activate = EmitEvent(
-        event=ChangeState(
-            lifecycle_node_matcher=matches_action(eps),
-            transition_id=lifecycle_msgs.msg.Transition.TRANSITION_ACTIVATE,
-        )
-    )
-
-    return LaunchDescription(
-        [
-            eps,
-            RegisterEventHandler(
-                OnProcessStart(
-                    target_action=eps,
-                    on_start=[
-                        LogInfo(msg="eps_node started; configuring..."),
-                        configure,
-                    ],
-                )
-            ),
-            RegisterEventHandler(
-                OnStateTransition(
-                    target_lifecycle_node=eps,
-                    goal_state="inactive",
-                    entities=[
-                        LogInfo(msg="eps_node configured; activating..."),
-                        activate,
-                    ],
-                    handle_once=True,
-                )
-            ),
-        ]
-    )
+    return LaunchDescription([
+        DeclareLaunchArgument('autostart_delay_ms', default_value='300',
+                              description='ms after startup before eps_node '
+                                          'self-configures+activates'),
+        eps,
+    ])
