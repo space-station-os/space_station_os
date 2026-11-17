@@ -98,11 +98,28 @@ clears. The heartbeat carries `healthy` and the current status message.
 
 The physics exposes fault hooks (`set_oru_failed`, `set_bcdu_fault`,
 `set_array_degradation`, `set_ddcu_fault`, `set_mbsu_fault`,
-`set_channel_offline`). The node maps them to the parameters
-`faults.failed_oru`, `faults.faulted_bcdu`, `faults.faulted_ddcu`,
-`faults.faulted_mbsu`, `faults.offline_channel` and
-`solar.array.degradation_factor` for what-if testing; routing faults through `ssos_sim` comes with the EPS
-fault/scenario work.
+`set_channel_offline`, `set_battery_soc`). Two things drive them, both in the
+ROS layer:
+
+- what-if parameters: `faults.failed_oru`, `faults.faulted_bcdu`,
+  `faults.faulted_ddcu`, `faults.faulted_mbsu`, `faults.offline_channel`,
+  `solar.array.degradation_factor`, `battery.state_of_health`,
+  `loads.demand_scale`;
+- faults injected by `ssos_sim`, which arrive as `FaultEvent`s for `eps` with a
+  `Injected fault: …` / `Scheduled fault: …` description. `EpsFaultInjection`
+  (in `nodes/`, no ROS types) parses them, tracks their expiry in node time and
+  tells the node which units and factors are affected.
+
+The node combines the two (a unit is faulted if either names it; factors
+multiply) and applies the result on the next step. The physics never sees a
+scenario, an expiry or a fault message. See [fault_catalog.md](fault_catalog.md).
+
+```
+ssos_sim --FaultEvent(eps, "Injected fault: ...")--> eps_node --hooks--> EpsSystem
+                                                        |
+EpsSystem state --health flags--> eps_node --FaultEvent(detected)--> system_manager
+                                           --heartbeat(healthy)----> system_manager
+```
 
 ## Stepping model
 

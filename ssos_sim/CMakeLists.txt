@@ -13,14 +13,19 @@ find_package(space_station_interfaces REQUIRED)
 find_package(rosgraph_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(ament_index_cpp REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
-include_directories(include)
-
-# Simulation library (for testability)
+# Simulation library (exported so other packages' tests can run it)
 add_library(ssos_sim_lib
   src/simulation_controller.cpp
+  src/scenario_loader.cpp
   src/world_model.cpp
 )
+target_include_directories(ssos_sim_lib PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(ssos_sim_lib yaml-cpp)
 ament_target_dependencies(ssos_sim_lib
   rclcpp
   rclcpp_lifecycle
@@ -40,6 +45,7 @@ ament_target_dependencies(simulation_controller
 
 # Install
 install(TARGETS ssos_sim_lib
+  EXPORT export_ssos_sim
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
@@ -57,6 +63,10 @@ install(DIRECTORY launch/
 install(DIRECTORY scenarios/
   DESTINATION share/${PROJECT_NAME}/scenarios
 )
+
+install(DIRECTORY include/
+  DESTINATION include
+)
 # Testing
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
@@ -73,6 +83,19 @@ if(BUILD_TESTING)
     space_station_interfaces
     rosgraph_msgs
   )
+  target_compile_definitions(test_simulation_controller PRIVATE
+    SSOS_SIM_TEST_SCENARIOS="${CMAKE_CURRENT_SOURCE_DIR}/tests/scenarios")
+
+  ament_add_gtest(test_scenario_loader tests/test_scenario_loader.cpp)
+  target_link_libraries(test_scenario_loader ssos_sim_lib)
+  target_compile_definitions(test_scenario_loader PRIVATE
+    SSOS_SIM_TEST_SCENARIOS="${CMAKE_CURRENT_SOURCE_DIR}/tests/scenarios"
+    SSOS_SIM_SCENARIOS="${CMAKE_CURRENT_SOURCE_DIR}/scenarios")
 endif()
+
+ament_export_targets(export_ssos_sim HAS_LIBRARY_TARGET)
+ament_export_include_directories(include)
+ament_export_dependencies(rclcpp rclcpp_lifecycle space_station_interfaces rosgraph_msgs
+  std_msgs ament_index_cpp yaml-cpp)
 
 ament_package()

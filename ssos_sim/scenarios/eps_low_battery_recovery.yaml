@@ -1,0 +1,29 @@
+scenario:
+  name: eps_low_battery_recovery
+  duration_s: 3600
+  sim_rate_hz: 10
+  time_scale: 30.0
+
+  faults:
+    # The bank is drained to 15% in daylight. Nothing needs clearing: the
+    # arrays recharge it past the 20% threshold and EPS recovers by itself.
+    - name: bank_drained
+      type: battery_low_soc
+      target_subsystem: eps
+      trigger:
+        type: time
+        at_s: 30.0
+      params:
+        soc: 0.15
+      duration_s: 0
+
+  expected_outcomes:
+    - state_transition:
+        from: NOMINAL
+        to: DEGRADED
+        before_s: 35.0
+    - state_transition:
+        from: DEGRADED
+        to: NOMINAL
+        via: RECOVERY
+        before_s: 3000.0

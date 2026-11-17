@@ -22,3 +22,5 @@ eps_node:
     eps.ddcu_mbsu: [0, 0, 1, 1, 2, 2, 3, 3]
 
     eps.low_soc_threshold: 0.20
+    # Battery state of health below this reports EPS degraded.
+    eps.min_state_of_health: 0.80

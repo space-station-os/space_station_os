@@ -1,5 +1,6 @@
 #include "ssos_sim/simulation_controller.hpp"
 
+#include <cmath>
 #include <fstream>
 #include <functional>
 #include <chrono>
@@ -38,6 +39,9 @@ SimulationController::SimulationController(const rclcpp::NodeOptions & options)
   this->declare_parameter("ic.cabin_temp_celsius", 22.0);
   this->declare_parameter("ic.solar_flux_w_m2", 1361.0);
   this->declare_parameter("ic.in_eclipse", false);
+  // Starting position in the orbit as a fraction of the period [0, 1); the
+  // default model is sunlit up to 0.65 and in eclipse after.
+  this->declare_parameter("ic.orbit_phase", 0.0);
 
   RCLCPP_INFO(get_logger(), "SimulationController created (unconfigured)");
 }
@@ -59,10 +63,21 @@ CallbackReturn SimulationController::on_configure(const rclcpp_lifecycle::State 
   ic.cabin_temp_celsius = this->get_parameter("ic.cabin_temp_celsius").as_double();
   ic.solar_flux_w_m2 = this->get_parameter("ic.solar_flux_w_m2").as_double();
   ic.in_eclipse = this->get_parameter("ic.in_eclipse").as_bool();
+  double orbit_phase = this->get_parameter("ic.orbit_phase").as_double();
+
+  fault_schedule_.clear();
+  scenario_name_.clear();
+  const std::string scenario_file = this->get_parameter("scenario_file").as_string();
+  if (!scenario_file.empty() && !load_scenario(scenario_file, ic, orbit_phase)) {
+    return CallbackReturn::FAILURE;
+  }
 
   // Create and initialize world model
   world_model_ = create_default_world_model();
   world_model_->initialize(ic);
+  if (orbit_phase > 0.0) {
+    world_model_->apply_perturbation("orbit_phase", orbit_phase);
+  }
 
   // Create publishers
   world_state_pub_ = this->create_publisher<WorldState>("/sim/world_state", 10);
@@ -75,7 +90,6 @@ CallbackReturn SimulationController::on_configure(const rclcpp_lifecycle::State 
     std::bind(&SimulationController::handle_inject_fault, this, _1, _2));
 
   sim_time_s_ = 0.0;
-  fault_schedule_.clear();
 
   RCLCPP_INFO(get_logger(), "Configured. Rate=%.1fHz, duration=%.0fs, altitude=%.1fkm",
     sim_rate_hz_, sim_duration_s_, ic.altitude_km);
@@ -183,36 +197,18 @@ void SimulationController::handle_inject_fault(
     req->fault_type.c_str(),
     req->duration_s);
 
-  // Build and publish a FaultEvent for the system_manager
+  // Build and publish a FaultEvent for the system_manager and the target
   auto fault_msg = FaultEvent();
   fault_msg.stamp = rclcpp::Clock().now();
   fault_msg.subsystem_name = req->target_subsystem;
   fault_msg.fault_type = req->fault_type;
   fault_msg.severity = FaultEvent::SEVERITY_CRITICAL;  // Default for injected faults
-  fault_msg.description = "Injected fault: " + req->fault_type +
-    " (params: " + req->parameters_json + ")";
+  fault_msg.description = fault_description(
+    "Injected fault", req->fault_type, req->parameters_json, req->duration_s);
   fault_msg.affected_interfaces = {};
 
   fault_event_pub_->publish(fault_msg);
-
-  // Apply perturbation to world model if applicable
-  if (req->fault_type == "sensor_stuck_at") {
-    // Parse stuck value from JSON params (minimal parsing)
-    // Expected format: {"stuck_value": 0.0}
-    // For now, apply as O2 perturbation if target is eclss
-    if (req->target_subsystem == "eclss") {
-      // Simple JSON extraction for stuck_value
-      auto pos = req->parameters_json.find("stuck_value");
-      if (pos != std::string::npos) {
-        auto colon = req->parameters_json.find(':', pos);
-        if (colon != std::string::npos) {
-          double val = std::stod(req->parameters_json.substr(colon + 1));
-          world_model_->apply_perturbation("atmospheric_o2_pct", val);
-          RCLCPP_WARN(get_logger(), "Applied O2 perturbation: %.1f%%", val);
-        }
-      }
-    }
-  }
+  apply_fault_effects(req->target_subsystem, req->fault_type, req->parameters_json);
 
   res->success = true;
   res->message = "Fault injected: " + req->fault_type + " on " + req->target_subsystem;
@@ -237,35 +233,115 @@ void SimulationController::fire_fault(const ScheduledFault & fault)
   fault_msg.subsystem_name = fault.target_subsystem;
   fault_msg.fault_type = fault.fault_type;
   fault_msg.severity = FaultEvent::SEVERITY_CRITICAL;
-  fault_msg.description = "Scheduled fault: " + fault.name;
+  fault_msg.description = fault_description(
+    "Scheduled fault", fault.name, fault.parameters_json, fault.duration_s);
   if (!fault.target_interface.empty()) {
     fault_msg.affected_interfaces = {fault.target_interface};
   }
 
   fault_event_pub_->publish(fault_msg);
+  apply_fault_effects(fault.target_subsystem, fault.fault_type, fault.parameters_json);
 }
 
 // ---------------------------------------------------------------------------
-// Scenario loading (placeholder — YAML parsing comes with ssos_scenarios)
+// Environment side of a fault (world model perturbations)
 // ---------------------------------------------------------------------------
-bool SimulationController::load_scenario(const std::string & scenario_file)
+void SimulationController::apply_fault_effects(
+  const std::string & target, const std::string & fault_type,
+  const std::string & parameters_json)
 {
-  (void)scenario_file;
-  RCLCPP_INFO(get_logger(), "Scenario loading not yet implemented — using parameter-based config");
+  // An ECLSS O2 sensor stuck-at is modelled as the O2 reading in the world
+  // state. Expected params: {"stuck_value": <pct>}
+  if (fault_type == "sensor_stuck_at" && target == "eclss") {
+    auto pos = parameters_json.find("stuck_value");
+    if (pos != std::string::npos) {
+      auto colon = parameters_json.find(':', pos);
+      if (colon != std::string::npos) {
+        try {
+          double val = std::stod(parameters_json.substr(colon + 1));
+          world_model_->apply_perturbation("atmospheric_o2_pct", val);
+          RCLCPP_WARN(get_logger(), "Applied O2 perturbation: %.1f%%", val);
+        } catch (const std::exception &) {
+          RCLCPP_WARN(get_logger(), "sensor_stuck_at: unreadable stuck_value");
+        }
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Scenario loading
+// ---------------------------------------------------------------------------
+std::string SimulationController::resolve_scenario_path(const std::string & scenario_file) const
+{
+  if (scenario_file.empty() || scenario_file.front() == '/') {
+    return scenario_file;
+  }
+  {
+    std::ifstream local(scenario_file);
+    if (local.good()) {
+      return scenario_file;
+    }
+  }
+  std::string name = scenario_file;
+  if (name.size() < 5 || name.substr(name.size() - 5) != ".yaml") {
+    name += ".yaml";
+  }
+  try {
+    return ament_index_cpp::get_package_share_directory("ssos_sim") + "/scenarios/" + name;
+  } catch (const std::exception &) {
+    return scenario_file;
+  }
+}
+
+bool SimulationController::load_scenario(
+  const std::string & scenario_file, WorldState & ic, double & orbit_phase)
+{
+  const std::string path = resolve_scenario_path(scenario_file);
+  Scenario scenario;
+  try {
+    scenario = load_scenario_file(path);
+  } catch (const std::exception & e) {
+    RCLCPP_ERROR(get_logger(), "%s", e.what());
+    return false;
+  }
+
+  scenario_name_ = scenario.name;
+  if (scenario.duration_s) {
+    sim_duration_s_ = *scenario.duration_s;
+  }
+  if (scenario.sim_rate_hz && *scenario.sim_rate_hz > 0.0) {
+    sim_rate_hz_ = *scenario.sim_rate_hz;
+  }
+  if (scenario.time_scale) {
+    this->set_parameter(rclcpp::Parameter("time_scale", *scenario.time_scale));
+  }
+
+  const auto & v = scenario.initial_conditions;
+  auto apply = [&v](const char * key, double & field) {
+      const auto it = v.find(key);
+      if (it != v.end()) {
+        field = it->second;
+      }
+    };
+  apply("altitude_km", ic.altitude_km);
+  apply("orbital_velocity_mps", ic.orbital_velocity_mps);
+  apply("atmospheric_o2_pct", ic.atmospheric_o2_pct);
+  apply("atmospheric_co2_ppm", ic.atmospheric_co2_ppm);
+  apply("cabin_pressure_kpa", ic.cabin_pressure_kpa);
+  apply("cabin_temp_celsius", ic.cabin_temp_celsius);
+  apply("solar_flux_w_m2", ic.solar_flux_w_m2);
+  if (scenario.in_eclipse) {
+    ic.in_eclipse = *scenario.in_eclipse;
+  }
+  if (scenario.orbit_phase) {
+    orbit_phase = *scenario.orbit_phase;
+  }
+  fault_schedule_ = scenario.faults;
+
+  RCLCPP_INFO(get_logger(), "Loaded scenario '%s' from %s: %zu scheduled fault(s)",
+    scenario_name_.c_str(), path.c_str(), fault_schedule_.size());
   return true;
-}
-
-WorldState SimulationController::parse_initial_conditions(const std::string & scenario_file)
-{
-  (void)scenario_file;
-  return world_model_->get_state();
-}
-
-std::vector<ScheduledFault> SimulationController::parse_fault_schedule(
-  const std::string & scenario_file)
-{
-  (void)scenario_file;
-  return {};
 }
 
 }  // namespace ssos_sim

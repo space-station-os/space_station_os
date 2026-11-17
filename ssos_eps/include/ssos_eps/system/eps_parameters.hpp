@@ -28,6 +28,7 @@ struct EpsParameters
   std::vector<int> channel_mbsu;  // MBSU fed by each channel (-1 = unconnected)
   std::vector<int> ddcu_mbsu;     // MBSU feeding each DDCU
   double low_soc_threshold;    // bank SOC below which EPS is unhealthy [-]
+  double min_state_of_health; // battery state of health below which EPS is degraded [-]
   solar::SolarParameters solar;
   battery::BatteryOruParams battery;
   bcdu::BcduParams bcdu;

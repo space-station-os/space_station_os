@@ -374,3 +374,77 @@ TEST_F(EpsNodeTest, DdcuFaultHookDropsLoadsAndReportsOnce)
 
   tear_down();
 }
+
+TEST_F(EpsNodeTest, AppliesSimulationInjectedFaultsAndExpiresThem)
+{
+  auto fault_pub = probe_->create_publisher<FaultEvent>("/ssos/fault_event", 10);
+  auto send = [&](const std::string & type, const std::string & description) {
+      FaultEvent ev;
+      ev.subsystem_name = "eps";
+      ev.fault_type = type;
+      ev.severity = FaultEvent::SEVERITY_CRITICAL;
+      ev.description = description;
+      fault_pub->publish(ev);
+    };
+
+  node_->set_parameter(rclcpp::Parameter("step_rate_hz", 30.0));
+  bring_up();
+  spin_for(200ms);
+  ASSERT_TRUE(node_->last_state().healthy);
+
+  // EPS's own detected-fault events and out-of-range units are ignored.
+  send("bcdu_fault", "A BCDU has isolated its batteries");
+  send("bcdu_fault", "Injected fault: bcdu_fault (params: {\"channel\": 99}, duration: 0 s)");
+  spin_for(200ms);
+  EXPECT_FALSE(node_->last_state().bcdu_fault);
+
+  send("bcdu_fault", "Injected fault: bcdu_fault (params: {\"channel\": 2}, duration: 0.5 s)");
+  spin_for(200ms);
+  EXPECT_TRUE(node_->last_state().bcdu_fault);
+  EXPECT_EQ(node_->last_state().channels[2].mode, ssos_eps::bcdu::BcduMode::FAULT);
+  EXPECT_FALSE(node_->last_state().healthy);
+
+  // Duration runs out on node time.
+  spin_for(600ms);
+  EXPECT_FALSE(node_->last_state().bcdu_fault);
+  EXPECT_TRUE(node_->last_state().healthy);
+
+  tear_down();
+}
+
+TEST_F(EpsNodeTest, InjectedFaultsStackWithParametersAndClear)
+{
+  auto fault_pub = probe_->create_publisher<FaultEvent>("/ssos/fault_event", 10);
+  auto send = [&](const std::string & type, const std::string & params) {
+      FaultEvent ev;
+      ev.subsystem_name = "eps";
+      ev.fault_type = type;
+      ev.description = "Scheduled fault: test (params: " + params + ", duration: 0 s)";
+      fault_pub->publish(ev);
+    };
+
+  node_->set_parameter(rclcpp::Parameter("step_rate_hz", 30.0));
+  bring_up();
+  spin_for(200ms);
+  const double full = node_->last_state().generation_w;
+  ASSERT_GT(full, 0.0);
+
+  send("solar_array_degraded", "{\"factor\": 0.5}");
+  send("load_spike", "{\"demand_scale\": 1.5}");
+  send("battery_low_soc", "{\"soc\": 0.1}");
+  spin_for(300ms);
+  const auto & s = node_->last_state();
+  EXPECT_NEAR(s.generation_w, 0.5 * full, 0.01 * full);
+  EXPECT_TRUE(s.array_degraded);
+  EXPECT_NEAR(s.load_demand_w, 45000.0, 1.0);
+  EXPECT_TRUE(s.low_soc);
+
+  // Clearing restores the configured values (the SOC override is one-shot).
+  send("clear_faults", "{}");
+  spin_for(300ms);
+  EXPECT_FALSE(node_->last_state().array_degraded);
+  EXPECT_NEAR(node_->last_state().load_demand_w, 30000.0, 1.0);
+  EXPECT_NEAR(node_->last_state().generation_w, full, 0.01 * full);
+
+  tear_down();
+}

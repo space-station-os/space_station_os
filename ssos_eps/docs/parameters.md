@@ -37,6 +37,7 @@ factory functions supply defaults only. Names mirror the physics structs.
 | `faults.offline_channel` | -1 | channel whose MBSU feeder is open (-1 = none) |
 | `faults.faulted_bcdu` | -1 | channel whose BCDU is faulted (-1 = none) |
 | `eps.low_soc_threshold` | 0.20 | bank SOC below which EPS is unhealthy |
+| `eps.min_state_of_health` | 0.80 | battery state of health below which EPS is degraded |
 
 ## Solar
 
@@ -147,7 +148,7 @@ The set-parameters callback rejects values before they reach the physics:
 | Parameter | Constraint |
 |-----------|-----------|
 | efficiencies (`*.cell_efficiency`, `solar.ssu.efficiency`, `bcdu.*_efficiency`, `battery.coulombic_efficiency`, `battery.state_of_health`) | ∈ (0, 1] |
-| `degradation_factor`, `gimbal_lock_derate`, `initial_soc`, `eps.low_soc_threshold` | ∈ [0, 1] |
+| `degradation_factor`, `gimbal_lock_derate`, `initial_soc`, `eps.low_soc_threshold`, `eps.min_state_of_health` | ∈ [0, 1] |
 | `beta_max_deg`, `beta_lock_limit_deg` | ∈ [0, 90]; `fixed_beta_deg` ∈ [-90, 90] |
 | capacities, voltages, thermal mass | > 0 |
 | areas, currents, resistances, times, powers | ≥ 0 |

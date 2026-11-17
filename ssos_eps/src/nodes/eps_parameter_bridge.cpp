@@ -55,6 +55,8 @@ const std::vector<DoubleField> & double_fields()
   static const std::vector<DoubleField> fields = {
     {"eps.low_soc_threshold",
       [](EpsParameters & p) -> double & {return p.low_soc_threshold;}, 0.0, 1.0, false},
+    {"eps.min_state_of_health",
+      [](EpsParameters & p) -> double & {return p.min_state_of_health;}, 0.0, 1.0, false},
 
     {"solar.array.area_m2",
       [](EpsParameters & p) -> double & {return p.solar.array.area_m2;}, 0.0, kInf, false},

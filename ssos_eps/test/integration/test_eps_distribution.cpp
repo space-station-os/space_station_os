@@ -324,3 +324,40 @@ TEST(EpsDistribution, DistributionEnergyIsConservedOverAnOrbit)
     EXPECT_NEAR(s.primary_load_w, s.load_served_w + s.distribution_loss_w, 1.0e-3);
   }
 }
+
+TEST(EpsDistribution, DegradationFlagsMakeEpsUnhealthy)
+{
+  EpsParameters p = zero_beta();
+  EpsSystem eps(p);
+  ASSERT_TRUE(eps.step(1.0, kSun).healthy);
+
+  p.solar.array.degradation_factor = 0.5;
+  eps.set_parameters(p);
+  const EpsState & arr = eps.step(1.0, kSun);
+  EXPECT_TRUE(arr.array_degraded);
+  EXPECT_FALSE(arr.healthy);
+  EXPECT_EQ(arr.status_message, "solar array output degraded");
+
+  p.solar.array.degradation_factor = 1.0;
+  p.battery.state_of_health = 0.6;
+  eps.set_parameters(p);
+  const EpsState & bat = eps.step(1.0, kSun);
+  EXPECT_FALSE(bat.array_degraded);
+  EXPECT_TRUE(bat.battery_degraded);
+  EXPECT_EQ(bat.status_message, "battery state of health degraded");
+
+  p.battery.state_of_health = 1.0;
+  eps.set_parameters(p);
+  EXPECT_TRUE(eps.step(1.0, kSun).healthy);
+}
+
+TEST(EpsDistribution, SetBatterySocKeepsFailedOrus)
+{
+  EpsSystem eps(zero_beta());
+  eps.set_oru_failed(3, true);
+  eps.set_battery_soc(0.15);
+  const EpsState & s = eps.state();
+  EXPECT_NEAR(s.battery_soc, 0.15, 1.0e-12);
+  EXPECT_TRUE(s.low_soc);
+  EXPECT_EQ(s.orus[3].health, battery::BatteryHealth::FAILED);
+}

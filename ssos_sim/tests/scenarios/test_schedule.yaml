@@ -1,0 +1,32 @@
+scenario:
+  name: test_schedule
+  duration_s: 120
+  sim_rate_hz: 20
+  time_scale: 50.0
+
+  initial_conditions:
+    atmospheric_co2_ppm: 2600.0
+    orbit_phase: 0.7
+
+  faults:
+    - name: late_fault
+      type: load_spike
+      target_subsystem: eps
+      trigger:
+        type: time
+        at_s: 40.0
+      params:
+        demand_scale: 2.0
+      duration_s: 30
+    - name: early_fault
+      type: bcdu_fault
+      target_subsystem: eps
+      target_interface: /ssos/eps/bcdu/status
+      trigger:
+        type: time
+        at_s: 10.0
+      params:
+        channel: 3
+        note: "quoted"
+        clear: false
+      duration_s: 0

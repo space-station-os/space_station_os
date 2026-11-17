@@ -1,0 +1,18 @@
+scenario:
+  name: eps_eclipse_transition
+  duration_s: 900
+  sim_rate_hz: 10
+  time_scale: 10.0
+
+  # Start just before eclipse entry (the default orbit enters eclipse at 0.65).
+  initial_conditions:
+    orbit_phase: 0.6
+
+  faults: []
+
+  expected_outcomes:
+    - eps_bcdu_mode:
+        from: charging
+        to: discharging
+        before_s: 300.0
+    - all_subsystems_nominal_at_s: 600

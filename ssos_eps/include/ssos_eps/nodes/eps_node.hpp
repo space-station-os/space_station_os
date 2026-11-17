@@ -21,6 +21,7 @@
 #include "space_station_interfaces/srv/load.hpp"
 #include "space_station_interfaces/srv/register_subsystem.hpp"
 
+#include "ssos_eps/nodes/eps_fault_injection.hpp"
 #include "ssos_eps/nodes/eps_parameter_bridge.hpp"
 #include "ssos_eps/system/eps_system.hpp"
 
@@ -68,6 +69,8 @@ private:
   void register_with_manager();
   void handle_load_request(const Load::Request::SharedPtr req, Load::Response::SharedPtr res);
   void on_world_state(const WorldState::SharedPtr msg);
+  void on_fault_event(const FaultEvent::SharedPtr msg);
+  void refresh_physics_parameters();
   rcl_interfaces::msg::SetParametersResult on_set_parameters(
     const std::vector<rclcpp::Parameter> & params);
 
@@ -93,6 +96,7 @@ private:
   Pub<Float64> beta_pub_;
 
   rclcpp::Subscription<WorldState>::SharedPtr world_state_sub_;
+  rclcpp::Subscription<FaultEvent>::SharedPtr fault_sub_;
   rclcpp::Client<RegisterSubsystem>::SharedPtr register_client_;
   rclcpp::Service<Load>::SharedPtr load_srv_;
   rclcpp::TimerBase::SharedPtr step_timer_;
@@ -120,6 +124,11 @@ private:
   bool ddcu_overload_reported_{false};
   bool mbsu_unstable_reported_{false};
   bool redundancy_reported_{false};
+  bool array_degraded_reported_{false};
+  bool battery_degraded_reported_{false};
+
+  EpsFaultInjection injection_;
+  uint64_t applied_injection_revision_{0};
 
   rclcpp::Time last_step_time_;
   bool first_step_{true};

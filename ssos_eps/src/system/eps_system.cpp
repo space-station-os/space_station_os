@@ -163,6 +163,15 @@ void EpsSystem::set_array_degradation(double factor)
   array_.set_params(params_.solar.array, params_.solar.thermal);
 }
 
+void EpsSystem::set_battery_soc(double soc)
+{
+  for (std::size_t i = 0; i < orus_.size(); ++i) {
+    orus_[i]->set_soc(soc);
+    state_.orus[i] = orus_[i]->state();
+  }
+  summarise();
+}
+
 void EpsSystem::set_ddcu_fault(int index, bool faulted)
 {
   if (index >= 0 && index < n_ddcu()) {
@@ -554,6 +563,8 @@ void EpsSystem::summarise()
   const double tolerance = params_.bcdu.unserved_tolerance_w;
   state_.low_soc = state_.battery_soc < params_.low_soc_threshold;
   state_.load_shed = stepped_ && state_.shed_loads > 0;
+  state_.array_degraded = params_.solar.array.degradation_factor < 1.0 - 1.0e-9;
+  state_.battery_degraded = params_.battery.state_of_health < params_.min_state_of_health;
   state_.load_unserved = stepped_ && state_.unserved_load_w > tolerance;
   if (!stepped_) {
     state_.mbsu_unstable = false;
@@ -562,7 +573,7 @@ void EpsSystem::summarise()
   state_.healthy = !state_.low_soc && !state_.load_unserved && !state_.load_shed &&
     !state_.bcdu_fault && !state_.oru_failed && !state_.oru_overheat &&
     !state_.ddcu_fault && !state_.ddcu_overload && !state_.mbsu_unstable &&
-    !state_.redundancy_lost;
+    !state_.redundancy_lost && !state_.array_degraded && !state_.battery_degraded;
 
   if (state_.load_shed) {
     state_.status_message = std::to_string(state_.shed_loads) + " load(s) shed";
@@ -584,6 +595,10 @@ void EpsSystem::summarise()
     state_.status_message = "battery ORU failed";
   } else if (state_.redundancy_lost) {
     state_.status_message = "MBSU source redundancy lost";
+  } else if (state_.battery_degraded) {
+    state_.status_message = "battery state of health degraded";
+  } else if (state_.array_degraded) {
+    state_.status_message = "solar array output degraded";
   } else {
     state_.status_message = "nominal";
   }

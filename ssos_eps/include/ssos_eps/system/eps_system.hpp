@@ -80,6 +80,8 @@ struct EpsState
   bool ddcu_overload;          // a DDCU's requested load exceeds its rating
   bool mbsu_unstable;          // an MBSU has no usable bus
   bool redundancy_lost;        // an MBSU is down to fewer than its redundant sources
+  bool array_degraded;         // array output below beginning of life
+  bool battery_degraded;       // battery state of health below the minimum
   bool healthy;                // none of the above
   std::string status_message;
 };
@@ -120,6 +122,8 @@ public:
   void set_oru_failed(int index, bool failed);
   void set_bcdu_fault(int channel, bool faulted);
   void set_array_degradation(double factor);
+  /// Set every ORU's state of charge, keeping failures and temperature.
+  void set_battery_soc(double soc);
   void set_ddcu_fault(int index, bool faulted);
   void set_mbsu_fault(int index, bool faulted);
   /// Open the feeder from a channel to its MBSU.

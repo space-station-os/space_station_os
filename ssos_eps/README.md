@@ -101,6 +101,21 @@ ros2 service call /ssos/eps/load_request space_station_interfaces/srv/Load \
   "{load_id: experiment, action: 0, power_w: 1500.0, priority: 2, ddcu_index: -1}"
 ```
 
+## Faults and scenarios
+
+EPS faults can be injected through the SSOS simulation path:
+`/sim/inject_fault` or a timed entry in an `ssos_sim` scenario file. Both
+publish a `FaultEvent` for `eps` that `eps_node` applies to the physics, with an
+optional duration in simulation seconds. EPS also publishes its own detected
+faults, and `system_manager` recovers once EPS has been healthy for its
+`recovery_hold_s`. See [docs/fault_catalog.md](docs/fault_catalog.md).
+
+```bash
+ros2 launch ssos_eps eps_system.launch.py scenario:=eps_bcdu_fault_recovery
+ros2 service call /sim/inject_fault space_station_interfaces/srv/InjectFault \
+  "{target_subsystem: eps, fault_type: load_spike, parameters_json: '{\"demand_scale\": 2.0}', duration_s: 120.0}"
+```
+
 ## Parameters
 
 Every physical parameter is a ROS 2 parameter, mapped through the single
@@ -112,4 +127,5 @@ See [docs/parameters.md](docs/parameters.md).
 
 - [docs/architecture.md](docs/architecture.md) — layering, step order and data flow
 - [docs/parameters.md](docs/parameters.md) — parameter reference
+- [docs/fault_catalog.md](docs/fault_catalog.md) — injectable and detected faults, scenarios
 - [docs/validation.md](docs/validation.md) — test coverage and orbit behaviour

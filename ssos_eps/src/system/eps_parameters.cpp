@@ -32,6 +32,7 @@ EpsParameters default_eps_parameters()
   p.channel_mbsu = {0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3};
   p.ddcu_mbsu = {0, 0, 1, 1, 2, 2, 3, 3};
   p.low_soc_threshold = 0.20;
+  p.min_state_of_health = 0.80;
   p.solar = solar::default_solar_parameters();
   p.battery = battery::default_battery_oru_params();
   p.bcdu = bcdu::default_bcdu_params();

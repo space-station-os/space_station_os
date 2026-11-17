@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <functional>
 #include <iomanip>
 #include <sstream>
@@ -89,6 +90,10 @@ CallbackReturn EpsNode::on_configure(const rclcpp_lifecycle::State &)
     "/ssos/eps/solar/panel_temperature_c", 10);
   beta_pub_ = this->create_publisher<Float64>("/ssos/eps/solar/beta_deg", 10);
 
+  fault_sub_ = this->create_subscription<FaultEvent>(
+    "/ssos/fault_event", 10, std::bind(&EpsNode::on_fault_event, this, _1));
+  injection_.clear();
+  applied_injection_revision_ = injection_.revision();
   world_state_sub_ = this->create_subscription<WorldState>(
     "/sim/world_state", 10, std::bind(&EpsNode::on_world_state, this, _1));
   register_client_ = this->create_client<RegisterSubsystem>("/ssos/register_subsystem");
@@ -107,6 +112,8 @@ CallbackReturn EpsNode::on_configure(const rclcpp_lifecycle::State &)
   ddcu_overload_reported_ = false;
   mbsu_unstable_reported_ = false;
   redundancy_reported_ = false;
+  array_degraded_reported_ = false;
+  battery_degraded_reported_ = false;
   params_dirty_ = false;
 
   RCLCPP_INFO(get_logger(),
@@ -200,6 +207,8 @@ CallbackReturn EpsNode::on_cleanup(const rclcpp_lifecycle::State &)
   panel_temp_pub_.reset();
   beta_pub_.reset();
   world_state_sub_.reset();
+  fault_sub_.reset();
+  injection_.clear();
   register_client_.reset();
   load_srv_.reset();
   param_cb_handle_.reset();
@@ -253,18 +262,75 @@ rcl_interfaces::msg::SetParametersResult EpsNode::on_set_parameters(
 
 void EpsNode::apply_fault_hooks()
 {
+  // A unit is faulted if either the what-if parameter or an injected fault
+  // from the simulation names it.
+  const auto failed_orus = injection_.indices("battery_oru_failed");
+  const auto faulted_bcdus = injection_.indices("bcdu_fault");
+  const auto lost_channels = injection_.indices("mbsu_channel_loss");
+  const auto faulted_ddcus = injection_.indices("ddcu_fault");
+  const auto faulted_mbsus = injection_.indices("mbsu_fault");
   for (int i = 0; i < eps_->n_orus(); ++i) {
-    eps_->set_oru_failed(i, i == failed_oru_);
+    eps_->set_oru_failed(i, i == failed_oru_ || failed_orus.count(i) > 0);
   }
   for (int c = 0; c < eps_->n_channels(); ++c) {
-    eps_->set_bcdu_fault(c, c == faulted_bcdu_);
-    eps_->set_channel_offline(c, c == offline_channel_);
+    eps_->set_bcdu_fault(c, c == faulted_bcdu_ || faulted_bcdus.count(c) > 0);
+    eps_->set_channel_offline(c, c == offline_channel_ || lost_channels.count(c) > 0);
   }
   for (int d = 0; d < eps_->n_ddcu(); ++d) {
-    eps_->set_ddcu_fault(d, d == faulted_ddcu_);
+    eps_->set_ddcu_fault(d, d == faulted_ddcu_ || faulted_ddcus.count(d) > 0);
   }
   for (int m = 0; m < eps_->n_mbsu(); ++m) {
-    eps_->set_mbsu_fault(m, m == faulted_mbsu_);
+    eps_->set_mbsu_fault(m, m == faulted_mbsu_ || faulted_mbsus.count(m) > 0);
+  }
+}
+
+void EpsNode::refresh_physics_parameters()
+{
+  system::EpsParameters updated = bridge_->read_parameters();
+  const auto & current = eps_->parameters();
+  updated.n_channels = current.n_channels;
+  updated.orus_per_channel = current.orus_per_channel;
+  updated.n_mbsu = current.n_mbsu;
+  updated.channel_mbsu = current.channel_mbsu;
+  updated.ddcu_mbsu = current.ddcu_mbsu;
+  updated.solar.array.degradation_factor *= injection_.array_factor();
+  updated.battery.state_of_health *= injection_.health_factor();
+  updated.demand_scale *= injection_.demand_scale();
+  eps_->set_parameters(updated);
+  apply_fault_hooks();
+}
+
+void EpsNode::on_fault_event(const FaultEvent::SharedPtr msg)
+{
+  // Only faults the simulation injects for EPS; EPS's own detected faults and
+  // other subsystems' events are ignored.
+  std::string params_json;
+  double duration_s = 0.0;
+  if (!eps_ || msg->subsystem_name != "eps" ||
+    !EpsFaultInjection::parse_description(msg->description, params_json, duration_s))
+  {
+    return;
+  }
+  const auto params = EpsFaultInjection::parse_params(params_json);
+
+  const std::string idx = EpsFaultInjection::index_param(msg->fault_type);
+  if (!idx.empty()) {
+    const auto it = params.find(idx);
+    const int index = it != params.end() ? static_cast<int>(std::lround(it->second)) : 0;
+    const int count = idx == "oru" ? eps_->n_orus() : idx == "channel" ? eps_->n_channels() :
+      idx == "mbsu" ? eps_->n_mbsu() : eps_->n_ddcu();
+    if (index < 0 || index >= count) {
+      RCLCPP_WARN(get_logger(), "Ignoring injected %s: %s %d does not exist",
+                  msg->fault_type.c_str(), idx.c_str(), index);
+      return;
+    }
+  }
+
+  std::string message;
+  if (injection_.apply(msg->fault_type, params, duration_s, this->now().seconds(), message)) {
+    RCLCPP_WARN(get_logger(), "Simulation fault: %s", message.c_str());
+  } else {
+    RCLCPP_WARN(get_logger(), "Ignoring injected fault: %s", message.c_str());
   }
 }
 
@@ -279,19 +345,21 @@ void EpsNode::step()
   if (!eps_) {
     return;
   }
+  const rclcpp::Time now = this->now();
+
   // Values set through the parameter callback are committed after it returns,
-  // so live physics edits are picked up on the following step.
-  if (params_dirty_) {
-    system::EpsParameters updated = bridge_->read_parameters();
-    const auto & current = eps_->parameters();
-    updated.n_channels = current.n_channels;
-    updated.orus_per_channel = current.orus_per_channel;
-    eps_->set_parameters(updated);
-    apply_fault_hooks();
+  // so live physics edits are picked up on the following step. Injected
+  // faults that started, expired or were cleared are applied the same way.
+  injection_.expire(now.seconds());
+  if (params_dirty_ || injection_.revision() != applied_injection_revision_) {
+    refresh_physics_parameters();
+    if (const auto soc = injection_.take_pending_soc()) {
+      eps_->set_battery_soc(*soc);
+    }
     params_dirty_ = false;
+    applied_injection_revision_ = injection_.revision();
   }
 
-  const rclcpp::Time now = this->now();
   double dt = 0.0;
   if (!first_step_) {
     const double measured = (now - last_step_time_).seconds();
@@ -546,6 +614,20 @@ void EpsNode::publish_telemetry(const rclcpp::Time & now)
     ddcu_overloaded > 0 ? std::to_string(ddcu_overloaded) + " DDCU(s) overloaded" : "nominal";
   diag.status.push_back(ddcu);
 
+  DiagnosticStatus faults;
+  faults.name = "eps/faults";
+  faults.hardware_id = "ssos_eps/faults";
+  for (const auto & f : injection_.active()) {
+    EpsDiagnostics::add_value(
+      faults, f.key, f.expires_s < 0.0 ? std::string("until cleared") :
+      std::to_string(static_cast<int>(std::max(f.expires_s - now.seconds(), 0.0))) +
+      " s left");
+  }
+  faults.level = injection_.active().empty() ? DiagnosticStatus::OK : DiagnosticStatus::WARN;
+  faults.message = injection_.active().empty() ? "no injected faults" :
+    std::to_string(injection_.active().size()) + " injected fault(s)";
+  diag.status.push_back(faults);
+
   telemetry_pub_->publish(diag);
 }
 
@@ -595,6 +677,14 @@ void EpsNode::publish_faults(const rclcpp::Time & now)
        FaultEvent::SEVERITY_WARNING,
        "An MBSU is running on a single source channel",
        {"/ssos/eps/diagnostics"});
+  edge(s.array_degraded, array_degraded_reported_, "solar_array_degraded",
+       FaultEvent::SEVERITY_WARNING,
+       "Solar array output is below beginning of life",
+       {"/ssos/eps/solar/array_power_w"});
+  edge(s.battery_degraded, battery_degraded_reported_, "battery_degraded",
+       FaultEvent::SEVERITY_WARNING,
+       "Battery state of health is below the minimum",
+       {"/ssos/eps/battery/soc"});
 }
 
 void EpsNode::register_with_manager()
