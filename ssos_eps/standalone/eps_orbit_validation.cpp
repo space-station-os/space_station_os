@@ -6,6 +6,8 @@
 // and load supply. Optional CSV of the full time history.
 //
 //   eps_orbit_validation [orbits] [load_w] [csv_path]
+//
+// load_w scales the baseline station loads to that total.
 
 #include <algorithm>
 #include <cmath>
@@ -39,6 +41,9 @@ int main(int argc, char ** argv)
   }
 
   EpsSystem eps;
+  // Scale the baseline station loads to the requested total.
+  const double baseline_w = eps.loads().total_requested_w();
+  eps.set_demand_scale(baseline_w > 0.0 ? load_w / baseline_w : 0.0);
   std::printf("EPS orbit validation: period %.0f s, eclipse %.0f s, load %.0f W\n",
               period_s, period_s * eclipse_fraction, load_w);
   std::printf("%5s %10s %10s %8s %8s %8s %12s %10s\n", "orbit", "gen_kWh", "load_kWh",
@@ -58,7 +63,6 @@ int main(int argc, char ** argv)
       EpsInput in{};
       in.in_eclipse = phase > (1.0 - eclipse_fraction);
       in.solar_flux_w_m2 = in.in_eclipse ? 0.0 : 1361.0;
-      in.load_demand_w = load_w;
       const auto & s = eps.step(dt, in);
 
       gen_wh += s.available_power_w * dt / 3600.0;

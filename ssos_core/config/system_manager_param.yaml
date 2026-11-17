@@ -2,3 +2,6 @@ system_manager:
   ros__parameters:
     heartbeat_timeout_s: 5.0
     eval_period_s: 1.0
+    # A faulted subsystem that reports healthy for this long has its fault
+    # cleared (DEGRADED -> RECOVERY -> NOMINAL). Negative disables auto-clear.
+    recovery_hold_s: 10.0

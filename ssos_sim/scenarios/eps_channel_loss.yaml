@@ -1,0 +1,39 @@
+scenario:
+  name: eps_channel_loss
+  duration_s: 300
+  sim_rate_hz: 10
+  time_scale: 10.0
+
+  faults:
+    # One channel lost: MBSU 0 reroutes onto channels 1 and 2 and keeps
+    # redundancy, so EPS stays healthy.
+    - name: channel_0_feeder_open
+      type: mbsu_channel_loss
+      target_subsystem: eps
+      trigger:
+        type: time
+        at_s: 30.0
+      params:
+        channel: 0
+      duration_s: 120
+    # A second channel on the same MBSU: down to one source, redundancy lost.
+    - name: channel_1_feeder_open
+      type: mbsu_channel_loss
+      target_subsystem: eps
+      trigger:
+        type: time
+        at_s: 60.0
+      params:
+        channel: 1
+      duration_s: 60
+
+  expected_outcomes:
+    - state_transition:
+        from: NOMINAL
+        to: DEGRADED
+        before_s: 65.0
+    - state_transition:
+        from: DEGRADED
+        to: NOMINAL
+        via: RECOVERY
+        before_s: 300.0

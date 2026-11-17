@@ -1,0 +1,12 @@
+# Main bus switching unit parameters for ssos_eps/eps_node (every MBSU shares
+# the same set).
+eps_node:
+  ros__parameters:
+    # A source channel is usable only inside this voltage window.
+    mbsu.min_source_voltage_v: 120.0
+    mbsu.max_source_voltage_v: 180.0
+
+    # Below min_sources the MBSU bus is unstable; below redundant_sources it
+    # still runs but redundancy is reported lost.
+    mbsu.min_sources: 1
+    mbsu.redundant_sources: 2

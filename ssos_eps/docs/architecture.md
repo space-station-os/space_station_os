@@ -13,7 +13,7 @@
 +-------------------------------------------------------------+
 | Layer 2: subsystem physics (NO ROS)                         |
 |   system/EpsSystem                                          |
-|   solar/   battery/   bcdu/                                 |
+|   solar/   battery/   bcdu/   mbsu/   ddcu/   loads/        |
 +----------------------------+--------------------------------+
                              | (uses)
                              v
@@ -35,21 +35,51 @@ standalone links `eps_physics` only. `eps_ros` (Layer 3) adds `rclcpp`,
         |
         v
  SolarArrayModel --array W--> SsuModel --160 V, available W--+
-                                                            |  split evenly
+                                                            |  shared evenly
                                                             v  per channel
-                    +--------------- channel c (x12) ---------------+
-                    |  BcduModel  <-- channel load share            |
-                    |     |  surplus -> charge (limits, eta_c)      |
-                    |     |  deficit -> discharge (limits, eta_d)   |
-                    |     v                                         |
-                    |  BatteryOruModel x2  (shared by capability)   |
-                    +-----------------------------------------------+
+           +----------------- channel c (x12) -----------------+
+           |  BcduModel  <-- load routed by its MBSU            |
+           |     |  surplus -> charge, deficit -> discharge     |
+           |  BatteryOruModel x2                                |
+           +--------------------------+-------------------------+
+                                      | 3 channels per MBSU
+                                      v
+           +----------------- MbsuModel (x4) -------------------+
+           |  usable sources only; demand shared by capability  |
+           +--------------------------+-------------------------+
+                                      | 2 DDCUs per MBSU
+                                      v
+           +----------------- DdcuModel (x8) -------------------+
+           |  115-173 V in, 124.5 V out, 6.25 kW, losses, temp  |
+           +--------------------------+-------------------------+
+                                      |
+                                      v
+                 LoadRegistry: named loads, priority, DDCU
 ```
 
-`EpsSystem::step(dt, input)` runs the stages in that fixed order every call,
-so the whole generation-to-storage chain is solved within one timestep with no
+Each `EpsSystem::step(dt, input)`:
+
+1. steps the array and SSU;
+2. asks every channel's BCDU what it could deliver this step (array share plus
+   battery discharge, within the BCDU limits) and at what bus voltage;
+3. lets each MBSU pick its usable source channels;
+4. sums the loads on each DDCU and sheds the least critical ones until the DDCU
+   is within its rating, then sheds further across an MBSU's DDCUs until its
+   sources can cover the DDCU input power;
+5. routes each MBSU's demand onto its channels in proportion to their
+   capability and steps the BCDUs and batteries with that load;
+6. steps the DDCUs, browning out any whose MBSU delivered less than routed.
+
+The whole generation-to-load chain is solved within one timestep with no
 inter-node message latency. One lifecycle node therefore owns the full chain;
-per-subsystem telemetry is still published on separate topics.
+per-unit telemetry is still published on separate topics.
+
+## Load admission
+
+`request_load` checks the request is well formed, then picks the DDCU (or the
+requested one) with the most rating headroom whose MBSU had enough spare supply
+in the last step. Updating an existing load credits back its current power.
+Loads stay registered while shed and come back on as soon as there is room.
 
 ## Sign conventions
 
@@ -60,17 +90,36 @@ per-subsystem telemetry is still published on separate topics.
 
 ## Health and faults
 
-`EpsState` exposes `low_soc`, `load_unserved`, `bcdu_fault`, `oru_failed` and
-`oru_overheat`;
-`healthy` is false when any is set. The node sends a `FaultEvent` on the rising
+`EpsState` exposes `low_soc`, `load_unserved`, `load_shed`, `bcdu_fault`,
+`oru_failed`, `oru_overheat`, `ddcu_fault`, `ddcu_overload`, `mbsu_unstable` and
+`redundancy_lost`; `healthy` is false when any is set. The node sends a `FaultEvent` on the rising
 edge of each condition (when `enable_auto_faults` is true) and re-arms once it
 clears. The heartbeat carries `healthy` and the current status message.
 
 The physics exposes fault hooks (`set_oru_failed`, `set_bcdu_fault`,
-`set_array_degradation`). The node maps them to the parameters
-`faults.failed_oru`, `faults.faulted_bcdu` and `solar.array.degradation_factor`
-for what-if testing; routing faults through `ssos_sim` comes with the EPS
-fault/scenario work.
+`set_array_degradation`, `set_ddcu_fault`, `set_mbsu_fault`,
+`set_channel_offline`, `set_battery_soc`). Two things drive them, both in the
+ROS layer:
+
+- what-if parameters: `faults.failed_oru`, `faults.faulted_bcdu`,
+  `faults.faulted_ddcu`, `faults.faulted_mbsu`, `faults.offline_channel`,
+  `solar.array.degradation_factor`, `battery.state_of_health`,
+  `loads.demand_scale`;
+- faults injected by `ssos_sim`, which arrive as `FaultEvent`s for `eps` with a
+  `Injected fault: …` / `Scheduled fault: …` description. `EpsFaultInjection`
+  (in `nodes/`, no ROS types) parses them, tracks their expiry in node time and
+  tells the node which units and factors are affected.
+
+The node combines the two (a unit is faulted if either names it; factors
+multiply) and applies the result on the next step. The physics never sees a
+scenario, an expiry or a fault message. See [fault_catalog.md](fault_catalog.md).
+
+```
+ssos_sim --FaultEvent(eps, "Injected fault: ...")--> eps_node --hooks--> EpsSystem
+                                                        |
+EpsSystem state --health flags--> eps_node --FaultEvent(detected)--> system_manager
+                                           --heartbeat(healthy)----> system_manager
+```
 
 ## Stepping model
 

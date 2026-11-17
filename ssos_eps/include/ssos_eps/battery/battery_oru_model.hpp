@@ -68,6 +68,10 @@ public:
   /// @return the terminal power actually exchanged [W]
   double step(double dt, double power_request_w);
 
+  /// Set the state of charge directly (e.g. to start from a drained bank),
+  /// keeping temperature and failure state.
+  void set_soc(double soc);
+
   /// A failed ORU is isolated: it carries no current until cleared.
   void set_failed(bool failed);
   bool failed() const {return failed_;}

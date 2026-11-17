@@ -37,6 +37,9 @@ struct SubsystemRecord
   rclcpp::Subscription<SubsystemHeartbeat>::SharedPtr heartbeat_sub;
   rclcpp::Time last_heard;
   bool registered{false};
+  bool reported_healthy{false};   // health as the subsystem itself reports it
+  rclcpp::Time healthy_since;      // start of the current healthy streak
+  rclcpp::Time fault_time;         // when the active fault was raised
 };
 
 /// Central system manager node.
@@ -78,6 +81,7 @@ private:
   // Parameters
   double heartbeat_timeout_s_{5.0};
   double eval_period_s_{1.0};
+  double recovery_hold_s_{10.0};  // healthy time before a fault clears (< 0 disables)
 
   // Callbacks
   void on_fault_event(const FaultEvent::SharedPtr msg);
@@ -88,6 +92,10 @@ private:
 
   /// Core state evaluation logic
   void run_evaluation();
+
+  /// Clear the faults of subsystems that have reported healthy for
+  /// recovery_hold_s since the fault. Returns the names that recovered.
+  std::vector<std::string> clear_recovered_faults();
 
   /// Publish a state transition
   void publish_state(uint8_t new_state, const std::string & reason);

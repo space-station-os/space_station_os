@@ -1,0 +1,19 @@
+# DC-to-DC converter unit parameters for ssos_eps/eps_node (every DDCU shares
+# the same set).
+eps_node:
+  ros__parameters:
+    ddcu.input_min_v: 115.0
+    ddcu.input_max_v: 173.0
+    ddcu.output_voltage_v: 124.5
+    ddcu.regulation_droop_v: 1.5
+
+    ddcu.rated_power_w: 6250.0
+    ddcu.efficiency: 0.96
+    ddcu.no_load_loss_w: 50.0
+
+    ddcu.thermal_mass_j_k: 20000.0
+    ddcu.heat_transfer_w_k: 8.0
+    ddcu.coldplate_temp_c: 18.0
+    ddcu.trip_temp_c: 70.0
+    ddcu.reset_temp_c: 55.0
+    ddcu.initial_temp_c: 20.0

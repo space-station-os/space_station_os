@@ -16,6 +16,7 @@ SystemManager::SystemManager(const rclcpp::NodeOptions & options)
   // Declare parameters
   this->declare_parameter("heartbeat_timeout_s", 5.0);
   this->declare_parameter("eval_period_s", 1.0);
+  this->declare_parameter("recovery_hold_s", 10.0);
 
   RCLCPP_INFO(get_logger(), "SystemManager created (unconfigured)");
 }
@@ -27,6 +28,7 @@ CallbackReturn SystemManager::on_configure(const rclcpp_lifecycle::State &)
   // Read parameters
   heartbeat_timeout_s_ = this->get_parameter("heartbeat_timeout_s").as_double();
   eval_period_s_ = this->get_parameter("eval_period_s").as_double();
+  recovery_hold_s_ = this->get_parameter("recovery_hold_s").as_double();
 
   // Create state publisher (lifecycle-managed — only publishes when active)
   state_pub_ = this->create_publisher<SystemState>("/ssos/system_state", 10);
@@ -49,8 +51,9 @@ CallbackReturn SystemManager::on_configure(const rclcpp_lifecycle::State &)
 
   current_state_ = SystemState::INIT;
 
-  RCLCPP_INFO(get_logger(), "Configured. Heartbeat timeout=%.1fs, eval period=%.1fs",
-    heartbeat_timeout_s_, eval_period_s_);
+  RCLCPP_INFO(get_logger(),
+    "Configured. Heartbeat timeout=%.1fs, eval period=%.1fs, recovery hold=%.1fs",
+    heartbeat_timeout_s_, eval_period_s_, recovery_hold_s_);
 
   return CallbackReturn::SUCCESS;
 }
@@ -103,6 +106,8 @@ void SystemManager::handle_register(
   record.heartbeat_topic = req->heartbeat_topic;
   record.registered = true;
   record.last_heard = this->now();
+  record.healthy_since = record.last_heard;
+  record.fault_time = record.last_heard;
 
   // Initialize heartbeat with defaults
   record.last_heartbeat.subsystem_name = name;
@@ -143,8 +148,13 @@ void SystemManager::on_heartbeat(
     return;
   }
 
+  const bool was_healthy = it->second.reported_healthy;
   it->second.last_heartbeat = *msg;
   it->second.last_heard = this->now();
+  it->second.reported_healthy = msg->healthy;
+  if (msg->healthy && !was_healthy) {
+    it->second.healthy_since = it->second.last_heard;
+  }
 
   if (it->second.has_active_fault) {
     it->second.last_heartbeat.healthy = false;
@@ -157,6 +167,12 @@ void SystemManager::on_heartbeat(
 
 void SystemManager::on_fault_event(const FaultEvent::SharedPtr msg)
 {
+  // "clear_faults" is the simulation's command to remove injected faults,
+  // not a fault itself.
+  if (msg->fault_type == "clear_faults") {
+    return;
+  }
+
   // Ignore faults from unregistered subsystems
   if (subsystems_.find(msg->subsystem_name) == subsystems_.end()) {
     RCLCPP_WARN(get_logger(),
@@ -177,7 +193,9 @@ void SystemManager::on_fault_event(const FaultEvent::SharedPtr msg)
     "Fault: " + msg->fault_type + " — " + msg->description;
   subsystems_[msg->subsystem_name].has_active_fault = true;
   subsystems_[msg->subsystem_name].active_fault_desc = msg->fault_type;
-  subsystems_[msg->subsystem_name].last_heartbeat.healthy = false;
+  // Recovery needs a fresh healthy streak after the latest fault.
+  subsystems_[msg->subsystem_name].fault_time = this->now();
+  subsystems_[msg->subsystem_name].healthy_since = this->now();
   // Emergency faults go straight to SAFE
   if (msg->severity == FaultEvent::SEVERITY_EMERGENCY) {
     publish_state(SystemState::SAFE,
@@ -229,8 +247,53 @@ uint8_t SystemManager::evaluate_system_state() const
   return SystemState::DEGRADED;
 }
 
+std::vector<std::string> SystemManager::clear_recovered_faults()
+{
+  std::vector<std::string> recovered;
+  if (recovery_hold_s_ < 0.0) {
+    return recovered;
+  }
+  const auto now = this->now();
+  for (auto & [name, record] : subsystems_) {
+    if (!record.has_active_fault || !record.reported_healthy) {
+      continue;
+    }
+    const bool active =
+      record.last_heartbeat.lifecycle_state == SubsystemHeartbeat::LIFECYCLE_ACTIVE;
+    const bool timed_out = (now - record.last_heard).seconds() > heartbeat_timeout_s_;
+    const double healthy_for = (now - record.healthy_since).seconds();
+    const double since_fault = (now - record.fault_time).seconds();
+    if (!active || timed_out || healthy_for < recovery_hold_s_ ||
+      since_fault < recovery_hold_s_)
+    {
+      continue;
+    }
+    RCLCPP_INFO(get_logger(), "Subsystem '%s' healthy for %.1fs; clearing fault '%s'",
+      name.c_str(), healthy_for, record.active_fault_desc.c_str());
+    record.has_active_fault = false;
+    record.last_heartbeat.healthy = true;
+    record.last_heartbeat.status_message = "recovered from " + record.active_fault_desc;
+    record.active_fault_desc.clear();
+    recovered.push_back(name);
+  }
+  return recovered;
+}
+
 void SystemManager::run_evaluation()
 {
+  if (current_state_ != SystemState::SAFE) {
+    const auto recovered = clear_recovered_faults();
+    if (!recovered.empty() && evaluate_system_state() == SystemState::NOMINAL) {
+      // Report RECOVERY first; the next evaluation moves on to NOMINAL.
+      std::string reason = "faults cleared:";
+      for (const auto & name : recovered) {
+        reason += " " + name;
+      }
+      publish_state(SystemState::RECOVERY, reason);
+      return;
+    }
+  }
+
   uint8_t new_state = evaluate_system_state();
 
   if (new_state != current_state_) {
@@ -238,7 +301,9 @@ void SystemManager::run_evaluation()
     std::string reason;
     switch (new_state) {
       case SystemState::NOMINAL:
-        reason = "all subsystems active and healthy";
+        reason = current_state_ == SystemState::RECOVERY ?
+          "recovery complete; all subsystems active and healthy" :
+          "all subsystems active and healthy";
         break;
       case SystemState::DEGRADED: {
         reason = "degraded subsystems:";

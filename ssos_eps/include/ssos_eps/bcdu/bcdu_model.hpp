@@ -65,6 +65,19 @@ public:
 
   void reset();
 
+  /// Source availability the hysteresis would give for this SSU voltage,
+  /// without changing state.
+  bool source_after(double ssu_voltage_v) const;
+
+  /// Bus-side power this channel can deliver over dt from the array share and
+  /// its batteries, without changing state [W].
+  double supply_capability_w(double dt, const BcduInput & input,
+                             const std::vector<battery::BatteryOruModel> & orus) const;
+
+  /// Bus voltage this channel would hold when supplying load this step [V].
+  double expected_bus_voltage_v(double dt, const BcduInput & input,
+                                const std::vector<battery::BatteryOruModel> & orus) const;
+
   /// Advance the channel by dt, charging or discharging its ORUs.
   const BcduState & step(double dt, const BcduInput & input,
                          std::vector<battery::BatteryOruModel> & orus);

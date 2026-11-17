@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "rclcpp/rclcpp.hpp"
@@ -113,4 +114,37 @@ TEST_F(EpsParameterBridgeTest, ClassifiesParameters)
   EXPECT_FALSE(EpsParameterBridge::is_static_parameter("bcdu.charge_enter_v"));
   EXPECT_TRUE(EpsParameterBridge::is_physics_parameter("solar.ssu.efficiency"));
   EXPECT_FALSE(EpsParameterBridge::is_physics_parameter("load_demand_w"));
+}
+
+TEST_F(EpsParameterBridgeTest, ReadsTopologyAndBaselineLoads)
+{
+  const auto p = bridge_->read_parameters();
+  const auto d = default_eps_parameters();
+  EXPECT_EQ(p.n_mbsu, d.n_mbsu);
+  EXPECT_EQ(p.channel_mbsu, d.channel_mbsu);
+  EXPECT_EQ(p.ddcu_mbsu, d.ddcu_mbsu);
+  ASSERT_EQ(p.baseline_loads.size(), d.baseline_loads.size());
+  EXPECT_EQ(p.baseline_loads.front().id, d.baseline_loads.front().id);
+  EXPECT_DOUBLE_EQ(p.baseline_loads.back().power_w, d.baseline_loads.back().power_w);
+  EXPECT_DOUBLE_EQ(p.ddcu.rated_power_w, d.ddcu.rated_power_w);
+  EXPECT_DOUBLE_EQ(p.demand_scale, 1.0);
+}
+
+TEST_F(EpsParameterBridgeTest, ValidatesDistributionParameters)
+{
+  EXPECT_FALSE(accepts({rclcpp::Parameter("ddcu.efficiency", 1.2)}));
+  EXPECT_FALSE(accepts({rclcpp::Parameter("ddcu.input_min_v", 180.0)}));
+  EXPECT_FALSE(accepts({rclcpp::Parameter("ddcu.reset_temp_c", 75.0)}));
+  EXPECT_FALSE(accepts({rclcpp::Parameter("mbsu.min_source_voltage_v", 200.0)}));
+  EXPECT_FALSE(accepts({rclcpp::Parameter("loads.demand_scale", -0.5)}));
+  EXPECT_TRUE(accepts({rclcpp::Parameter("loads.demand_scale", 1.5)}));
+  EXPECT_FALSE(accepts({rclcpp::Parameter("eps.channel_mbsu", std::vector<int64_t>{0, 1})}));
+  EXPECT_FALSE(accepts({rclcpp::Parameter(
+      "eps.ddcu_mbsu", std::vector<int64_t>{0, 0, 1, 1, 2, 2, 3, 9})}));
+  EXPECT_FALSE(accepts({rclcpp::Parameter(
+      "loads.ids", std::vector<std::string>{"a", "b"})}));
+  EXPECT_TRUE(EpsParameterBridge::is_static_parameter("loads.ids"));
+  EXPECT_TRUE(EpsParameterBridge::is_static_parameter("eps.ddcu_mbsu"));
+  EXPECT_FALSE(EpsParameterBridge::is_static_parameter("ddcu.rated_power_w"));
+  EXPECT_TRUE(EpsParameterBridge::is_physics_parameter("loads.demand_scale"));
 }

@@ -1,4 +1,4 @@
-"""Launch the ssos_eps generation and storage node.
+"""Launch the ssos_eps node (generation, storage and distribution).
 
 The node self-activates via its `autostart` parameter: it configures then
 activates itself `autostart_delay_ms` after startup, so no lifecycle
@@ -29,6 +29,9 @@ def generate_launch_description():
                     config('solar_parameters.yaml'),
                     config('battery_parameters.yaml'),
                     config('bcdu_parameters.yaml'),
+                    config('mbsu_parameters.yaml'),
+                    config('ddcu_parameters.yaml'),
+                    config('loads_parameters.yaml'),
                     {'autostart': True, 'autostart_delay_ms': delay}])
 
     return LaunchDescription([

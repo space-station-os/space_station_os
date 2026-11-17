@@ -1,4 +1,5 @@
 #include "ssos_sim/world_model.hpp"
+#include <algorithm>
 #include <cmath>
 
 namespace ssos_sim
@@ -24,12 +25,8 @@ public:
     elapsed_s_ += dt;
 
     // Eclipse cycling based on orbital period
-    double orbit_phase = std::fmod(elapsed_s_, orbital_period_s_) / orbital_period_s_;
     bool was_in_eclipse = state_.in_eclipse;
-    state_.in_eclipse = orbit_phase > (1.0 - eclipse_fraction_);
-
-    // Solar flux: full sun or zero in eclipse
-    state_.solar_flux_w_m2 = state_.in_eclipse ? 0.0 : 1361.0;
+    update_illumination();
 
     // Slight cabin temp drift during eclipse (simplified thermal model)
     if (state_.in_eclipse) {
@@ -52,7 +49,11 @@ public:
 
   void apply_perturbation(const std::string & param, double value) override
   {
-    if (param == "atmospheric_o2_pct") {
+    if (param == "orbit_phase") {
+      // Jump to a position in the orbit (fraction of the period).
+      elapsed_s_ = std::fmod(std::max(value, 0.0), 1.0) * orbital_period_s_;
+      update_illumination();
+    } else if (param == "atmospheric_o2_pct") {
       state_.atmospheric_o2_pct = value;
     } else if (param == "atmospheric_co2_ppm") {
       state_.atmospheric_co2_ppm = value;
@@ -64,6 +65,14 @@ public:
   }
 
 private:
+  void update_illumination()
+  {
+    double orbit_phase = std::fmod(elapsed_s_, orbital_period_s_) / orbital_period_s_;
+    state_.in_eclipse = orbit_phase > (1.0 - eclipse_fraction_);
+    // Solar flux: full sun or zero in eclipse
+    state_.solar_flux_w_m2 = state_.in_eclipse ? 0.0 : 1361.0;
+  }
+
   WorldState state_;
   double elapsed_s_{0.0};
   double orbital_period_s_{5520.0};  // ~92 minutes default

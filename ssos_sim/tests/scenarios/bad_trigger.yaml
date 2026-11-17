@@ -1,0 +1,8 @@
+scenario:
+  name: bad_trigger
+  faults:
+    - name: no_time
+      type: bcdu_fault
+      target_subsystem: eps
+      trigger:
+        type: condition

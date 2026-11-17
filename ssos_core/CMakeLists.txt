@@ -13,12 +13,13 @@ find_package(space_station_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(lifecycle_msgs REQUIRED)
 
-# Include headers
-include_directories(include)
-
-# System manager library (for testability)
+# System manager library (exported so other packages' tests can run it)
 add_library(system_manager_lib
   src/system_manager.cpp
+)
+target_include_directories(system_manager_lib PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
 )
 ament_target_dependencies(system_manager_lib
   rclcpp
@@ -38,6 +39,7 @@ ament_target_dependencies(system_manager
 
 # Install
 install(TARGETS system_manager_lib
+  EXPORT export_ssos_core
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
@@ -55,11 +57,18 @@ install(DIRECTORY config/
   DESTINATION share/${PROJECT_NAME}/config
 )
 
+install(DIRECTORY include/
+  DESTINATION include
+)
+
 # Testing
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
 
-  ament_add_gtest(test_system_manager test/test_system_manager.cpp)
+  # Own DDS domain: other packages' tests run in parallel and publish
+  # /ssos/fault_event and heartbeats for the same subsystem names.
+  ament_add_gtest(test_system_manager test/test_system_manager.cpp
+    ENV ROS_DOMAIN_ID=64)
   target_include_directories(test_system_manager PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
@@ -71,5 +80,10 @@ if(BUILD_TESTING)
     space_station_interfaces
   )
 endif()
+
+ament_export_targets(export_ssos_core HAS_LIBRARY_TARGET)
+ament_export_include_directories(include)
+ament_export_dependencies(rclcpp rclcpp_lifecycle space_station_interfaces std_msgs
+  lifecycle_msgs)
 
 ament_package()

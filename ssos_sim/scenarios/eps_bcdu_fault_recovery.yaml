@@ -1,0 +1,28 @@
+scenario:
+  name: eps_bcdu_fault_recovery
+  duration_s: 300
+  sim_rate_hz: 10
+  time_scale: 10.0
+
+  faults:
+    - name: bcdu_channel_3
+      type: bcdu_fault
+      target_subsystem: eps
+      target_interface: /ssos/eps/bcdu/channel_3/status
+      trigger:
+        type: time
+        at_s: 60.0
+      params:
+        channel: 3
+      duration_s: 120
+
+  expected_outcomes:
+    - state_transition:
+        from: NOMINAL
+        to: DEGRADED
+        before_s: 65.0
+    - state_transition:
+        from: DEGRADED
+        to: NOMINAL
+        via: RECOVERY
+        before_s: 300.0

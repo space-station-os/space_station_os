@@ -212,6 +212,12 @@ void BatteryOruModel::update_derived(double current_a, double dt)
   }
 }
 
+void BatteryOruModel::set_soc(double soc)
+{
+  state_.soc = std::clamp(soc, 0.0, 1.0);
+  update_derived(0.0, 0.0);
+}
+
 void BatteryOruModel::set_failed(bool failed)
 {
   failed_ = failed;
