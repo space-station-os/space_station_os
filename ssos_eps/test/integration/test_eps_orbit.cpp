@@ -249,26 +249,3 @@ TEST(EpsOrbit, OruOverTemperatureMakesEpsUnhealthy)
   EXPECT_FALSE(cool.oru_overheat);
   EXPECT_TRUE(cool.healthy);
 }
-
-TEST(EpsOrbit, OruOverTemperatureMakesEpsUnhealthy)
-{
-  EpsSystem eps(zero_beta());
-  EXPECT_TRUE(eps.step(1.0, EpsInput{1361.0, false, 30000.0}).healthy);
-
-  // Limit below the ORUs' current temperature.
-  EpsParameters p = eps.parameters();
-  p.battery.max_temp_c = eps.state().orus.front().temperature_c - 5.0;
-  eps.set_parameters(p);
-  const EpsState & hot = eps.step(1.0, EpsInput{1361.0, false, 30000.0});
-  EXPECT_EQ(hot.orus.front().health, battery::BatteryHealth::OVERHEAT);
-  EXPECT_TRUE(hot.oru_overheat);
-  EXPECT_FALSE(hot.oru_failed);
-  EXPECT_FALSE(hot.healthy);
-  EXPECT_EQ(hot.status_message, "battery ORU over temperature");
-
-  p.battery.max_temp_c = 35.0;
-  eps.set_parameters(p);
-  const EpsState & cool = eps.step(1.0, EpsInput{1361.0, false, 30000.0});
-  EXPECT_FALSE(cool.oru_overheat);
-  EXPECT_TRUE(cool.healthy);
-}

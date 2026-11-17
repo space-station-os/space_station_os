@@ -90,9 +90,9 @@ Loads stay registered while shed and come back on as soon as there is room.
 
 ## Health and faults
 
-`EpsState` exposes `low_soc`, `load_unserved`, `bcdu_fault`, `oru_failed` and
-`oru_overheat`;
-`healthy` is false when any is set. The node sends a `FaultEvent` on the rising
+`EpsState` exposes `low_soc`, `load_unserved`, `load_shed`, `bcdu_fault`,
+`oru_failed`, `oru_overheat`, `ddcu_fault`, `ddcu_overload`, `mbsu_unstable` and
+`redundancy_lost`; `healthy` is false when any is set. The node sends a `FaultEvent` on the rising
 edge of each condition (when `enable_auto_faults` is true) and re-arms once it
 clears. The heartbeat carries `healthy` and the current status message.
 
