@@ -27,6 +27,14 @@ TOPIC CONTRACT  (matched against ssos_eps eps_node)
   /ssos/eps/battery/oru_<n>/state     sensor_msgs/BatteryState             (24)
   /ssos/eps/mbsu/mbsu_<n>/status      space_station_interfaces/MBSUStatus   (4)
   /ssos/eps/ddcu/ddcu_<n>/status      space_station_interfaces/DDCUStatus   (8)
+  /ssos/eps/heartbeat                 space_station_interfaces/SubsystemHeartbeat
+
+EPS health (classify_health) is shared with the overview and the sidebar:
+  NOMINAL   heartbeat healthy
+  DEGRADED  heartbeat unhealthy, "eps" diagnostic at WARN
+  FAULT     heartbeat unhealthy, "eps" diagnostic at ERROR (load not supplied)
+  STALE     no heartbeat for HEARTBEAT_STALE_S
+  NO DATA   nothing received yet
 ============================================================================
 """
 
@@ -36,6 +44,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import QTimer
 
 import re
+import time
 
 from sensor_msgs.msg import BatteryState
 try:
@@ -50,6 +59,12 @@ try:
 except Exception:
     BCDUStatus = None
     _HAVE_BCDU = False
+try:
+    from space_station_interfaces.msg import SubsystemHeartbeat
+    _HAVE_HB = True
+except Exception:
+    SubsystemHeartbeat = None
+    _HAVE_HB = False
 try:
     from space_station_interfaces.msg import DDCUStatus, MBSUStatus
     _HAVE_DIST = True
@@ -73,6 +88,60 @@ _DDCU_TAGS = {
     "off": ("OFF", "red"),
     "tripped": ("TRIP", "red"),
 }
+HEARTBEAT_STALE_S = 5.0
+_LIFECYCLE_WORDS = {0: "UNCONFIGURED", 1: "INACTIVE", 2: "ACTIVE", 3: "FINALIZED"}
+HEALTH_COLORS = {
+    "NOMINAL": "green",
+    "DEGRADED": "amber",
+    "FAULT": "red",
+    "STALE": "txt3",
+    "NO DATA": "txt3",
+}
+_ROSTER_STATUS = {
+    "NOMINAL": "nominal",
+    "DEGRADED": "degraded",
+    "FAULT": "fault",
+    "STALE": "stale",
+    "NO DATA": "offline",
+}
+_CONDITION_NAMES = {
+    "eps": "EPS",
+    "eps/solar": "Solar",
+    "eps/bcdu": "BCDU",
+    "eps/battery": "Battery",
+    "eps/mbsu": "MBSU",
+    "eps/ddcu": "DDCU",
+    "eps/loads": "Loads",
+}
+
+
+def level_int(level):
+    """DiagnosticStatus.level arrives as bytes in rclpy."""
+    if isinstance(level, (bytes, bytearray)):
+        return level[0] if level else 0
+    try:
+        return int(level)
+    except (TypeError, ValueError):
+        return 0
+
+
+def classify_health(healthy, level, age_s):
+    """EPS health word from the heartbeat, the "eps" diagnostic level and the
+    heartbeat age (None = no heartbeat yet)."""
+    if healthy is None or age_s is None:
+        return "NO DATA"
+    if age_s > HEARTBEAT_STALE_S:
+        return "STALE"
+    if healthy:
+        return "NOMINAL"
+    return "FAULT" if level >= 2 else "DEGRADED"
+
+
+def roster_status(word):
+    """SubsystemRoster status for an EPS health word."""
+    return _ROSTER_STATUS.get(word, "unknown")
+
+
 _LOAD_RE = re.compile(
     r"([\d.]+)/([\d.]+) W, p(\d+), ddcu (-?\d+)(, shed)?")
 ARRAY_PEAK_KW = 84.0
@@ -185,6 +254,10 @@ class EPSWidget(QWidget):
         self._loads = {}
         self._loads_diag = {}
         self._load_rows = []
+        self._hb = None
+        self._hb_time = None
+        self._diag_levels = {}
+        self._injected = {}
         self._plot_t = 0.0
 
         self._build_ui()
@@ -201,7 +274,50 @@ class EPSWidget(QWidget):
         root.setSpacing(16)
 
         root.addWidget(page_header(
-            "Electrical Power", "Solar Arrays · Batteries · BCDU", "EPS"))
+            "Electrical Power", "Solar Arrays · Batteries · Distribution", "EPS"))
+
+        # --- Health banner ---
+        banner = QFrame()
+        banner.setProperty("class", "card")
+        bl = QHBoxLayout(banner)
+        bl.setContentsMargins(18, 14, 18, 14)
+        bl.setSpacing(24)
+        state_col = QVBoxLayout()
+        state_col.addWidget(_card_header("EPS HEALTH"))
+        self.health_value = QLabel("NO DATA")
+        self.health_value.setFont(theme.mono_font(20, bold=True))
+        self.health_value.setStyleSheet(f"color: {theme.color('txt3')};")
+        state_col.addWidget(self.health_value)
+        self.health_lifecycle = QLabel("LIFECYCLE —")
+        self.health_lifecycle.setFont(theme.mono_font(10))
+        self.health_lifecycle.setStyleSheet(f"color: {theme.color('txt3')};")
+        state_col.addWidget(self.health_lifecycle)
+        bl.addLayout(state_col)
+        msg_col = QVBoxLayout()
+        msg_col.addWidget(_card_header("STATUS"))
+        self.health_message = QLabel("waiting for /ssos/eps/heartbeat")
+        self.health_message.setFont(theme.sans_font(13))
+        self.health_message.setWordWrap(True)
+        msg_col.addWidget(self.health_message)
+        msg_col.addStretch()
+        bl.addLayout(msg_col, 2)
+        cond_col = QVBoxLayout()
+        cond_col.addWidget(_card_header("ACTIVE CONDITIONS"))
+        self.health_conditions = QLabel("—")
+        self.health_conditions.setFont(theme.mono_font(11))
+        self.health_conditions.setWordWrap(True)
+        cond_col.addWidget(self.health_conditions)
+        cond_col.addStretch()
+        bl.addLayout(cond_col, 3)
+        inj_col = QVBoxLayout()
+        inj_col.addWidget(_card_header("INJECTED FAULTS"))
+        self.health_injected = QLabel("none")
+        self.health_injected.setFont(theme.mono_font(11))
+        self.health_injected.setWordWrap(True)
+        inj_col.addWidget(self.health_injected)
+        inj_col.addStretch()
+        bl.addLayout(inj_col, 2)
+        root.addWidget(banner)
 
         # --- Power balance ---
         root.addWidget(_section("POWER BALANCE · PRIMARY BUS"))
@@ -393,6 +509,9 @@ class EPSWidget(QWidget):
                 self.node.create_subscription(
                     BatteryState, f"/ssos/eps/battery/oru_{i}/state",
                     lambda msg, idx=i: self._on_oru(idx, msg), 10)
+            if _HAVE_HB:
+                self.node.create_subscription(
+                    SubsystemHeartbeat, "/ssos/eps/heartbeat", self._on_heartbeat, 10)
             if _HAVE_DIST:
                 for m in range(N_MBSU):
                     self.node.create_subscription(
@@ -409,8 +528,11 @@ class EPSWidget(QWidget):
         for status in msg.status:
             values = {kv.key: kv.value for kv in status.values}
             values["_message"] = status.message
-            values["_level"] = status.level
-            if status.name == "eps":
+            values["_level"] = level_int(status.level)
+            self._diag_levels[status.name] = (values["_level"], status.message)
+            if status.name == "eps/faults":
+                self._injected = {k: v for k, v in values.items() if not k.startswith("_")}
+            elif status.name == "eps":
                 self._eps = values
             elif status.name == "eps/solar":
                 self._solar = values
@@ -431,6 +553,10 @@ class EPSWidget(QWidget):
                                           m.group(5) is not None)
                 self._loads = loads
 
+    def _on_heartbeat(self, msg):
+        self._hb = msg
+        self._hb_time = time.monotonic()
+
     def _on_bcdu(self, msg):
         self._bcdu = msg
 
@@ -449,6 +575,7 @@ class EPSWidget(QWidget):
     # ----------------------------- refresh -----------------------------
     def _refresh(self):
         self._plot_t += 1.0
+        self._refresh_health()
         self._refresh_balance()
         self._refresh_solar()
         self._refresh_bcdu()
@@ -743,3 +870,50 @@ class EPSWidget(QWidget):
             labels[4].setStyleSheet(f"color: {theme.color(color)};")
             labels[0].setStyleSheet(
                 f"color: {theme.color('txt3') if shed else theme.color('txt')};")
+
+    # ----------------------------- health -----------------------------
+    def health(self):
+        """(word, status message, lifecycle word) for the current EPS state."""
+        age = None if self._hb_time is None else time.monotonic() - self._hb_time
+        healthy = None if self._hb is None else bool(self._hb.healthy)
+        level = self._diag_levels.get("eps", (0, ""))[0]
+        word = classify_health(healthy, level, age)
+        message = self._hb.status_message if self._hb is not None else ""
+        if word == "STALE":
+            message = f"no heartbeat for {age:.0f} s"
+        lifecycle = "—" if self._hb is None else _LIFECYCLE_WORDS.get(
+            int(self._hb.lifecycle_state), "UNKNOWN")
+        return word, message, lifecycle
+
+    def roster_status(self):
+        return roster_status(self.health()[0])
+
+    def _refresh_health(self):
+        word, message, lifecycle = self.health()
+        color = HEALTH_COLORS.get(word, "txt3")
+        self.health_value.setText(word)
+        self.health_value.setStyleSheet(f"color: {theme.color(color)};")
+        self.health_lifecycle.setText(f"LIFECYCLE {lifecycle}")
+        if message:
+            self.health_message.setText(message)
+        self.health_message.setStyleSheet(
+            f"color: {theme.color('txt') if word == 'NOMINAL' else theme.color(color)};")
+
+        lines = []
+        for name, (level, msg) in sorted(self._diag_levels.items()):
+            if name in _CONDITION_NAMES and level > 0:
+                tag = "ERR" if level >= 2 else "WARN"
+                lines.append(f"{tag:4} {_CONDITION_NAMES[name]}: {msg}")
+        self.health_conditions.setText("\n".join(lines) if lines else "none")
+        worst = max((lv for n, (lv, _) in self._diag_levels.items() if n in _CONDITION_NAMES),
+                    default=0)
+        self.health_conditions.setStyleSheet(
+            f"color: {theme.color('red' if worst >= 2 else 'amber' if worst else 'txt3')};")
+
+        if self._injected:
+            self.health_injected.setText(
+                "\n".join(f"{k}  ({v})" for k, v in sorted(self._injected.items())))
+            self.health_injected.setStyleSheet(f"color: {theme.color('amber')};")
+        else:
+            self.health_injected.setText("none")
+            self.health_injected.setStyleSheet(f"color: {theme.color('txt3')};")
