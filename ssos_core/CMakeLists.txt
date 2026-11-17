@@ -65,7 +65,10 @@ install(DIRECTORY include/
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
 
-  ament_add_gtest(test_system_manager test/test_system_manager.cpp)
+  # Own DDS domain: other packages' tests run in parallel and publish
+  # /ssos/fault_event and heartbeats for the same subsystem names.
+  ament_add_gtest(test_system_manager test/test_system_manager.cpp
+    ENV ROS_DOMAIN_ID=64)
   target_include_directories(test_system_manager PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>

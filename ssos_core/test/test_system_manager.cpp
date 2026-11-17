@@ -173,6 +173,20 @@ protected:
     }
   }
 
+  // Publish heartbeats until the manager reaches `state` or the timeout runs
+  // out. Waiting on the outcome keeps the tests robust on a loaded CI runner.
+  bool heartbeats_until(uint8_t state, std::chrono::milliseconds timeout, bool healthy = true)
+  {
+    const auto end = std::chrono::steady_clock::now() + timeout;
+    while (std::chrono::steady_clock::now() < end) {
+      heartbeats_for(50ms, healthy);
+      if (manager_->get_current_state() == state) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   void inject_fault(uint8_t severity = FaultEvent::SEVERITY_CRITICAL)
   {
     FaultEvent ev;
@@ -196,15 +210,14 @@ protected:
 
 TEST_F(SystemManagerRecoveryTest, FaultClearsAfterHealthyHold)
 {
-  heartbeats_for(300ms, true);
-  ASSERT_EQ(manager_->get_current_state(), SystemState::NOMINAL);
+  ASSERT_TRUE(heartbeats_until(SystemState::NOMINAL, 5s));
 
   inject_fault();
   heartbeats_for(200ms, true);
   EXPECT_EQ(manager_->get_current_state(), SystemState::DEGRADED);
 
-  heartbeats_for(1000ms, true);
-  EXPECT_EQ(manager_->get_current_state(), SystemState::NOMINAL);
+  // 0.5 s hold, then RECOVERY and NOMINAL on the following evaluations.
+  EXPECT_TRUE(heartbeats_until(SystemState::NOMINAL, 5s));
   EXPECT_TRUE(saw(SystemState::DEGRADED));
   EXPECT_TRUE(saw(SystemState::RECOVERY));
 
@@ -217,7 +230,7 @@ TEST_F(SystemManagerRecoveryTest, FaultClearsAfterHealthyHold)
 
 TEST_F(SystemManagerRecoveryTest, FaultStaysWhileSubsystemUnhealthy)
 {
-  heartbeats_for(300ms, true);
+  ASSERT_TRUE(heartbeats_until(SystemState::NOMINAL, 5s));
   inject_fault();
   heartbeats_for(1200ms, false);
   EXPECT_EQ(manager_->get_current_state(), SystemState::DEGRADED);
@@ -226,14 +239,12 @@ TEST_F(SystemManagerRecoveryTest, FaultStaysWhileSubsystemUnhealthy)
   // Once healthy again it still has to hold healthy before recovering.
   heartbeats_for(200ms, true);
   EXPECT_EQ(manager_->get_current_state(), SystemState::DEGRADED);
-  heartbeats_for(1000ms, true);
-  EXPECT_EQ(manager_->get_current_state(), SystemState::NOMINAL);
+  EXPECT_TRUE(heartbeats_until(SystemState::NOMINAL, 5s));
 }
 
 TEST_F(SystemManagerRecoveryTest, ClearFaultsCommandIsNotAFault)
 {
-  heartbeats_for(300ms, true);
-  ASSERT_EQ(manager_->get_current_state(), SystemState::NOMINAL);
+  ASSERT_TRUE(heartbeats_until(SystemState::NOMINAL, 5s));
   // Registration passes through DEGRADED until the first heartbeat; only
   // look at what happens after the command.
   states_.clear();
@@ -249,7 +260,7 @@ TEST_F(SystemManagerRecoveryTest, ClearFaultsCommandIsNotAFault)
 
 TEST_F(SystemManagerRecoveryTest, SafeStaysLatched)
 {
-  heartbeats_for(300ms, true);
+  ASSERT_TRUE(heartbeats_until(SystemState::NOMINAL, 5s));
   inject_fault(FaultEvent::SEVERITY_EMERGENCY);
   heartbeats_for(1500ms, true);
   EXPECT_EQ(manager_->get_current_state(), SystemState::SAFE);
@@ -264,7 +275,7 @@ protected:
 
 TEST_F(SystemManagerNoRecoveryTest, NegativeHoldKeepsFaultLatched)
 {
-  heartbeats_for(300ms, true);
+  ASSERT_TRUE(heartbeats_until(SystemState::NOMINAL, 5s));
   inject_fault();
   heartbeats_for(1500ms, true);
   EXPECT_EQ(manager_->get_current_state(), SystemState::DEGRADED);
