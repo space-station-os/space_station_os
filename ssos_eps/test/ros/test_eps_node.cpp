@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <memory>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -13,7 +14,10 @@
 using namespace std::chrono_literals;
 using lifecycle_msgs::msg::State;
 using ssos_eps::nodes::BCDUStatus;
+using ssos_eps::nodes::DDCUStatus;
 using ssos_eps::nodes::FaultEvent;
+using ssos_eps::nodes::Load;
+using ssos_eps::nodes::MBSUStatus;
 using ssos_eps::nodes::SubsystemHeartbeat;
 using ssos_eps::nodes::WorldState;
 
@@ -222,7 +226,8 @@ TEST_F(EpsNodeTest, RejectsInvalidLiveParameter)
   bring_up();
   EXPECT_FALSE(node_->set_parameter(
       rclcpp::Parameter("bcdu.charge_efficiency", 1.5)).successful);
-  EXPECT_FALSE(node_->set_parameter(rclcpp::Parameter("load_demand_w", -1.0)).successful);
+  EXPECT_FALSE(node_->set_parameter(
+      rclcpp::Parameter("loads.demand_scale", -1.0)).successful);
   EXPECT_TRUE(node_->set_parameter(
       rclcpp::Parameter("solar.array.degradation_factor", 0.5)).successful);
   tear_down();
@@ -259,6 +264,187 @@ TEST_F(EpsNodeTest, OruOverTemperatureReachesHeartbeatAndFaultEvent)
   ASSERT_TRUE(node_->set_parameter(rclcpp::Parameter("battery.max_temp_c", 35.0)).successful);
   spin_for(300ms);
   EXPECT_TRUE(heartbeats.back().healthy);
+
+  tear_down();
+}
+
+TEST_F(EpsNodeTest, LoadRequestServiceAdmitsAndReleases)
+{
+  auto client = probe_->create_client<Load>("/ssos/eps/load_request");
+  node_->set_parameter(rclcpp::Parameter("step_rate_hz", 30.0));
+  bring_up();
+  spin_for(100ms);
+  ASSERT_TRUE(client->wait_for_service(1s));
+
+  auto call = [&](const std::string & id, uint8_t action, double power, int ddcu) {
+      auto req = std::make_shared<Load::Request>();
+      req->load_id = id;
+      req->action = action;
+      req->power_w = power;
+      req->priority = 2;
+      req->ddcu_index = ddcu;
+      auto future = client->async_send_request(req);
+      EXPECT_EQ(executor_.spin_until_future_complete(future, 2s),
+                rclcpp::FutureReturnCode::SUCCESS);
+      return future.get();
+    };
+
+  const auto granted = call("experiment", Load::Request::ACTION_REQUEST, 1500.0, -1);
+  ASSERT_TRUE(granted->success) << granted->message;
+  EXPECT_GE(granted->ddcu_index, 0);
+  EXPECT_DOUBLE_EQ(granted->granted_power_w, 1500.0);
+  EXPECT_GT(granted->supply_voltage, 123.0);
+
+  spin_for(200ms);
+  bool served = false;
+  for (const auto & l : node_->last_state().loads) {
+    if (l.id == "experiment") {
+      served = l.served_w > 1499.0;
+    }
+  }
+  EXPECT_TRUE(served);
+
+  EXPECT_TRUE(call("experiment", Load::Request::ACTION_RELEASE, 0.0, -1)->success);
+  EXPECT_FALSE(call("experiment", Load::Request::ACTION_RELEASE, 0.0, -1)->success);
+
+  const auto empty = call("", Load::Request::ACTION_REQUEST, 100.0, -1);
+  EXPECT_FALSE(empty->success);
+  EXPECT_EQ(empty->ddcu_index, -1);
+  EXPECT_FALSE(call("neg", Load::Request::ACTION_REQUEST, -5.0, -1)->success);
+  EXPECT_FALSE(call("bad_ddcu", Load::Request::ACTION_REQUEST, 100.0, 50)->success);
+  EXPECT_FALSE(call("too_big", Load::Request::ACTION_REQUEST, 7000.0, -1)->success);
+  EXPECT_FALSE(call("bad_action", 7, 100.0, -1)->success);
+
+  tear_down();
+}
+
+TEST_F(EpsNodeTest, PublishesMbsuAndDdcuStatus)
+{
+  std::vector<MBSUStatus> mbsu;
+  std::vector<DDCUStatus> ddcu;
+  auto mbsu_sub = probe_->create_subscription<MBSUStatus>(
+    "/ssos/eps/mbsu/mbsu_0/status", 10, [&](MBSUStatus::SharedPtr m) {mbsu.push_back(*m);});
+  auto ddcu_sub = probe_->create_subscription<DDCUStatus>(
+    "/ssos/eps/ddcu/ddcu_0/status", 10, [&](DDCUStatus::SharedPtr m) {ddcu.push_back(*m);});
+
+  node_->set_parameter(rclcpp::Parameter("step_rate_hz", 20.0));
+  bring_up();
+  spin_for(500ms);
+
+  ASSERT_FALSE(mbsu.empty());
+  ASSERT_FALSE(ddcu.empty());
+  EXPECT_EQ(mbsu.back().source_channels, (std::vector<int32_t>{0, 1, 2}));
+  EXPECT_EQ(mbsu.back().available_sources, 3);
+  EXPECT_FALSE(mbsu.back().unstable);
+  EXPECT_GT(mbsu.back().supplied_power, 0.0);
+  EXPECT_EQ(ddcu.back().mode, "regulating");
+  EXPECT_EQ(ddcu.back().mbsu_index, 0);
+  EXPECT_DOUBLE_EQ(ddcu.back().rated_power, 6250.0);
+  EXPECT_GT(ddcu.back().output_power, 0.0);
+  EXPECT_GT(ddcu.back().active_loads, 0);
+  EXPECT_FALSE(ddcu.back().fault);
+
+  tear_down();
+}
+
+TEST_F(EpsNodeTest, DdcuFaultHookDropsLoadsAndReportsOnce)
+{
+  int ddcu_faults = 0;
+  auto fault_sub = probe_->create_subscription<FaultEvent>(
+    "/ssos/fault_event", 10, [&](FaultEvent::SharedPtr m) {
+      if (m->subsystem_name == "eps" && m->fault_type == "ddcu_fault") {
+        ++ddcu_faults;
+      }
+    });
+
+  node_->set_parameter(rclcpp::Parameter("step_rate_hz", 30.0));
+  bring_up();
+  spin_for(100ms);
+  EXPECT_TRUE(node_->last_state().healthy);
+
+  ASSERT_TRUE(node_->set_parameter(rclcpp::Parameter("faults.faulted_ddcu", 0)).successful);
+  spin_for(300ms);
+  EXPECT_TRUE(node_->last_state().ddcu_fault);
+  EXPECT_TRUE(node_->last_state().load_shed);
+  EXPECT_EQ(ddcu_faults, 1);
+
+  ASSERT_TRUE(node_->set_parameter(rclcpp::Parameter("faults.faulted_ddcu", -1)).successful);
+  spin_for(200ms);
+  EXPECT_TRUE(node_->last_state().healthy);
+
+  tear_down();
+}
+
+TEST_F(EpsNodeTest, AppliesSimulationInjectedFaultsAndExpiresThem)
+{
+  auto fault_pub = probe_->create_publisher<FaultEvent>("/ssos/fault_event", 10);
+  auto send = [&](const std::string & type, const std::string & description) {
+      FaultEvent ev;
+      ev.subsystem_name = "eps";
+      ev.fault_type = type;
+      ev.severity = FaultEvent::SEVERITY_CRITICAL;
+      ev.description = description;
+      fault_pub->publish(ev);
+    };
+
+  node_->set_parameter(rclcpp::Parameter("step_rate_hz", 30.0));
+  bring_up();
+  spin_for(200ms);
+  ASSERT_TRUE(node_->last_state().healthy);
+
+  // EPS's own detected-fault events and out-of-range units are ignored.
+  send("bcdu_fault", "A BCDU has isolated its batteries");
+  send("bcdu_fault", "Injected fault: bcdu_fault (params: {\"channel\": 99}, duration: 0 s)");
+  spin_for(200ms);
+  EXPECT_FALSE(node_->last_state().bcdu_fault);
+
+  send("bcdu_fault", "Injected fault: bcdu_fault (params: {\"channel\": 2}, duration: 0.5 s)");
+  spin_for(200ms);
+  EXPECT_TRUE(node_->last_state().bcdu_fault);
+  EXPECT_EQ(node_->last_state().channels[2].mode, ssos_eps::bcdu::BcduMode::FAULT);
+  EXPECT_FALSE(node_->last_state().healthy);
+
+  // Duration runs out on node time.
+  spin_for(600ms);
+  EXPECT_FALSE(node_->last_state().bcdu_fault);
+  EXPECT_TRUE(node_->last_state().healthy);
+
+  tear_down();
+}
+
+TEST_F(EpsNodeTest, InjectedFaultsStackWithParametersAndClear)
+{
+  auto fault_pub = probe_->create_publisher<FaultEvent>("/ssos/fault_event", 10);
+  auto send = [&](const std::string & type, const std::string & params) {
+      FaultEvent ev;
+      ev.subsystem_name = "eps";
+      ev.fault_type = type;
+      ev.description = "Scheduled fault: test (params: " + params + ", duration: 0 s)";
+      fault_pub->publish(ev);
+    };
+
+  node_->set_parameter(rclcpp::Parameter("step_rate_hz", 30.0));
+  bring_up();
+  spin_for(200ms);
+  const double full = node_->last_state().generation_w;
+  ASSERT_GT(full, 0.0);
+
+  send("solar_array_degraded", "{\"factor\": 0.5}");
+  send("load_spike", "{\"demand_scale\": 1.5}");
+  send("battery_low_soc", "{\"soc\": 0.1}");
+  spin_for(300ms);
+  const auto & s = node_->last_state();
+  EXPECT_NEAR(s.generation_w, 0.5 * full, 0.01 * full);
+  EXPECT_TRUE(s.array_degraded);
+  EXPECT_NEAR(s.load_demand_w, 45000.0, 1.0);
+  EXPECT_TRUE(s.low_soc);
+
+  // Clearing restores the configured values (the SOC override is one-shot).
+  send("clear_faults", "{}");
+  spin_for(300ms);
+  EXPECT_FALSE(node_->last_state().array_degraded);
+  EXPECT_NEAR(node_->last_state().load_demand_w, 30000.0, 1.0);
+  EXPECT_NEAR(node_->last_state().generation_w, full, 0.01 * full);
 
   tear_down();
 }

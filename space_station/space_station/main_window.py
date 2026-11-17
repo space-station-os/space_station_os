@@ -1,12 +1,13 @@
 import os
 import sys
+import time
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget,
     QFrame, QApplication, QScrollArea, QPushButton, QLabel
 )
 from PyQt5.QtCore import QTimer, Qt
 import rclpy
-from rclpy.executors import SingleThreadedExecutor
+from rclpy.executors import ShutdownException, SingleThreadedExecutor, TimeoutException
 from rclpy.node import Node
 
 from space_station.video_player import VideoPlayer
@@ -71,6 +72,9 @@ except ImportError:
     import importlib.resources as pkg_resources
     _USE_NEW_RESOURCES_API = False
 
+
+# Share of each 20 ms GUI tick spent running ROS callbacks.
+_ROS_PUMP_BUDGET_S = 0.010
 
 _STATE_NAMES = {0: "INIT", 1: "NOMINAL", 2: "DEGRADED", 3: "RECOVERY", 4: "SAFE"}
 _SEVERITY_NAMES = {0: "warning", 1: "critical", 2: "emergency"}
@@ -182,9 +186,22 @@ class MainWindow(QMainWindow):
 
     # ---------------- ROS pump ----------------
     def _spin_ros_once(self):
-        if self._ros_ctx.ok():
+        # Run every callback that is ready, within a time budget per tick. The
+        # panels subscribe to well over 50 topics at >= 1 Hz; handling a single
+        # callback per tick let queues fill and telemetry lag by seconds.
+        if not self._ros_ctx.ok():
+            return
+        deadline = time.monotonic() + _ROS_PUMP_BUDGET_S
+        while time.monotonic() < deadline:
             try:
-                self.executor.spin_once(timeout_sec=0.0)
+                handler, _, _ = self.executor.wait_for_ready_callbacks(timeout_sec=0.0)
+            except (TimeoutException, ShutdownException):
+                break
+            except Exception:
+                break
+            try:
+                handler()
+                handler.result()
             except Exception:
                 pass
 
@@ -296,6 +313,7 @@ class MainWindow(QMainWindow):
             comms_layout.addWidget(comms_label)
             comms_layout.addStretch()
         self.overview_panel = OverviewWidget(self.node)
+        self.overview_panel.set_eps_health_source(self.eps_panel.health)
 
         self.stack.addWidget(self.overview_panel)  # 0 Overview
         self.stack.addWidget(self.eclss_panel)     # 1 ECLSS (incl. OGS + WRS)
@@ -485,6 +503,9 @@ class MainWindow(QMainWindow):
                 self.roster.set_status("Thermal", "fault")
             else:
                 self.roster.set_status("Thermal", "nominal")
+        elif name == "eps":
+            # NOMINAL / DEGRADED / FAULT from the EPS panel's classification.
+            self.roster.set_status("EPS", self.eps_panel.roster_status())
         else:
             self.roster.set_status(row, "nominal" if healthy else "fault")
 

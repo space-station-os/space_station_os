@@ -57,6 +57,51 @@ BCDUStatus EpsDiagnostics::make_bcdu_status(const rclcpp::Time & stamp,
   return msg;
 }
 
+MBSUStatus EpsDiagnostics::make_mbsu_status(const rclcpp::Time & stamp,
+                                            const std::string & frame_id,
+                                            const mbsu::MbsuState & state)
+{
+  MBSUStatus msg;
+  msg.header.stamp = stamp;
+  msg.header.frame_id = frame_id;
+  msg.bus_voltage = state.bus_voltage_v;
+  msg.source_channels.assign(state.source_channels.begin(), state.source_channels.end());
+  msg.source_available.assign(state.source_available.begin(), state.source_available.end());
+  msg.available_sources = state.available_sources;
+  msg.demand_power = state.demand_w;
+  msg.supplied_power = state.supplied_w;
+  msg.unstable = state.unstable;
+  msg.fault = state.faulted || state.unstable || state.redundancy_lost ||
+    state.shortfall_w > 1.0e-6;
+  msg.fault_message = state.status_message == "nominal" ? "" : state.status_message;
+  return msg;
+}
+
+DDCUStatus EpsDiagnostics::make_ddcu_status(const rclcpp::Time & stamp,
+                                            const std::string & frame_id,
+                                            const ddcu::DdcuState & state,
+                                            int mbsu_index, double rated_power_w,
+                                            int active_loads, int shed_loads)
+{
+  DDCUStatus msg;
+  msg.header.stamp = stamp;
+  msg.header.frame_id = frame_id;
+  msg.mode = ddcu::to_string(state.mode);
+  msg.mbsu_index = mbsu_index;
+  msg.input_voltage = state.input_voltage_v;
+  msg.output_voltage = state.output_voltage_v;
+  msg.output_power = state.output_power_w;
+  msg.input_power = state.input_power_w;
+  msg.rated_power = rated_power_w;
+  msg.heat_loss = state.heat_w;
+  msg.temperature = state.temperature_c;
+  msg.active_loads = active_loads;
+  msg.shed_loads = shed_loads;
+  msg.fault = state.mode != ddcu::DdcuMode::REGULATING || shed_loads > 0;
+  msg.fault_message = state.status_message == "nominal" ? "" : state.status_message;
+  return msg;
+}
+
 BatteryState EpsDiagnostics::make_battery_state(const rclcpp::Time & stamp,
                                                 const std::string & id,
                                                 const battery::BatteryOruState & state,

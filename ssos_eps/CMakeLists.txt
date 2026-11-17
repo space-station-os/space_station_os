@@ -27,6 +27,11 @@ add_library(eps_physics
   src/battery/battery_oru_model.cpp
   src/bcdu/bcdu_parameters.cpp
   src/bcdu/bcdu_model.cpp
+  src/mbsu/mbsu_parameters.cpp
+  src/mbsu/mbsu_model.cpp
+  src/ddcu/ddcu_parameters.cpp
+  src/ddcu/ddcu_model.cpp
+  src/loads/load_registry.cpp
   src/system/eps_parameters.cpp
   src/system/eps_system.cpp
 )
@@ -40,6 +45,7 @@ target_include_directories(eps_physics PUBLIC
 add_library(eps_ros
   src/nodes/eps_parameter_bridge.cpp
   src/nodes/eps_diagnostics.cpp
+  src/nodes/eps_fault_injection.cpp
   src/nodes/eps_node.cpp
 )
 target_link_libraries(eps_ros eps_physics)
@@ -84,9 +90,24 @@ if(BUILD_TESTING)
   ament_add_gtest(test_bcdu test/unit/bcdu/test_bcdu.cpp)
   target_link_libraries(test_bcdu eps_physics)
 
+  ament_add_gtest(test_mbsu test/unit/mbsu/test_mbsu.cpp)
+  target_link_libraries(test_mbsu eps_physics)
+
+  ament_add_gtest(test_ddcu test/unit/ddcu/test_ddcu.cpp)
+  target_link_libraries(test_ddcu eps_physics)
+
+  ament_add_gtest(test_load_registry test/unit/loads/test_load_registry.cpp)
+  target_link_libraries(test_load_registry eps_physics)
+
+  ament_add_gtest(test_fault_injection test/unit/faults/test_fault_injection.cpp)
+  target_link_libraries(test_fault_injection eps_ros)
+
   # ---- Integration tests ----
   ament_add_gtest(test_eps_orbit test/integration/test_eps_orbit.cpp)
   target_link_libraries(test_eps_orbit eps_physics)
+
+  ament_add_gtest(test_eps_distribution test/integration/test_eps_distribution.cpp)
+  target_link_libraries(test_eps_distribution eps_physics)
 
   # ---- ROS lifecycle / parameter tests ----
   # Own DDS domains so /clock and /sim/world_state from other packages' tests
@@ -96,6 +117,17 @@ if(BUILD_TESTING)
   target_link_libraries(test_eps_node eps_ros)
   ament_target_dependencies(test_eps_node rclcpp rclcpp_lifecycle
     space_station_interfaces std_msgs sensor_msgs diagnostic_msgs lifecycle_msgs)
+
+  # End-to-end with ssos_core's system_manager and ssos_sim's controller.
+  find_package(ssos_core REQUIRED)
+  find_package(ssos_sim REQUIRED)
+  ament_add_gtest(test_eps_scenario test/ros/test_eps_scenario.cpp
+    ENV ROS_DOMAIN_ID=63
+    TIMEOUT 120)
+  target_link_libraries(test_eps_scenario eps_ros ssos_core::system_manager_lib
+    ssos_sim::ssos_sim_lib)
+  target_compile_definitions(test_eps_scenario PRIVATE
+    SSOS_EPS_TEST_SCENARIOS="${CMAKE_CURRENT_SOURCE_DIR}/test/scenarios")
 
   ament_add_gtest(test_eps_parameter_bridge test/ros/test_eps_parameter_bridge.cpp
     ENV ROS_DOMAIN_ID=62)

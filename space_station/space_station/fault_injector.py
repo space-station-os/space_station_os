@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Fault-injection dialog.
 
-A small operator tool to trigger a chosen ECLSS or EPS fault. Each fault maps to a
-recipe of (a) an announcement via the simulation controller's /sim/inject_fault
-service (published as a FaultEvent the system manager + event feed pick up) and
-(b) live parameter changes on the target node that produce the actual physical
-effect. "Restore Nominal" reverts every recipe's parameters.
+A small operator tool to trigger a chosen ECLSS or EPS fault. Each fault goes
+through the simulation controller's /sim/inject_fault service (published as a
+FaultEvent the system manager, event feed and target subsystem pick up). ECLSS
+recipes also change live parameters on the target node to produce the physical
+effect; EPS applies its injected faults itself. "Restore Nominal" reverts the
+ECLSS parameters and sends clear_faults to EPS.
 """
 import time
 
@@ -60,37 +61,67 @@ FAULTS = [
                     ("ars_node", "enable_auto_faults", False),
                     ("cabin_node", "enable_auto_faults", False)],
     },
+    # EPS faults go through the simulation fault path only: ssos_sim publishes
+    # them on /ssos/fault_event and eps_node applies them to the physics.
+    # "Restore Nominal" sends clear_faults to EPS.
     {
         "label": "Solar Array Degradation (EPS)",
         "desc": "Array output → 30% of beginning-of-life. Daylight surplus shrinks, "
                 "the batteries stop recovering and the bank drains orbit by orbit.",
-        "target": "eps", "type": "solar_array_degraded", "params_json": "{}",
-        "apply": [("eps_node", "solar.array.degradation_factor", 0.3)],
-        "restore": [("eps_node", "solar.array.degradation_factor", 1.0)],
+        "target": "eps", "type": "solar_array_degraded",
+        "params_json": '{"factor": 0.3}',
+        "apply": [], "restore": [], "clear": "eps",
+    },
+    {
+        "label": "Battery Degradation (EPS)",
+        "desc": "Battery state of health → 50%: every ORU holds half its rated "
+                "charge, so eclipse discharges go twice as deep.",
+        "target": "eps", "type": "battery_degraded",
+        "params_json": '{"state_of_health": 0.5}',
+        "apply": [], "restore": [], "clear": "eps",
+    },
+    {
+        "label": "Low Battery (EPS)",
+        "desc": "The battery bank is drained to 15%. In daylight the arrays recharge "
+                "it past the 20% threshold and EPS recovers on its own.",
+        "target": "eps", "type": "battery_low_soc", "params_json": '{"soc": 0.15}',
+        "apply": [], "restore": [], "clear": "eps",
     },
     {
         "label": "Battery ORU Failure (EPS)",
         "desc": "Battery ORU 0 fails and is isolated. Its channel partner carries "
                 "the channel load alone; EPS reports degraded.",
         "target": "eps", "type": "battery_oru_failed", "params_json": '{"oru": 0}',
-        "apply": [("eps_node", "faults.failed_oru", 0)],
-        "restore": [("eps_node", "faults.failed_oru", -1)],
+        "apply": [], "restore": [], "clear": "eps",
     },
     {
         "label": "BCDU Fault (EPS)",
-        "desc": "BCDU on channel 0 isolates its batteries. In eclipse that channel's "
-                "share of the station load goes unserved.",
+        "desc": "BCDU on channel 0 isolates its batteries. MBSU 0 reroutes the "
+                "channel's share onto channels 1 and 2; EPS reports degraded.",
         "target": "eps", "type": "bcdu_fault", "params_json": '{"channel": 0}',
-        "apply": [("eps_node", "faults.faulted_bcdu", 0)],
-        "restore": [("eps_node", "faults.faulted_bcdu", -1)],
+        "apply": [], "restore": [], "clear": "eps",
     },
     {
         "label": "Load Spike (EPS)",
-        "desc": "Station load → 90 kW, above peak array output. The batteries "
-                "discharge even in daylight and the bank heads toward low SOC.",
-        "target": "eps", "type": "load_spike", "params_json": '{"load_w": 90000}',
-        "apply": [("eps_node", "load_demand_w", 90000.0)],
-        "restore": [("eps_node", "load_demand_w", 30000.0)],
+        "desc": "Every station load doubles (60 kW requested). DDCUs above their "
+                "6.25 kW rating shed their least critical loads first, and the "
+                "batteries discharge even in daylight.",
+        "target": "eps", "type": "load_spike", "params_json": '{"demand_scale": 2.0}',
+        "apply": [], "restore": [], "clear": "eps",
+    },
+    {
+        "label": "DDCU Fault (EPS)",
+        "desc": "DDCU 0 trips. The loads it carries lose power and are reported "
+                "shed; new load requests are placed on the other DDCUs.",
+        "target": "eps", "type": "ddcu_fault", "params_json": '{"ddcu": 0}',
+        "apply": [], "restore": [], "clear": "eps",
+    },
+    {
+        "label": "Channel Loss (EPS)",
+        "desc": "The feeder from power channel 0 to MBSU 0 opens. The MBSU "
+                "reroutes its demand onto channels 1 and 2, so no load is lost.",
+        "target": "eps", "type": "mbsu_channel_loss", "params_json": '{"channel": 0}',
+        "apply": [], "restore": [], "clear": "eps",
     },
     {
         "label": "O₂ Sensor Stuck (inject)",
@@ -233,6 +264,9 @@ class FaultInjectorDialog(QDialog):
         for f in FAULTS:
             triples.extend(f["restore"])
         ok = self._set_params(triples) if triples else True
+        for target in sorted({f["clear"] for f in FAULTS if f.get("clear")}):
+            ok = self._inject({"target": target, "type": "clear_faults",
+                               "params_json": "{}"}) is not None and ok
         self.status.setText(
             "Restored nominal parameters." if ok else
             "Restore incomplete — some nodes may be unavailable.")

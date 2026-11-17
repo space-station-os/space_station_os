@@ -1,3 +1,11 @@
+"""system_manager + simulation_controller + eps_node.
+
+  ros2 launch ssos_eps eps_system.launch.py
+  ros2 launch ssos_eps eps_system.launch.py scenario:=eps_bcdu_fault_recovery
+
+`scenario` names a file in ssos_sim/scenarios (or an absolute path); the
+simulation controller loads its settings and fault schedule.
+"""
 import os
 
 from ament_index_python.packages import get_package_share_directory
@@ -31,6 +39,9 @@ def generate_launch_description():
     configure_arg = DeclareLaunchArgument(
         'configure_delay', default_value='3.0',
         description='Seconds before all nodes are configured')
+    scenario_arg = DeclareLaunchArgument(
+        'scenario', default_value='',
+        description='ssos_sim scenario name or path (empty = no scenario)')
 
     def config(name):
         return os.path.join(share, 'config', name)
@@ -41,14 +52,18 @@ def generate_launch_description():
     sim_controller = LifecycleNode(
         package='ssos_sim', executable='simulation_controller',
         name='simulation_controller', namespace='', output='screen',
-        parameters=[{'sim_duration_s': 1.0e9}])
+        parameters=[{'sim_duration_s': 1.0e9,
+                     'scenario_file': LaunchConfiguration('scenario')}])
     eps = LifecycleNode(
         package='ssos_eps', executable='eps_node', name='eps_node',
         namespace='', output='screen',
         parameters=[config('eps_parameters.yaml'),
                     config('solar_parameters.yaml'),
                     config('battery_parameters.yaml'),
-                    config('bcdu_parameters.yaml')])
+                    config('bcdu_parameters.yaml'),
+                    config('mbsu_parameters.yaml'),
+                    config('ddcu_parameters.yaml'),
+                    config('loads_parameters.yaml')])
 
     all_nodes = [system_manager, sim_controller, eps]
 
@@ -63,4 +78,5 @@ def generate_launch_description():
                 [_activate(n) for n in all_nodes])
 
     return LaunchDescription(
-        [delay_arg, configure_arg] + all_nodes + [configure_all, activate_all])
+        [delay_arg, configure_arg, scenario_arg] + all_nodes +
+        [configure_all, activate_all])

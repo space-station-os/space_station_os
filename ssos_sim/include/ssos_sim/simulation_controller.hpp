@@ -14,6 +14,7 @@
 #include "space_station_interfaces/msg/fault_event.hpp"
 #include "space_station_interfaces/srv/inject_fault.hpp"
 
+#include "ssos_sim/scenario_loader.hpp"
 #include "ssos_sim/world_model.hpp"
 
 namespace ssos_sim
@@ -24,19 +25,6 @@ using FaultEvent = space_station_interfaces::msg::FaultEvent;
 using InjectFault = space_station_interfaces::srv::InjectFault;
 using Clock = rosgraph_msgs::msg::Clock;
 using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
-
-/// A scheduled fault loaded from scenario YAML
-struct ScheduledFault
-{
-  std::string name;
-  std::string fault_type;
-  std::string target_subsystem;
-  std::string target_interface;
-  double trigger_time_s;
-  std::string parameters_json;
-  double duration_s;
-  bool fired{false};
-};
 
 /// Central simulation controller.
 /// Owns the world clock, world model, scenario config, and fault schedule.
@@ -56,6 +44,10 @@ public:
 
   /// Get world model (for testing)
   const WorldModel & get_world_model() const { return *world_model_; }
+
+  /// Loaded scenario name and fault schedule (for testing)
+  const std::string & scenario_name() const { return scenario_name_; }
+  const std::vector<ScheduledFault> & fault_schedule() const { return fault_schedule_; }
 
 private:
   // Publishers
@@ -86,14 +78,16 @@ private:
     const InjectFault::Request::SharedPtr req,
     InjectFault::Response::SharedPtr res);
 
-  // Scenario loading
-  bool load_scenario(const std::string & scenario_file);
-  WorldState parse_initial_conditions(const std::string & scenario_file);
-  std::vector<ScheduledFault> parse_fault_schedule(const std::string & scenario_file);
+  // Scenario loading: resolve the file, apply its settings over the
+  // parameters and load its fault schedule. Returns false on error.
+  bool load_scenario(const std::string & scenario_file, WorldState & ic, double & orbit_phase);
+  std::string resolve_scenario_path(const std::string & scenario_file) const;
 
   // Fault processing
   void check_fault_schedule();
   void fire_fault(const ScheduledFault & fault);
+  void apply_fault_effects(const std::string & target, const std::string & fault_type,
+                           const std::string & parameters_json);
 };
 
 }  // namespace ssos_sim

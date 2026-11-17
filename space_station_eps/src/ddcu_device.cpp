@@ -89,38 +89,41 @@ void DdcuNode::handleLoadRequest(
 {
   std::lock_guard<std::mutex> lock(voltage_mutex_);
 
-  double load_voltage = request->load_voltage;
-  RCLCPP_INFO(this->get_logger(), "[DDCU] Voltage request received: %.2f V", load_voltage);
+  RCLCPP_INFO(this->get_logger(), "[DDCU] Load request received: %s %.1f W",
+              request->load_id.c_str(), request->power_w);
+
+  response->ddcu_index = -1;
+  response->granted_power_w = 0.0;
+  response->supply_voltage = 0.0;
 
   if (input_voltage_ < 115.0 || input_voltage_ > 173.0) {
     response->success = false;
-    response->message = "Primary bus voltage unstable — unable to provide load voltage.";
+    response->message = "Primary bus voltage unstable — unable to supply load.";
     RCLCPP_WARN(this->get_logger(), "[DDCU] Request rejected: primary bus unstable.");
     return;
   }
-  if (load_voltage < (nominal_voltage_ - regulation_tolerance_) ||
-      load_voltage > (nominal_voltage_ + regulation_tolerance_)) {
+  if (request->action == space_station_interfaces::srv::Load::Request::ACTION_REQUEST &&
+      !(request->power_w > 0.0))
+  {
     response->success = false;
-    response->message = "Requested voltage outside regulation range.";
-    RCLCPP_WARN(this->get_logger(), "[DDCU] Request rejected: voltage out of range.");
+    response->message = "Requested power must be positive.";
+    RCLCPP_WARN(this->get_logger(), "[DDCU] Request rejected: invalid power.");
     return;
   }
-  double output_voltage = nominal_voltage_;
-  output_voltage -= (load_voltage * 0.005);
-  if (output_voltage < nominal_voltage_ - regulation_tolerance_) {
-    output_voltage = nominal_voltage_ - regulation_tolerance_;
-  }
 
-  // Publish updated voltage
+  double output_voltage = nominal_voltage_;
   publishOutputVoltage(output_voltage);
 
-  // Return success response
   response->success = true;
-  response->message = "Voltage supply successful at " + std::to_string(output_voltage) + " V.";
+  response->ddcu_index = 0;
+  response->supply_voltage = output_voltage;
+  response->granted_power_w =
+    request->action == space_station_interfaces::srv::Load::Request::ACTION_REQUEST ?
+    request->power_w : 0.0;
+  response->message = "Load supplied at " + std::to_string(output_voltage) + " V.";
 
-  RCLCPP_INFO(this->get_logger(),
-              "[DDCU] Voltage supplied: %.2f V (requested %.2f V)",
-              output_voltage, load_voltage);
+  RCLCPP_INFO(this->get_logger(), "[DDCU] Load %s supplied at %.2f V",
+              request->load_id.c_str(), output_voltage);
 }
 void DdcuNode::callInternalCooling(double heat_j)
 {

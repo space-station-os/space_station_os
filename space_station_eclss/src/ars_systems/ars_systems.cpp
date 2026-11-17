@@ -331,7 +331,11 @@ bool ARSActionServer::supply_load()
   }
 
   auto request = std::make_shared<space_station_interfaces::srv::Load::Request>();
-  request->load_voltage = 124.5;
+  request->load_id = "ars";
+  request->action = space_station_interfaces::srv::Load::Request::ACTION_REQUEST;
+  request->power_w = 1500.0;
+  request->priority = 0;
+  request->ddcu_index = -1;
 
   load_client_->async_send_request(request,
     [this](rclcpp::Client<space_station_interfaces::srv::Load>::SharedFuture future_resp) {

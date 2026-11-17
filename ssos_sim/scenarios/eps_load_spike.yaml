@@ -1,0 +1,24 @@
+scenario:
+  name: eps_load_spike
+  duration_s: 300
+  sim_rate_hz: 10
+  time_scale: 10.0
+
+  faults:
+    - name: station_load_doubles
+      type: load_spike
+      target_subsystem: eps
+      trigger:
+        type: time
+        at_s: 60.0
+      params:
+        demand_scale: 2.0
+      duration_s: 120
+
+  expected_outcomes:
+    - eps_loads_shed_after_s: 61.0
+    - state_transition:
+        from: DEGRADED
+        to: NOMINAL
+        via: RECOVERY
+        before_s: 300.0

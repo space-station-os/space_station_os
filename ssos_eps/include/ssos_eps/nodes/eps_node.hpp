@@ -13,16 +13,21 @@
 #include "std_msgs/msg/float64.hpp"
 
 #include "space_station_interfaces/msg/bcdu_status.hpp"
+#include "space_station_interfaces/msg/ddcu_status.hpp"
 #include "space_station_interfaces/msg/fault_event.hpp"
+#include "space_station_interfaces/msg/mbsu_status.hpp"
 #include "space_station_interfaces/msg/subsystem_heartbeat.hpp"
 #include "space_station_interfaces/msg/world_state.hpp"
+#include "space_station_interfaces/srv/load.hpp"
 #include "space_station_interfaces/srv/register_subsystem.hpp"
 
+#include "ssos_eps/nodes/eps_fault_injection.hpp"
 #include "ssos_eps/nodes/eps_parameter_bridge.hpp"
 #include "ssos_eps/system/eps_system.hpp"
 
-// Lifecycle node wrapping the EPS generation and storage physics (solar
-// arrays, SSU, BCDUs and battery ORUs).
+// Lifecycle node wrapping the EPS physics: generation and storage (solar
+// arrays, SSU, BCDUs, battery ORUs) and distribution (MBSUs, DDCUs, loads).
+// Downstream loads request power through /ssos/eps/load_request.
 
 namespace ssos_eps
 {
@@ -30,6 +35,9 @@ namespace nodes
 {
 
 using BCDUStatus = space_station_interfaces::msg::BCDUStatus;
+using MBSUStatus = space_station_interfaces::msg::MBSUStatus;
+using DDCUStatus = space_station_interfaces::msg::DDCUStatus;
+using Load = space_station_interfaces::srv::Load;
 using FaultEvent = space_station_interfaces::msg::FaultEvent;
 using RegisterSubsystem = space_station_interfaces::srv::RegisterSubsystem;
 using SubsystemHeartbeat = space_station_interfaces::msg::SubsystemHeartbeat;
@@ -59,7 +67,10 @@ private:
   void publish_faults(const rclcpp::Time & now);
   void apply_fault_hooks();
   void register_with_manager();
+  void handle_load_request(const Load::Request::SharedPtr req, Load::Response::SharedPtr res);
   void on_world_state(const WorldState::SharedPtr msg);
+  void on_fault_event(const FaultEvent::SharedPtr msg);
+  void refresh_physics_parameters();
   rcl_interfaces::msg::SetParametersResult on_set_parameters(
     const std::vector<rclcpp::Parameter> & params);
 
@@ -73,6 +84,8 @@ private:
   Pub<BCDUStatus> bcdu_pub_;
   std::vector<Pub<BCDUStatus>> channel_pubs_;
   std::vector<Pub<sensor_msgs::msg::BatteryState>> oru_pubs_;
+  std::vector<Pub<MBSUStatus>> mbsu_pubs_;
+  std::vector<Pub<DDCUStatus>> ddcu_pubs_;
   Pub<Float64> soc_pub_;
   Pub<Float64> power_balance_pub_;
   Pub<Float64> array_power_pub_;
@@ -83,17 +96,21 @@ private:
   Pub<Float64> beta_pub_;
 
   rclcpp::Subscription<WorldState>::SharedPtr world_state_sub_;
+  rclcpp::Subscription<FaultEvent>::SharedPtr fault_sub_;
   rclcpp::Client<RegisterSubsystem>::SharedPtr register_client_;
+  rclcpp::Service<Load>::SharedPtr load_srv_;
   rclcpp::TimerBase::SharedPtr step_timer_;
   rclcpp::TimerBase::SharedPtr autostart_timer_;
   OnSetParametersCallbackHandle::SharedPtr param_cb_handle_;
 
   double step_rate_hz_{1.0};
-  double load_demand_w_{30000.0};
   bool enable_auto_faults_{true};
   bool params_dirty_{false};
   int failed_oru_{-1};
   int faulted_bcdu_{-1};
+  int faulted_ddcu_{-1};
+  int faulted_mbsu_{-1};
+  int offline_channel_{-1};
 
   double solar_flux_w_m2_{1361.0};
   bool in_eclipse_{false};
@@ -103,6 +120,15 @@ private:
   bool bcdu_fault_reported_{false};
   bool oru_failed_reported_{false};
   bool oru_overheat_reported_{false};
+  bool ddcu_fault_reported_{false};
+  bool ddcu_overload_reported_{false};
+  bool mbsu_unstable_reported_{false};
+  bool redundancy_reported_{false};
+  bool array_degraded_reported_{false};
+  bool battery_degraded_reported_{false};
+
+  EpsFaultInjection injection_;
+  uint64_t applied_injection_revision_{0};
 
   rclcpp::Time last_step_time_;
   bool first_step_{true};
