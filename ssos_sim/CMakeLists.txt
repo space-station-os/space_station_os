@@ -71,7 +71,14 @@ install(DIRECTORY include/
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
 
-  ament_add_gtest(test_simulation_controller tests/test_simulation_controller.cpp)
+  # The scenario-by-name test looks up this package's installed share
+  # directory; add the install prefix so it resolves without a sourced
+  # workspace (e.g. a plain `colcon test`).
+  # Own DDS domain: these tests publish /clock and EPS fault events that
+  # other packages' tests running in parallel would otherwise receive.
+  ament_add_gtest(test_simulation_controller tests/test_simulation_controller.cpp
+    ENV ROS_DOMAIN_ID=65
+    APPEND_ENV AMENT_PREFIX_PATH=${CMAKE_INSTALL_PREFIX})
   target_include_directories(test_simulation_controller PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
