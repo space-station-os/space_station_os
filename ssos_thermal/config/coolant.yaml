@@ -1,5 +1,6 @@
 coolant_node:
   ros__parameters:
+    use_sim_time: true
     mass_kg: 200.0                        # [kg] internal coolant loop water mass
     specific_heat_j_per_kg_c: 4186.0       # [J/(kg*degC)] specific heat capacity of water
     heat_transfer_efficiency: 0.85         # fraction of removed heat transferred to ammonia loop

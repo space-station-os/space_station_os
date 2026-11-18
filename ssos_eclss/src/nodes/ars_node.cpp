@@ -29,6 +29,9 @@ ArsNode::ArsNode(const rclcpp::NodeOptions & options)
   if (!this->has_parameter("enable_auto_faults")) {
     this->declare_parameter("enable_auto_faults", enable_auto_faults_);
   }
+  if (!this->has_parameter("eps_coupling")) {
+    this->declare_parameter("eps_coupling", eps_coupling_);
+  }
   autostart_timer_ = EclssDiagnostics::maybe_autostart(this);
 }
 
@@ -75,6 +78,8 @@ CallbackReturn ArsNode::on_configure(const rclcpp_lifecycle::State &)
   // Registration client.
   register_client_ =
     this->create_client<RegisterSubsystem>("/ssos/register_subsystem");
+  eps_coupling_ = this->get_parameter("eps_coupling").as_bool();
+  power_.start(eps_coupling_);
 
   // Live parameter validation/apply.
   param_cb_handle_ = this->add_on_set_parameters_callback(
@@ -132,6 +137,7 @@ CallbackReturn ArsNode::on_cleanup(const rclcpp_lifecycle::State &)
   world_state_sub_.reset();
   cabin_co2_sub_.reset();
   register_client_.reset();
+  power_.stop();
   ars_.reset();
   bridge_.reset();
   return CallbackReturn::SUCCESS;
@@ -186,9 +192,21 @@ void ArsNode::step()
   constexpr double kMaxPhysicsDt = 5.0;
   const int chunks = std::max(1, static_cast<int>(std::ceil(dt / kMaxPhysicsDt)));
   const double h = dt / static_cast<double>(chunks);
-  for (int i = 0; i < chunks; ++i) {
-    last_result_ = ars_->step(h, cabin_);
+  // Without the blower and bed heaters the 4BMS does nothing: hold the beds
+  // and report no removal until EPS powers it again.
+  const double supply = power_.powered_fraction();
+  if (supply > 0.999) {
+    for (int i = 0; i < chunks; ++i) {
+      last_result_ = ars_->step(h, cabin_);
+    }
+    full_power_w_ = last_result_.heater_power_w + last_result_.blower_power_w;
+  } else {
+    last_result_.co2_removal_rate_kg_s = 0.0;
+    last_result_.co2_removal_rate_kg_day = 0.0;
+    last_result_.co2_desorbed_rate_kg_s = 0.0;
+    last_result_.blower_flow_scfm = 0.0;
   }
+  power_.update_demand(full_power_w_);
 
   // CO2 removal rate.
   std_msgs::msg::Float64 removal;
@@ -214,6 +232,8 @@ void ArsNode::step()
   kv("blower_flow_scfm", last_result_.blower_flow_scfm);
   kv("precooler_exit_k", last_result_.precooler_exit_temp_k);
   kv("adsorbing_train", last_result_.adsorbing_train);
+  kv("power_demand_w", full_power_w_);
+  kv("power_supply_fraction", supply);
   status.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
   status.message = "nominal";
   diag.status.push_back(status);
@@ -282,6 +302,11 @@ void ArsNode::step()
       FaultEvent::SEVERITY_CRITICAL, health_msg, {"/ssos/ars/co2_removal_kg_day"}));
   }
   was_healthy_ = healthy;
+
+  if (!power_.powered()) {
+    healthy = false;
+    health_msg = power_.status();
+  }
 
   // Heartbeat.
   heartbeat_pub_->publish(EclssDiagnostics::make_heartbeat(

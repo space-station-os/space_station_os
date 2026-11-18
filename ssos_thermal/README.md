@@ -12,8 +12,9 @@ physics code can run in simulation or on flight hardware. ROS lives only in
 `src/nodes/` and `src/main/`.
 
 > **Status:** implemented, tested (`colcon test --packages-select
-> ssos_thermal`), and wired into `space_station.launch.py` (as of the
-> `thermal` + `coolant` `LifecycleNode` entries). `space_station_thermal_control`'s
+> ssos_thermal`), and started by `space_station.launch.py` through
+> `space_station/launch/thermals.launch.py` with the station network
+> (`config/station_thermal_nodes.yaml`). `space_station_thermal_control`'s
 > equivalent executables keep running unmodified — this package doesn't
 > touch it.
 
@@ -21,7 +22,7 @@ physics code can run in simulation or on flight hardware. ROS lives only in
 
 | Node | Executable | Model | Highlights |
 |------|-----------|-------|-----------|
-| **Thermal Network** | `thermal_network_node` | Lumped-node conductive network, `LifecycleNode` | RK4 integration over a 3-node star (`base_link`, `SolarPanel1`, `SolarPanel2`) loaded from YAML, coolant-loop feedback via `/coolant_heat_transfer` action, edge-triggered overheat fault |
+| **Thermal Network** | `thermal_network_node` | Lumped-node conductive network, `LifecycleNode` | RK4 integration of a node/link graph loaded from YAML, stepped on ROS time (sim time when `use_sim_time` is set), fixed-temperature boundary nodes, external heat loads from other subsystems on `/thermal/heat_loads`, coolant-loop feedback via `/coolant_heat_transfer` action, edge-triggered overheat fault |
 | **Coolant** | `coolant_node` | Internal-loop-to-ammonia cooldown model, `LifecycleNode` | Serves the `/coolant_heat_transfer` action `thermal_network` uses to command cooling; publishes read-only `/thermal/coolant/status` for the mission-control GUI's coolant cards; best-effort vent via the legacy `radiator`'s `VentHeat` service |
 
 Only these two are in scope — `space_station_thermal_control`'s
@@ -54,6 +55,28 @@ Each self-activates shortly after launch (no external lifecycle
 both roll up into the mission-control GUI's single "Thermal" roster row),
 and publishes heartbeats on `/ssos/<name>/heartbeat` and faults on
 `/ssos/fault_event`.
+
+## Networks
+
+| File | Nodes | Use |
+|------|-------|-----|
+| `config/thermal_nodes.yaml` | `base_link`, `SolarPanel1`, `SolarPanel2` | Standalone default: a 3-node star with no heat sink |
+| `config/station_thermal_nodes.yaml` | `itcs_sink` (fixed 17 °C), `base_link` (cabin and structure), `itcs_coldplate` (EPS electronics cold plate), `SolarPanel1`, `SolarPanel2` | Full station: the internal coolant loop is the boundary node, so heat from EPS settles to a steady temperature instead of rising without bound |
+
+A node with `fixed_temperature_c` is a boundary: it holds its temperature and
+is left out of the average and hottest-node reports.
+
+## Heat loads from other subsystems
+
+`thermal_network` subscribes to `/thermal/heat_loads`
+(`space_station_interfaces/HeatLoadArray`: a `source` name and a list of
+`{node_name, power}`). The latest set from each source is added to the named
+nodes' internal power; a source that has not published for
+`heat_load_timeout_s` is dropped. Published `ThermalNodeData.internal_power`
+is the node's own power plus these loads. `ssos_eps` publishes its conversion
+losses onto `itcs_coldplate` and the power delivered to loads onto
+`base_link`, and reads the cold-plate temperature back from
+`/thermal/nodes/state`.
 
 ## Parameters
 

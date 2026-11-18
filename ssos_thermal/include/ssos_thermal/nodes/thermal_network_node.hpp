@@ -2,6 +2,7 @@
 #define SSOS_THERMAL__NODES__THERMAL_NETWORK_NODE_HPP_
 
 #include <memory>
+#include <unordered_map>
 #include <string>
 
 #include "rclcpp/rclcpp.hpp"
@@ -10,6 +11,7 @@
 #include "rclcpp_lifecycle/lifecycle_publisher.hpp"
 
 #include "diagnostic_msgs/msg/diagnostic_status.hpp"
+#include "space_station_interfaces/msg/heat_load_array.hpp"
 #include "space_station_interfaces/action/coolant.hpp"
 #include "space_station_interfaces/msg/fault_event.hpp"
 #include "space_station_interfaces/msg/subsystem_heartbeat.hpp"
@@ -78,6 +80,21 @@ private:
   // Timers
   rclcpp::TimerBase::SharedPtr step_timer_;
   rclcpp::TimerBase::SharedPtr autostart_timer_;
+
+  // Heat dissipated into the network by other subsystems, latest per source.
+  struct HeatSource
+  {
+    rclcpp::Time received;
+    std::unordered_map<std::string, double> power_w;
+  };
+  void onHeatLoads(const space_station_interfaces::msg::HeatLoadArray::SharedPtr msg);
+  void applyHeatLoads();
+  rclcpp::Subscription<space_station_interfaces::msg::HeatLoadArray>::SharedPtr heat_sub_;
+  std::unordered_map<std::string, HeatSource> heat_sources_;
+  rclcpp::Clock steady_clock_{RCL_STEADY_TIME};
+  double heat_load_timeout_s_ = 10.0;
+  rclcpp::Time last_step_time_;
+  bool first_step_ = true;
 
   // Parameter callback handle
   OnSetParametersCallbackHandle::SharedPtr param_cb_handle_;

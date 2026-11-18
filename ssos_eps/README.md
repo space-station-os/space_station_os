@@ -15,7 +15,7 @@ ROS**: everything under `src/{common,solar,battery,bcdu,mbsu,ddcu,loads,system}`
 
 | Subsystem | Model | Highlights |
 |-----------|-------|-----------|
-| **Solar array** | Flux × area × efficiency | Sunrise re-acquisition ramp, beta-angle precession and cosine derate, SARJ gimbal lock, degradation factor, first-order panel temperature |
+| **Solar array** | Flux × area × efficiency | Sunrise re-acquisition ramp, beta-angle precession (~60 day cycle, beta gimbal tracking, optional legacy cosine derate), SARJ gimbal lock, degradation factor, first-order panel temperature |
 | **SSU** | Sequential shunt unit | 160 V regulation with ripple, conversion efficiency, dropout below minimum input, shunting of unused power |
 | **Battery ORU** | Equivalent circuit Li-ion | OCV(SOC) table + series resistance, coulomb counting with coulombic efficiency, CC/CV charge limits, discharge cut-off, I²R heating to a cold plate |
 | **BCDU** | One per power channel | SSU-voltage hysteresis, charge from surplus / discharge for deficit, bus-side current limits, conversion losses, IDLE / CHARGING / DISCHARGING / FAULT, degraded detection |
@@ -57,7 +57,9 @@ ros2 launch ssos_eps eps_system.launch.py   # system_manager + simulation_contro
 ```
 
 `eps_node` is an `rclcpp_lifecycle::LifecycleNode`. It subscribes to
-`/sim/world_state` (`solar_flux_w_m2`, `in_eclipse`), registers with the
+`/sim/world_state` (`solar_flux_w_m2`, `in_eclipse`), `/ssos/fault_event`
+(simulation-injected faults) and `/thermal/nodes/state` (cold-plate
+temperature), registers with the
 `system_manager` via `/ssos/register_subsystem`, and publishes:
 
 | Topic | Type |
@@ -73,6 +75,8 @@ ros2 launch ssos_eps eps_system.launch.py   # system_manager + simulation_contro
 | `/ssos/eps/solar/{array_power_w,ssu_voltage_v,ssu_power_w,ssu_current_a,panel_temperature_c,beta_deg}` | `std_msgs/Float64` |
 | `/ssos/eps/mbsu/mbsu_<n>/status` | `space_station_interfaces/MBSUStatus` |
 | `/ssos/eps/ddcu/ddcu_<n>/status` | `space_station_interfaces/DDCUStatus` |
+| `/ssos/eps/loads` | `space_station_interfaces/LoadStatusArray` (every load: priority, DDCU, requested, served, shed) |
+| `/thermal/heat_loads` | `space_station_interfaces/HeatLoadArray` (source `eps`; when `thermal.enable_coupling`) |
 
 `BCDUStatus.current_draw` is positive when the BCDU discharges onto the bus.
 `BatteryState.current` follows the sensor_msgs convention (positive while
@@ -116,6 +120,13 @@ ros2 service call /sim/inject_fault space_station_interfaces/srv/InjectFault \
   "{target_subsystem: eps, fault_type: load_spike, parameters_json: '{\"demand_scale\": 2.0}', duration_s: 120.0}"
 ```
 
+## Station integration
+
+The ECLSS units (ARS, OGS, WRS, Sabatier) request their own power from EPS and
+lose function when shed; EPS heats the thermal network's cold plate and cabin
+nodes and takes its cold-plate temperature from it. The whole loop is checked by
+`test_station_integration`. See [docs/integration.md](docs/integration.md).
+
 ## Parameters
 
 Every physical parameter is a ROS 2 parameter, mapped through the single
@@ -129,3 +140,14 @@ See [docs/parameters.md](docs/parameters.md).
 - [docs/parameters.md](docs/parameters.md) — parameter reference
 - [docs/fault_catalog.md](docs/fault_catalog.md) — injectable and detected faults, scenarios
 - [docs/validation.md](docs/validation.md) — test coverage and orbit behaviour
+- [docs/integration.md](docs/integration.md) — ECLSS power, thermal coupling, end-to-end test
+
+## Relationship to space_station_eps
+
+`ssos_eps` covers everything the legacy package did (SARJ-driven array, SSU,
+battery health, BCDUs, MBSU distribution, DDCUs and the load service) in one
+lifecycle node with a ROS-free physics library, and adds sim-time stepping,
+fault injection through `ssos_sim`, `system_manager` supervision and the
+ECLSS/thermal coupling. The legacy package is left in place and unchanged
+apart from its DDCU client, which follows the replaced `Load.srv` fields;
+`space_station.launch.py` runs `ssos_eps` only.

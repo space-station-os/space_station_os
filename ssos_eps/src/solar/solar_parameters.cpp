@@ -14,9 +14,13 @@ SolarArrayParams default_solar_array_params()
   p.cell_efficiency = 0.165;
   p.degradation_factor = 1.0;
   p.sunrise_ramp_s = 480.0;
-  p.derate_with_beta_cosine = true;
+  // The beta gimbals keep the panels square to the sun as beta changes, so
+  // there is no cos(beta) loss in normal tracking; only gimbal lock derates.
+  p.derate_with_beta_cosine = false;
   p.beta_max_deg = 75.0;
-  p.beta_precession_orbits = 10;
+  // Beta cycles over about 60 days (~930 orbits); the legacy controller used
+  // 10 orbits, which drives the array through high beta within hours.
+  p.beta_precession_orbits = 930;
   p.beta_lock_limit_deg = 72.0;
   p.gimbal_lock_derate = 0.6;
   p.use_fixed_beta = false;

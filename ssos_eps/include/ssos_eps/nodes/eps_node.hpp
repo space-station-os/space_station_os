@@ -1,6 +1,7 @@
 #ifndef SSOS_EPS__NODES__EPS_NODE_HPP_
 #define SSOS_EPS__NODES__EPS_NODE_HPP_
 
+#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
@@ -15,8 +16,11 @@
 #include "space_station_interfaces/msg/bcdu_status.hpp"
 #include "space_station_interfaces/msg/ddcu_status.hpp"
 #include "space_station_interfaces/msg/fault_event.hpp"
+#include "space_station_interfaces/msg/heat_load_array.hpp"
+#include "space_station_interfaces/msg/load_status_array.hpp"
 #include "space_station_interfaces/msg/mbsu_status.hpp"
 #include "space_station_interfaces/msg/subsystem_heartbeat.hpp"
+#include "space_station_interfaces/msg/thermal_node_data_array.hpp"
 #include "space_station_interfaces/msg/world_state.hpp"
 #include "space_station_interfaces/srv/load.hpp"
 #include "space_station_interfaces/srv/register_subsystem.hpp"
@@ -38,6 +42,9 @@ using BCDUStatus = space_station_interfaces::msg::BCDUStatus;
 using MBSUStatus = space_station_interfaces::msg::MBSUStatus;
 using DDCUStatus = space_station_interfaces::msg::DDCUStatus;
 using Load = space_station_interfaces::srv::Load;
+using LoadStatusArray = space_station_interfaces::msg::LoadStatusArray;
+using HeatLoadArray = space_station_interfaces::msg::HeatLoadArray;
+using ThermalNodeDataArray = space_station_interfaces::msg::ThermalNodeDataArray;
 using FaultEvent = space_station_interfaces::msg::FaultEvent;
 using RegisterSubsystem = space_station_interfaces::srv::RegisterSubsystem;
 using SubsystemHeartbeat = space_station_interfaces::msg::SubsystemHeartbeat;
@@ -57,6 +64,8 @@ public:
   CallbackReturn on_cleanup(const rclcpp_lifecycle::State & state) override;
 
   const system::EpsState & last_state() const {return last_state_;}
+  /// Cold-plate temperature from ssos_thermal [C]; NaN until it is heard.
+  double coldplate_temp_c() const {return coldplate_temp_c_;}
 
 private:
   template<typename MsgT>
@@ -70,6 +79,7 @@ private:
   void handle_load_request(const Load::Request::SharedPtr req, Load::Response::SharedPtr res);
   void on_world_state(const WorldState::SharedPtr msg);
   void on_fault_event(const FaultEvent::SharedPtr msg);
+  void on_thermal_nodes(const ThermalNodeDataArray::SharedPtr msg);
   void refresh_physics_parameters();
   rcl_interfaces::msg::SetParametersResult on_set_parameters(
     const std::vector<rclcpp::Parameter> & params);
@@ -86,6 +96,8 @@ private:
   std::vector<Pub<sensor_msgs::msg::BatteryState>> oru_pubs_;
   std::vector<Pub<MBSUStatus>> mbsu_pubs_;
   std::vector<Pub<DDCUStatus>> ddcu_pubs_;
+  Pub<LoadStatusArray> loads_pub_;
+  Pub<HeatLoadArray> heat_pub_;
   Pub<Float64> soc_pub_;
   Pub<Float64> power_balance_pub_;
   Pub<Float64> array_power_pub_;
@@ -97,6 +109,7 @@ private:
 
   rclcpp::Subscription<WorldState>::SharedPtr world_state_sub_;
   rclcpp::Subscription<FaultEvent>::SharedPtr fault_sub_;
+  rclcpp::Subscription<ThermalNodeDataArray>::SharedPtr thermal_sub_;
   rclcpp::Client<RegisterSubsystem>::SharedPtr register_client_;
   rclcpp::Service<Load>::SharedPtr load_srv_;
   rclcpp::TimerBase::SharedPtr step_timer_;
@@ -126,6 +139,14 @@ private:
   bool redundancy_reported_{false};
   bool array_degraded_reported_{false};
   bool battery_degraded_reported_{false};
+
+  // Thermal coupling: EPS heat goes to the network, the cold-plate
+  // temperature comes back as the DDCU/battery cold plate.
+  bool thermal_coupling_{true};
+  std::string thermal_coldplate_node_{"itcs_coldplate"};
+  std::string thermal_cabin_node_{"base_link"};
+  double coldplate_temp_c_{std::numeric_limits<double>::quiet_NaN()};
+  bool thermal_dirty_{false};
 
   EpsFaultInjection injection_;
   uint64_t applied_injection_revision_{0};

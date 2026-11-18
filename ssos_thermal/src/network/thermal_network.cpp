@@ -21,6 +21,10 @@ ThermalNetwork ThermalNetwork::load_from_yaml(
     node.heat_capacity = entry["heat_capacity"].as<double>();
     node.internal_power = entry["internal_power"].as<double>();
     node.temperature = reference_temp_c + std::rand() % 10;
+    if (entry["fixed_temperature_c"]) {
+      node.fixed = true;
+      node.temperature = entry["fixed_temperature_c"].as<double>();
+    }
 
     const std::string name = entry["node_name"].as<std::string>();
     const std::string parent_link =
@@ -51,7 +55,10 @@ double ThermalNetwork::compute_dTdt(
   const std::string & name, const std::unordered_map<std::string, double> & temps) const
 {
   const auto & node = nodes_.at(name);
-  double q_total = node.internal_power;
+  if (node.fixed) {
+    return 0.0;
+  }
+  double q_total = node.internal_power + node.external_power;
 
   for (const auto & link : links_) {
     if (link.from == name && temps.count(link.to)) {
@@ -116,6 +123,30 @@ double ThermalNetwork::node_temperature(const std::string & name) const
   return nodes_.count(name) ? nodes_.at(name).temperature : 0.0;
 }
 
+bool ThermalNetwork::set_external_power(const std::string & name, double power_w)
+{
+  const auto it = nodes_.find(name);
+  if (it == nodes_.end()) {
+    return false;
+  }
+  it->second.external_power = power_w;
+  return true;
+}
+
+void ThermalNetwork::clear_external_power()
+{
+  for (auto & [name, node] : nodes_) {
+    (void)name;
+    node.external_power = 0.0;
+  }
+}
+
+double ThermalNetwork::total_power(const std::string & name) const
+{
+  const auto it = nodes_.find(name);
+  return it == nodes_.end() ? 0.0 : it->second.internal_power + it->second.external_power;
+}
+
 double ThermalNetwork::link_heat_flow(const ThermalLinkState & link) const
 {
   const auto from = nodes_.find(link.from);
@@ -130,21 +161,24 @@ void ThermalNetwork::set_all_temperatures(double temperature_c)
 {
   for (auto & [name, node] : nodes_) {
     (void)name;
-    node.temperature = temperature_c;
+    if (!node.fixed) {
+      node.temperature = temperature_c;
+    }
   }
 }
 
 double ThermalNetwork::average_temperature() const
 {
-  if (nodes_.empty()) {
-    return 0.0;
-  }
   double total = 0.0;
+  std::size_t count = 0;
   for (const auto & [name, node] : nodes_) {
     (void)name;
-    total += node.temperature;
+    if (!node.fixed) {
+      total += node.temperature;
+      ++count;
+    }
   }
-  return total / static_cast<double>(nodes_.size());
+  return count > 0 ? total / static_cast<double>(count) : 0.0;
 }
 
 double ThermalNetwork::average_internal_power() const
@@ -164,7 +198,7 @@ ThermalNetwork::Hottest ThermalNetwork::hottest() const
 {
   Hottest result{"n/a", -std::numeric_limits<double>::infinity()};
   for (const auto & [name, node] : nodes_) {
-    if (node.temperature > result.temperature) {
+    if (!node.fixed && node.temperature > result.temperature) {
       result.temperature = node.temperature;
       result.name = name;
     }

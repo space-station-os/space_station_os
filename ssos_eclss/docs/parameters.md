@@ -12,6 +12,13 @@ functions supply defaults only, and parameters flow IN from ROS.
   what-if, efficiency): live-tunable via the set-parameters callback and applied
   on the next step.
 
+## EPS power
+
+`eps_coupling` (default `true`, on ARS, OGS, WRS and Sabatier) makes the unit
+request its power from `ssos_eps` and lose function when EPS sheds it. It is
+read in `on_configure`. With it off, or with EPS not running, the unit behaves
+as if fully powered. See `ssos_eps/docs/integration.md`.
+
 ## Validation
 
 The set-parameters callback rejects out-of-range values with a clear message

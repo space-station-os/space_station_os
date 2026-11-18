@@ -16,6 +16,9 @@ SabatierNode::SabatierNode(const rclcpp::NodeOptions & options)
 : rclcpp_lifecycle::LifecycleNode("sabatier_node", options)
 {
   this->declare_parameter("step_rate_hz", step_rate_hz_);
+  if (!this->has_parameter("eps_coupling")) {
+    this->declare_parameter("eps_coupling", eps_coupling_);
+  }
   autostart_timer_ = EclssDiagnostics::maybe_autostart(this);
 }
 
@@ -35,6 +38,8 @@ CallbackReturn SabatierNode::on_configure(const rclcpp_lifecycle::State &)
   fault_pub_ = this->create_publisher<FaultEvent>("/ssos/fault_event", 10);
   register_client_ =
     this->create_client<RegisterSubsystem>("/ssos/register_subsystem");
+  eps_coupling_ = this->get_parameter("eps_coupling").as_bool();
+  power_.start(eps_coupling_);
 
   // CO2 available = ARS desorption stream.
   ars_co2_sub_ = this->create_subscription<std_msgs::msg::Float64>(
@@ -90,6 +95,7 @@ CallbackReturn SabatierNode::on_cleanup(const rclcpp_lifecycle::State &)
   ars_co2_sub_.reset();
   ogs_o2_sub_.reset();
   register_client_.reset();
+  power_.stop();
   sabatier_.reset();
   return CallbackReturn::SUCCESS;
 }
@@ -109,7 +115,17 @@ void SabatierNode::step()
 
   // Feed the reactor: all CO2 the ARS is desorbing, plus the OGS H2 stream.
   const double co2_in_mol_s = co2_available_kg_s_ / units::M_CO2;
-  last_result_ = sabatier_->step(dt, co2_in_mol_s, h2_available_mol_s_);
+  // The reactor needs its heaters; unpowered, it converts nothing and all
+  // desorbed CO2 is vented.
+  const double supply = power_.powered_fraction();
+  if (supply > 0.999) {
+    last_result_ = sabatier_->step(dt, co2_in_mol_s, h2_available_mol_s_);
+    full_power_w_ = last_result_.heater_power_w;
+  } else {
+    last_result_.co2_consumed_mol_s = 0.0;
+    last_result_.water_produced_kg_s = 0.0;
+  }
+  power_.update_demand(full_power_w_);
 
   // CO2 split: what the reactor actually consumed goes to Sabatier; the rest of
   // the desorbed stream (H2-limited surplus + unconverted) is vented to space.
@@ -150,14 +166,17 @@ void SabatierNode::step()
   kv("reactor_temp_k", last_result_.reactor_temp_k);
   kv("heater_power_w", last_result_.heater_power_w);
   kv("hydrogen_limited", last_result_.hydrogen_limited ? 1.0 : 0.0);
+  kv("power_demand_w", full_power_w_);
+  kv("power_supply_fraction", supply);
   status.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
   status.message = last_result_.hydrogen_limited ? "H2-limited" : "nominal";
   diag.status.push_back(status);
   telemetry_pub_->publish(diag);
 
+  const bool powered = power_.powered();
   heartbeat_pub_->publish(EclssDiagnostics::make_heartbeat(
-    now, "sabatier", SubsystemHeartbeat::LIFECYCLE_ACTIVE, true,
-    last_result_.hydrogen_limited ? "H2-limited" : "nominal"));
+    now, "sabatier", SubsystemHeartbeat::LIFECYCLE_ACTIVE, powered,
+    !powered ? power_.status() : last_result_.hydrogen_limited ? "H2-limited" : "nominal"));
 }
 
 void SabatierNode::register_with_manager()

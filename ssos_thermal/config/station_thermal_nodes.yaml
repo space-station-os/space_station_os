@@ -1,0 +1,43 @@
+# Station thermal network used with the full SSOS stack (space_station.launch.py).
+# Same node/link format as thermal_nodes.yaml, plus a coolant-loop heat sink so
+# heat from other subsystems (via /thermal/heat_loads) settles instead of
+# accumulating:
+#
+#   itcs_sink       internal coolant loop rejecting to the external ammonia
+#                   loop through the interface heat exchanger (fixed 17 degC)
+#   base_link       cabin and structure; receives the power delivered to loads
+#   itcs_coldplate  cold plate carrying the DDCUs and battery ORUs; receives
+#                   EPS conversion losses and returns its temperature to EPS
+#
+# conductance is to parent_link [W/K]; heat_capacity [J/K]; internal_power [W].
+
+- node_name: "itcs_sink"
+  parent_link: ""
+  heat_capacity: 1.0e6
+  internal_power: 0.0
+  conductance: 0.0
+  fixed_temperature_c: 17.0
+
+- node_name: "base_link"
+  parent_link: "itcs_sink"
+  heat_capacity: 30300.0
+  internal_power: 1380.0
+  conductance: 6000.0
+
+- node_name: "itcs_coldplate"
+  parent_link: "itcs_sink"
+  heat_capacity: 50000.0
+  internal_power: 0.0
+  conductance: 1000.0
+
+- node_name: "SolarPanel1"
+  parent_link: "base_link"
+  heat_capacity: 1200.0
+  internal_power: 10.0
+  conductance: 0.5
+
+- node_name: "SolarPanel2"
+  parent_link: "base_link"
+  heat_capacity: 1200.0
+  internal_power: 10.0
+  conductance: 0.5

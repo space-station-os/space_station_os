@@ -21,6 +21,9 @@ WrsNode::WrsNode(const rclcpp::NodeOptions & options)
   this->declare_parameter("condensate_kg_day", condensate_kg_day_);
   this->declare_parameter("potable_limit_us", potable_limit_us_);
   this->declare_parameter("enable_auto_faults", enable_auto_faults_);
+  if (!this->has_parameter("eps_coupling")) {
+    this->declare_parameter("eps_coupling", eps_coupling_);
+  }
   autostart_timer_ = EclssDiagnostics::maybe_autostart(this);
 }
 
@@ -44,6 +47,8 @@ CallbackReturn WrsNode::on_configure(const rclcpp_lifecycle::State &)
   fault_pub_ = this->create_publisher<FaultEvent>("/ssos/fault_event", 10);
   register_client_ =
     this->create_client<RegisterSubsystem>("/ssos/register_subsystem");
+  eps_coupling_ = this->get_parameter("eps_coupling").as_bool();
+  power_.start(eps_coupling_);
 
   // Sabatier-recovered water (clean) joins the WRS feed.
   sabatier_water_sub_ = this->create_subscription<std_msgs::msg::Float64>(
@@ -115,6 +120,7 @@ CallbackReturn WrsNode::on_cleanup(const rclcpp_lifecycle::State &)
   fault_pub_.reset();
   sabatier_water_sub_.reset();
   register_client_.reset();
+  power_.stop();
   wrs_.reset();
   return CallbackReturn::SUCCESS;
 }
@@ -136,7 +142,15 @@ void WrsNode::step()
   // Humidity condensate + Sabatier product water (both clean feeds).
   const double condensate =
     units::kg_per_day_to_kg_per_s(condensate_kg_day_) + sabatier_water_kg_s_;
-  last_result_ = wrs_->step(dt, urine, condensate, 1.0e-8);
+  // Distillation and filtration need power; unpowered, nothing is processed.
+  const double supply = power_.powered_fraction();
+  if (supply > 0.999) {
+    last_result_ = wrs_->step(dt, urine, condensate, 1.0e-8);
+    full_power_w_ = last_result_.power_w;
+  } else {
+    last_result_.potable_water_kg_s = 0.0;
+  }
+  power_.update_demand(full_power_w_);
 
   std_msgs::msg::Float64 water;
   water.data = last_result_.potable_water_kg_s * units::SECONDS_PER_DAY;
@@ -158,6 +172,8 @@ void WrsNode::step()
   kv("overall_recovery", last_result_.overall_recovery);
   kv("voc_conversion", last_result_.voc_conversion);
   kv("sabatier_feed_kg_day", units::kg_per_s_to_kg_per_day(sabatier_water_kg_s_));
+  kv("power_demand_w", full_power_w_);
+  kv("power_supply_fraction", supply);
   status.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
   status.message = "nominal";
   diag.status.push_back(status);
@@ -173,6 +189,10 @@ void WrsNode::step()
     fault_pub_->publish(EclssDiagnostics::make_fault(
       now, "wrs", "water_quality_out_of_spec", FaultEvent::SEVERITY_CRITICAL, msg,
       {"/ssos/wrs/potable_kg_day"}));
+  }
+  if (!power_.powered()) {
+    healthy = false;
+    msg = power_.status();
   }
   heartbeat_pub_->publish(EclssDiagnostics::make_heartbeat(
     now, "wrs", SubsystemHeartbeat::LIFECYCLE_ACTIVE, healthy, msg));

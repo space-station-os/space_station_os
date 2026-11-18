@@ -52,7 +52,9 @@ add_library(eclss_physics
   src/faults/thermal_fault.cpp
   src/faults/fault_injector.cpp
 )
-target_include_directories(eclss_physics PUBLIC include)
+target_include_directories(eclss_physics PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
 # NOTE: eclss_physics links NOTHING from ROS
 
 # ---- ROS node library ----
@@ -64,6 +66,7 @@ add_library(eclss_ros
   src/nodes/wrs_node.cpp
   src/nodes/cabin_node.cpp
   src/nodes/sabatier_node.cpp
+  src/nodes/eps_power_client.cpp
 )
 target_link_libraries(eclss_ros eclss_physics)
 ament_target_dependencies(eclss_ros
@@ -104,7 +107,9 @@ target_link_libraries(breakthrough_curve_gen eclss_physics)
 
 # ---- Install ----
 install(TARGETS eclss_physics eclss_ros
-  ARCHIVE DESTINATION lib LIBRARY DESTINATION lib RUNTIME DESTINATION bin)
+  EXPORT export_ssos_eclss
+  ARCHIVE DESTINATION lib LIBRARY DESTINATION lib RUNTIME DESTINATION bin
+  INCLUDES DESTINATION include)
 install(TARGETS ars_node ogs_node wrs_node cabin_node sabatier_node
   RUNTIME DESTINATION lib/${PROJECT_NAME})
 install(TARGETS ars_validation parameter_sweep breakthrough_curve_gen
@@ -178,15 +183,28 @@ if(BUILD_TESTING)
   target_link_libraries(test_sabatier eclss_physics)
 
   # ---- ROS lifecycle / parameter tests ----
-  ament_add_gtest(test_ars_node test/ros/test_ars_node.cpp)
+  ament_add_gtest(test_ars_node test/ros/test_ars_node.cpp
+    ENV ROS_DOMAIN_ID=68)
   target_link_libraries(test_ars_node eclss_ros)
   ament_target_dependencies(test_ars_node rclcpp rclcpp_lifecycle
     space_station_interfaces std_msgs diagnostic_msgs lifecycle_msgs)
 
-  ament_add_gtest(test_parameter_bridge test/ros/test_parameter_bridge.cpp)
+  ament_add_gtest(test_eps_power_client test/ros/test_eps_power_client.cpp
+    ENV ROS_DOMAIN_ID=67)
+  target_link_libraries(test_eps_power_client eclss_ros)
+  ament_target_dependencies(test_eps_power_client rclcpp rclcpp_lifecycle
+    space_station_interfaces)
+
+  ament_add_gtest(test_parameter_bridge test/ros/test_parameter_bridge.cpp
+    ENV ROS_DOMAIN_ID=69)
   target_link_libraries(test_parameter_bridge eclss_ros)
   ament_target_dependencies(test_parameter_bridge rclcpp rclcpp_lifecycle
     space_station_interfaces std_msgs diagnostic_msgs lifecycle_msgs)
 endif()
+
+ament_export_include_directories(include)
+ament_export_targets(export_ssos_eclss HAS_LIBRARY_TARGET)
+ament_export_dependencies(rclcpp rclcpp_lifecycle space_station_interfaces
+  std_msgs sensor_msgs diagnostic_msgs lifecycle_msgs)
 
 ament_package()

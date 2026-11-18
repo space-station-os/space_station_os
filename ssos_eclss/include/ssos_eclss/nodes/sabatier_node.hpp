@@ -13,6 +13,7 @@
 #include "space_station_interfaces/msg/subsystem_heartbeat.hpp"
 #include "space_station_interfaces/srv/register_subsystem.hpp"
 
+#include "ssos_eclss/nodes/eps_power_client.hpp"
 #include "ssos_eclss/sabatier/sabatier_system.hpp"
 
 // Lifecycle node wrapping the Sabatier CO2-reduction reactor. Closes the ECLSS
@@ -66,6 +67,11 @@ private:
   double step_rate_hz_{1.0};
   rclcpp::Time last_step_time_;
   bool first_step_{true};
+
+  // Power from ssos_eps; full_power_w_ is the demand at full function.
+  EpsPowerClient power_{this, "eclss_sabatier", 2};
+  bool eps_coupling_{true};
+  double full_power_w_{0.0};
 };
 
 }  // namespace nodes

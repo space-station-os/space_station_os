@@ -93,6 +93,15 @@ def generate_launch_description():
         launch_arguments={'autostart_delay_ms': '11000'}.items(),
     )
 
+    # ---- Thermal (self-activates at t=11s): EPS heat goes onto the station
+    # network's cold plate, and EPS reads the cold-plate temperature back ----
+    thermal = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(space_station_pkg, 'launch', 'thermals.launch.py')
+        ),
+        launch_arguments={'autostart_delay_ms': '11000'}.items(),
+    )
+
     # ---- GNC / orbit (re-enabled: needed for the GNC panel's station model
     # + orbit trajectory rendering) ----
     gnc_core = IncludeLaunchDescription(
@@ -115,6 +124,7 @@ def generate_launch_description():
         activate_core_sim,
         eclss,
         eps,
+        thermal,
         gnc_core,
         orbit_dynamics,
     ])

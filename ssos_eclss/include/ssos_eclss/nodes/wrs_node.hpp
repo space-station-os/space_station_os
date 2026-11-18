@@ -13,6 +13,7 @@
 #include "space_station_interfaces/msg/subsystem_heartbeat.hpp"
 #include "space_station_interfaces/srv/register_subsystem.hpp"
 
+#include "ssos_eclss/nodes/eps_power_client.hpp"
 #include "ssos_eclss/wrs/water_recovery_system.hpp"
 
 // Lifecycle node wrapping the Water Recovery System physics.
@@ -70,6 +71,11 @@ private:
   rclcpp::Time last_step_time_;
   bool first_step_{true};
   bool enable_auto_faults_{false};  // faults injected explicitly, not auto-tripped
+
+  // Power from ssos_eps; full_power_w_ is the demand at full function.
+  EpsPowerClient power_{this, "eclss_wrs", 1};
+  bool eps_coupling_{true};
+  double full_power_w_{0.0};
 };
 
 }  // namespace nodes

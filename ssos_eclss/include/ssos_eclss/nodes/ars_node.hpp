@@ -16,6 +16,7 @@
 #include "space_station_interfaces/msg/world_state.hpp"
 #include "space_station_interfaces/srv/register_subsystem.hpp"
 
+#include "ssos_eclss/nodes/eps_power_client.hpp"
 #include "ssos_eclss/ars/four_bed_system.hpp"
 #include "ssos_eclss/nodes/eclss_parameter_bridge.hpp"
 
@@ -103,6 +104,11 @@ private:
   // production rate (== the requirement), so a threshold check there is a
   // knife-edge. Faults are injected explicitly (sim fault-injection YAML).
   bool enable_auto_faults_{false};
+
+  // Power from ssos_eps; full_power_w_ is the demand at full function.
+  EpsPowerClient power_{this, "eclss_ars", 0};
+  bool eps_coupling_{true};
+  double full_power_w_{0.0};
 };
 
 }  // namespace nodes

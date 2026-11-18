@@ -33,6 +33,9 @@ EpsNode::EpsNode(const rclcpp::NodeOptions & options)
   this->declare_parameter("faults.faulted_ddcu", faulted_ddcu_);
   this->declare_parameter("faults.faulted_mbsu", faulted_mbsu_);
   this->declare_parameter("faults.offline_channel", offline_channel_);
+  this->declare_parameter("thermal.enable_coupling", thermal_coupling_);
+  this->declare_parameter("thermal.coldplate_node", thermal_coldplate_node_);
+  this->declare_parameter("thermal.cabin_node", thermal_cabin_node_);
 
   bridge_ = std::make_unique<EpsParameterBridge>(this);
   bridge_->declare_parameters(system::default_eps_parameters());
@@ -49,6 +52,11 @@ CallbackReturn EpsNode::on_configure(const rclcpp_lifecycle::State &)
   faulted_ddcu_ = static_cast<int>(this->get_parameter("faults.faulted_ddcu").as_int());
   faulted_mbsu_ = static_cast<int>(this->get_parameter("faults.faulted_mbsu").as_int());
   offline_channel_ = static_cast<int>(this->get_parameter("faults.offline_channel").as_int());
+  thermal_coupling_ = this->get_parameter("thermal.enable_coupling").as_bool();
+  thermal_coldplate_node_ = this->get_parameter("thermal.coldplate_node").as_string();
+  thermal_cabin_node_ = this->get_parameter("thermal.cabin_node").as_string();
+  coldplate_temp_c_ = std::numeric_limits<double>::quiet_NaN();
+  thermal_dirty_ = false;
 
   eps_ = std::make_unique<system::EpsSystem>(bridge_->read_parameters());
   apply_fault_hooks();
@@ -80,6 +88,8 @@ CallbackReturn EpsNode::on_configure(const rclcpp_lifecycle::State &)
     ddcu_pubs_.push_back(this->create_publisher<DDCUStatus>(
         "/ssos/eps/ddcu/ddcu_" + std::to_string(d) + "/status", 10));
   }
+  loads_pub_ = this->create_publisher<LoadStatusArray>("/ssos/eps/loads", 10);
+  heat_pub_ = this->create_publisher<HeatLoadArray>("/thermal/heat_loads", 10);
   soc_pub_ = this->create_publisher<Float64>("/ssos/eps/battery/soc", 10);
   power_balance_pub_ = this->create_publisher<Float64>("/ssos/eps/power_balance_w", 10);
   array_power_pub_ = this->create_publisher<Float64>("/ssos/eps/solar/array_power_w", 10);
@@ -90,6 +100,8 @@ CallbackReturn EpsNode::on_configure(const rclcpp_lifecycle::State &)
     "/ssos/eps/solar/panel_temperature_c", 10);
   beta_pub_ = this->create_publisher<Float64>("/ssos/eps/solar/beta_deg", 10);
 
+  thermal_sub_ = this->create_subscription<ThermalNodeDataArray>(
+    "/thermal/nodes/state", 10, std::bind(&EpsNode::on_thermal_nodes, this, _1));
   fault_sub_ = this->create_subscription<FaultEvent>(
     "/ssos/fault_event", 10, std::bind(&EpsNode::on_fault_event, this, _1));
   injection_.clear();
@@ -147,6 +159,8 @@ CallbackReturn EpsNode::on_activate(const rclcpp_lifecycle::State &)
   {
     p->on_activate();
   }
+  loads_pub_->on_activate();
+  heat_pub_->on_activate();
 
   first_step_ = true;
   const auto period = std::chrono::duration<double>(1.0 / std::max(step_rate_hz_, 1.0e-3));
@@ -184,6 +198,8 @@ CallbackReturn EpsNode::on_deactivate(const rclcpp_lifecycle::State &)
   {
     p->on_deactivate();
   }
+  loads_pub_->on_deactivate();
+  heat_pub_->on_deactivate();
   return CallbackReturn::SUCCESS;
 }
 
@@ -198,6 +214,9 @@ CallbackReturn EpsNode::on_cleanup(const rclcpp_lifecycle::State &)
   oru_pubs_.clear();
   mbsu_pubs_.clear();
   ddcu_pubs_.clear();
+  loads_pub_.reset();
+  heat_pub_.reset();
+  thermal_sub_.reset();
   soc_pub_.reset();
   power_balance_pub_.reset();
   array_power_pub_.reset();
@@ -296,8 +315,31 @@ void EpsNode::refresh_physics_parameters()
   updated.solar.array.degradation_factor *= injection_.array_factor();
   updated.battery.state_of_health *= injection_.health_factor();
   updated.demand_scale *= injection_.demand_scale();
+  if (thermal_coupling_ && std::isfinite(coldplate_temp_c_)) {
+    updated.battery.coldplate_temp_c = coldplate_temp_c_;
+    updated.ddcu.coldplate_temp_c = coldplate_temp_c_;
+  }
   eps_->set_parameters(updated);
   apply_fault_hooks();
+}
+
+void EpsNode::on_thermal_nodes(const ThermalNodeDataArray::SharedPtr msg)
+{
+  if (!thermal_coupling_) {
+    return;
+  }
+  for (const auto & node : msg->nodes) {
+    if (node.name == thermal_coldplate_node_) {
+      // Re-apply parameters only when the plate has moved noticeably.
+      if (!std::isfinite(coldplate_temp_c_) ||
+        std::abs(node.temperature - coldplate_temp_c_) > 0.05)
+      {
+        coldplate_temp_c_ = node.temperature;
+        thermal_dirty_ = true;
+      }
+      return;
+    }
+  }
 }
 
 void EpsNode::on_fault_event(const FaultEvent::SharedPtr msg)
@@ -351,12 +393,15 @@ void EpsNode::step()
   // so live physics edits are picked up on the following step. Injected
   // faults that started, expired or were cleared are applied the same way.
   injection_.expire(now.seconds());
-  if (params_dirty_ || injection_.revision() != applied_injection_revision_) {
+  if (params_dirty_ || thermal_dirty_ ||
+    injection_.revision() != applied_injection_revision_)
+  {
     refresh_physics_parameters();
     if (const auto soc = injection_.take_pending_soc()) {
       eps_->set_battery_soc(*soc);
     }
     params_dirty_ = false;
+    thermal_dirty_ = false;
     applied_injection_revision_ = injection_.revision();
   }
 
@@ -400,6 +445,40 @@ void EpsNode::publish_telemetry(const rclcpp::Time & now)
   publish_float(ssu_current_pub_, s.ssu.available_current_a);
   publish_float(panel_temp_pub_, s.array.panel_temperature_c);
   publish_float(beta_pub_, s.array.beta_deg);
+
+  LoadStatusArray loads_msg;
+  loads_msg.header.stamp = now;
+  for (const auto & l : s.loads) {
+    space_station_interfaces::msg::LoadStatus ls;
+    ls.load_id = l.id;
+    ls.priority = static_cast<uint8_t>(std::clamp(l.priority, 0, 255));
+    ls.ddcu_index = l.ddcu;
+    ls.requested_power = l.requested_w;
+    ls.served_power = l.served_w;
+    ls.shed = l.shed;
+    loads_msg.loads.push_back(ls);
+  }
+  loads_pub_->publish(loads_msg);
+
+  if (thermal_coupling_) {
+    // Conversion losses heat the cold plate the electronics sit on; the power
+    // delivered to loads ends up as heat in the cabin and structure.
+    double plate_w = s.distribution_loss_w + s.conversion_loss_w;
+    for (const auto & oru : s.orus) {
+      plate_w += oru.heat_w;
+    }
+    HeatLoadArray heat;
+    heat.header.stamp = now;
+    heat.source = "eps";
+    space_station_interfaces::msg::HeatLoad plate;
+    plate.node_name = thermal_coldplate_node_;
+    plate.power = plate_w;
+    space_station_interfaces::msg::HeatLoad cabin;
+    cabin.node_name = thermal_cabin_node_;
+    cabin.power = s.load_served_w;
+    heat.loads = {plate, cabin};
+    heat_pub_->publish(heat);
+  }
 
   int charging = 0;
   int discharging = 0;
@@ -488,6 +567,9 @@ void EpsNode::publish_telemetry(const rclcpp::Time & now)
   EpsDiagnostics::add_value(eps, "stored_energy_kwh", s.stored_energy_wh / 1000.0, 2);
   EpsDiagnostics::add_value(eps, "solar_flux_w_m2", solar_flux_w_m2_, 1);
   EpsDiagnostics::add_value(eps, "in_eclipse", in_eclipse_ ? "true" : "false");
+  EpsDiagnostics::add_value(eps, "coldplate_temp_c", eps_->parameters().ddcu.coldplate_temp_c, 2);
+  EpsDiagnostics::add_value(eps, "coldplate_source",
+                            std::isfinite(coldplate_temp_c_) ? "thermal" : "config");
   eps.level = s.load_unserved ? DiagnosticStatus::ERROR :
     s.healthy ? DiagnosticStatus::OK : DiagnosticStatus::WARN;
   eps.message = s.status_message;
@@ -699,8 +781,8 @@ void EpsNode::register_with_manager()
     "/ssos/eps/diagnostics", "/ssos/eps/bcdu/status", "/ssos/eps/battery/soc",
     "/ssos/eps/power_balance_w", "/ssos/eps/solar/array_power_w",
     "/ssos/eps/solar/ssu_voltage_v", "/ssos/eps/mbsu/mbsu_<n>/status",
-    "/ssos/eps/ddcu/ddcu_<n>/status"};
-  req->subscribed_topics = {"/sim/world_state"};
+    "/ssos/eps/ddcu/ddcu_<n>/status", "/ssos/eps/loads", "/thermal/heat_loads"};
+  req->subscribed_topics = {"/sim/world_state", "/ssos/fault_event", "/thermal/nodes/state"};
   req->heartbeat_topic = "/ssos/eps/heartbeat";
   register_client_->async_send_request(req);
 }

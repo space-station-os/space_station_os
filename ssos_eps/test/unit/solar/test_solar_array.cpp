@@ -65,9 +65,21 @@ TEST(SolarArray, IlluminationIsHalfwayAtMidRamp)
   EXPECT_NEAR(array.state().illumination, 0.5, 1.0e-9);
 }
 
+TEST(SolarArray, BetaGimbalsTrackByDefault)
+{
+  SolarArrayParams p = zero_beta();
+  p.fixed_beta_deg = 60.0;
+  SolarArrayModel array(p);
+  const SolarArrayState & s = array.step(1.0, 1361.0, false);
+  EXPECT_FALSE(s.gimbal_locked);
+  EXPECT_DOUBLE_EQ(s.beta_derate, 1.0);
+  EXPECT_NEAR(s.array_power_w, 1361.0 * p.area_m2 * p.cell_efficiency, 1.0e-6);
+}
+
 TEST(SolarArray, BetaCosineDerate)
 {
   SolarArrayParams p = zero_beta();
+  p.derate_with_beta_cosine = true;
   p.fixed_beta_deg = 60.0;
   SolarArrayModel array(p);
   const SolarArrayState & s = array.step(1.0, 1361.0, false);
@@ -79,6 +91,7 @@ TEST(SolarArray, BetaCosineDerate)
 TEST(SolarArray, GimbalLockAppliesExtraDerate)
 {
   SolarArrayParams p = zero_beta();
+  p.derate_with_beta_cosine = true;
   p.fixed_beta_deg = -75.0;
   SolarArrayModel array(p);
   const SolarArrayState & s = array.step(1.0, 1361.0, false);

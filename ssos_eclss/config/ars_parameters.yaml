@@ -7,6 +7,8 @@ ars_node:
     # Stepped at 10 Hz: with sim time_scale up to ~30x this keeps each physics
     # step small enough (a few sim-seconds) for a stable, CFL-respecting bed PDE.
     step_rate_hz: 10.0
+    # Request power from ssos_eps as load eclss_ars; without EPS running the unit runs as if fully powered.
+    eps_coupling: true
     co2_required_kg_day: 4.16
     # Faults are injected explicitly (sim fault-injection), not auto-tripped. In
     # the closed loop, removal settles at the crew production rate (== this

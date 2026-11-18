@@ -1,5 +1,6 @@
 thermal_network:
   ros__parameters:
+    use_sim_time: true
     thermal_config_file: "config/thermal_nodes.yaml"   # Path to YAML describing thermal nodes & links
 
     enable_failure: false
@@ -8,4 +9,5 @@ thermal_network:
     cooling_trigger_threshold: 400.0                   # [degC] Above this average temperature, cooling is triggered
     max_temp_threshold: 500.0                           # [degC] Absolute safety cap; publish fault if exceeded
     cooling_rate: 0.05                                  # Fractional rate of heat removed during cooling
-    thermal_update_dt: 0.5                              # [s] Simulation timestep for RK4 integration
+    thermal_update_dt: 0.5                              # [s] Update period and largest RK4 sub-step
+    heat_load_timeout_s: 10.0                           # [s] Drop a /thermal/heat_loads source this long silent

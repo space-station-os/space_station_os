@@ -7,9 +7,11 @@ eps_node:
     solar.array.degradation_factor: 1.0
     solar.array.sunrise_ramp_s: 480.0
 
-    solar.array.derate_with_beta_cosine: true
+    # Beta gimbals track the sun, so no cos(beta) loss unless enabled here.
+    solar.array.derate_with_beta_cosine: false
     solar.array.beta_max_deg: 75.0
-    solar.array.beta_precession_orbits: 10
+    # ~60 day beta cycle. The legacy space_station_eps value was 10 orbits.
+    solar.array.beta_precession_orbits: 930
     solar.array.beta_lock_limit_deg: 72.0
     solar.array.gimbal_lock_derate: 0.6
     solar.array.use_fixed_beta: false

@@ -24,6 +24,7 @@ ThermalNetworkNode::ThermalNetworkNode(const rclcpp::NodeOptions & options)
   this->declare_parameter("cooling_rate", cooling_rate_);
   this->declare_parameter("thermal_update_dt", thermal_update_dt_);
   this->declare_parameter("thermal_config_file", thermal_config_file_);
+  this->declare_parameter("heat_load_timeout_s", heat_load_timeout_s_);
 
   autostart_timer_ = ThermalDiagnostics::maybe_autostart(this);
 }
@@ -37,7 +38,9 @@ CallbackReturn ThermalNetworkNode::on_configure(const rclcpp_lifecycle::State &)
   cooling_rate_ = this->get_parameter("cooling_rate").as_double();
   thermal_update_dt_ = this->get_parameter("thermal_update_dt").as_double();
   thermal_config_file_ = this->get_parameter("thermal_config_file").as_string();
+  heat_load_timeout_s_ = this->get_parameter("heat_load_timeout_s").as_double();
   cooling_active_ = false;
+  heat_sources_.clear();
 
   // An absolute path is used as-is (tests point at the source tree);
   // a relative one resolves against the installed package share dir.
@@ -60,6 +63,8 @@ CallbackReturn ThermalNetworkNode::on_configure(const rclcpp_lifecycle::State &)
   cooling_client_ = rclcpp_action::create_client<space_station_interfaces::action::Coolant>(
     this, "/coolant_heat_transfer");
   register_client_ = this->create_client<RegisterSubsystem>("/ssos/register_subsystem");
+  heat_sub_ = this->create_subscription<space_station_interfaces::msg::HeatLoadArray>(
+    "/thermal/heat_loads", 10, std::bind(&ThermalNetworkNode::onHeatLoads, this, _1));
 
   param_cb_handle_ = this->add_on_set_parameters_callback(
     std::bind(&ThermalNetworkNode::onSetParameters, this, _1));
@@ -77,6 +82,7 @@ CallbackReturn ThermalNetworkNode::on_activate(const rclcpp_lifecycle::State &)
   heartbeat_pub_->on_activate();
   fault_pub_->on_activate();
 
+  first_step_ = true;
   step_timer_ = this->create_wall_timer(
     std::chrono::duration<double>(thermal_update_dt_),
     std::bind(&ThermalNetworkNode::updateSimulation, this));
@@ -103,6 +109,8 @@ CallbackReturn ThermalNetworkNode::on_deactivate(const rclcpp_lifecycle::State &
 CallbackReturn ThermalNetworkNode::on_cleanup(const rclcpp_lifecycle::State &)
 {
   step_timer_.reset();
+  heat_sub_.reset();
+  heat_sources_.clear();
   node_pub_.reset();
   link_pub_.reset();
   diag_pub_.reset();
@@ -178,8 +186,27 @@ void ThermalNetworkNode::updateSimulation()
 
   coolingCallback();
 
-  if (!cooling_active_) {
-    network_->step(thermal_update_dt_);
+  // Advance by the ROS time elapsed since the last update, so the network
+  // follows the global simulation clock (frozen when paused, faster at a
+  // higher time_scale). RK4 runs in sub-steps of at most thermal_update_dt.
+  const rclcpp::Time now = this->now();
+  double dt = 0.0;
+  if (!first_step_) {
+    const double measured = (now - last_step_time_).seconds();
+    if (measured > 0.0 && measured < 600.0) {
+      dt = measured;
+    }
+  }
+  first_step_ = false;
+  last_step_time_ = now;
+
+  applyHeatLoads();
+  if (!cooling_active_ && dt > 0.0) {
+    const double max_step = std::max(thermal_update_dt_, 1.0e-3);
+    const int chunks = std::max(1, static_cast<int>(std::ceil(dt / max_step)));
+    for (int i = 0; i < chunks; ++i) {
+      network_->step(dt / chunks);
+    }
   }
 
   const network::ThermalNetwork::Hottest hottest = network_->hottest();
@@ -190,7 +217,8 @@ void ThermalNetworkNode::updateSimulation()
     data.name = name;
     data.temperature = node.temperature;
     data.heat_capacity = node.heat_capacity;
-    data.internal_power = node.internal_power;
+    // Total heat input: configured internal power plus heat from other subsystems.
+    data.internal_power = node.internal_power + node.external_power;
     node_msg.nodes.push_back(data);
   }
   node_pub_->publish(node_msg);
@@ -207,7 +235,6 @@ void ThermalNetworkNode::updateSimulation()
   }
   link_pub_->publish(link_msg);
 
-  const rclcpp::Time now = this->now();
   const bool healthy = !(enable_failure_ && hottest.temperature > max_temp_threshold_);
   const std::string status_message = healthy ?
     "nominal" : "overheating: " + hottest.name;
@@ -265,7 +292,7 @@ void ThermalNetworkNode::registerWithManager()
   req->subsystem_name = "thermal";
   req->published_topics = {"/thermal/nodes/state", "/thermal/links/flux",
                            "/thermals/diagnostics"};
-  req->subscribed_topics = {};
+  req->subscribed_topics = {"/thermal/heat_loads"};
   req->heartbeat_topic = "/ssos/thermal/heartbeat";
   register_client_->async_send_request(req);
 }
@@ -298,6 +325,42 @@ rcl_interfaces::msg::SetParametersResult ThermalNetworkNode::onSetParameters(
   rcl_interfaces::msg::SetParametersResult result;
   result.successful = true;
   return result;
+}
+
+void ThermalNetworkNode::onHeatLoads(
+  const space_station_interfaces::msg::HeatLoadArray::SharedPtr msg)
+{
+  HeatSource source;
+  source.received = steady_clock_.now();
+  for (const auto & load : msg->loads) {
+    source.power_w[load.node_name] += load.power;
+  }
+  heat_sources_[msg->source.empty() ? "unknown" : msg->source] = std::move(source);
+}
+
+void ThermalNetworkNode::applyHeatLoads()
+{
+  network_->clear_external_power();
+  const rclcpp::Time now = steady_clock_.now();
+  std::unordered_map<std::string, double> total;
+  for (auto it = heat_sources_.begin(); it != heat_sources_.end(); ) {
+    if ((now - it->second.received).seconds() > heat_load_timeout_s_) {
+      RCLCPP_WARN(get_logger(), "Heat source '%s' went quiet; dropping its loads",
+                  it->first.c_str());
+      it = heat_sources_.erase(it);
+      continue;
+    }
+    for (const auto & [node, power] : it->second.power_w) {
+      total[node] += power;
+    }
+    ++it;
+  }
+  for (const auto & [node, power] : total) {
+    if (!network_->set_external_power(node, power)) {
+      RCLCPP_WARN_THROTTLE(get_logger(), *this->get_clock(), 10000,
+                           "Heat load for unknown thermal node '%s'", node.c_str());
+    }
+  }
 }
 
 }  // namespace nodes

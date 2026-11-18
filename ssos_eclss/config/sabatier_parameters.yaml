@@ -3,3 +3,5 @@ sabatier_node:
   ros__parameters:
     use_sim_time: true
     step_rate_hz: 1.0
+    # Request power from ssos_eps as load eclss_sabatier; without EPS running the unit runs as if fully powered.
+    eps_coupling: true

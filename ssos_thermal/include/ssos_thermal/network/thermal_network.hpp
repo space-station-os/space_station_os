@@ -19,6 +19,8 @@ struct ThermalNodeState
   double temperature;
   double heat_capacity;
   double internal_power;
+  double external_power{0.0};   // heat added by other subsystems [W]
+  bool fixed{false};            // boundary node held at its temperature
 };
 
 struct ThermalLinkState
@@ -48,6 +50,10 @@ public:
   //
   // A link's "to" must itself be a declared node_name for compute_dTdt() to
   // exchange heat over it -- a link pointing at an undeclared name is inert.
+  //
+  // A node with fixed_temperature_c is a boundary (e.g. the heat sink of a
+  // coolant loop): it stays at that temperature and is left out of the
+  // average, the hottest-node search and set_all_temperatures().
   static ThermalNetwork load_from_yaml(
     const std::string & filepath, double reference_temp_c = 20.0);
 
@@ -58,6 +64,14 @@ public:
   const std::vector<ThermalLinkState> & links() const {return links_;}
 
   double node_temperature(const std::string & name) const;
+
+  // Heat other subsystems dissipate into a node, on top of its configured
+  // internal_power [W]. Returns false for an unknown node.
+  bool set_external_power(const std::string & name, double power_w);
+  void clear_external_power();
+
+  // internal_power + external_power of a node [W].
+  double total_power(const std::string & name) const;
 
   // Heat flow over a link [W], positive when heat moves from link.from to
   // link.to: conductance * (T_from - T_to). Same relation step() integrates,

@@ -43,6 +43,7 @@ struct ArsResult
   double system_pressure_drop_pa;  // total flow-path pressure drop [Pa]
   double blower_flow_scfm;         // delivered process flow [SCFM]
   double blower_power_w;           // blower shaft power [W]
+  double heater_power_w;           // bed heater power commanded this step [W]
   double precooler_exit_temp_k;    // precooler exit air temperature [K]
   double max_bed_temp_k;           // hottest solid temperature in any bed [K]
   double co2_desorbed_rate_kg_s;   // CO2 released by the regenerating bed [kg/s]

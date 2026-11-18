@@ -17,7 +17,7 @@ struct SolarArrayParams
   double cell_efficiency;         // beginning-of-life conversion efficiency [-]
   double degradation_factor;      // fraction of BOL output remaining [-]
   double sunrise_ramp_s;          // array re-acquisition time after eclipse exit [s]
-  bool derate_with_beta_cosine;   // apply cos(beta) to incident flux
+  bool derate_with_beta_cosine;   // apply cos(beta) to incident flux (no beta gimbal tracking)
   double beta_max_deg;            // peak solar beta angle over a precession cycle [deg]
   int beta_precession_orbits;     // orbits per full beta cycle [-]
   double beta_lock_limit_deg;     // |beta| above which the SARJ cannot track [deg]

@@ -129,6 +129,18 @@ if(BUILD_TESTING)
   target_compile_definitions(test_eps_scenario PRIVATE
     SSOS_EPS_TEST_SCENARIOS="${CMAKE_CURRENT_SOURCE_DIR}/test/scenarios")
 
+  # Whole station: sim + system_manager + ECLSS on EPS power + thermal.
+  find_package(ssos_eclss REQUIRED)
+  find_package(ssos_thermal REQUIRED)
+  ament_add_gtest(test_station_integration test/ros/test_station_integration.cpp
+    ENV ROS_DOMAIN_ID=66
+    TIMEOUT 120)
+  target_link_libraries(test_station_integration eps_ros ssos_core::system_manager_lib
+    ssos_sim::ssos_sim_lib ssos_eclss::eclss_ros ssos_thermal::thermal_network_ros)
+  target_compile_definitions(test_station_integration PRIVATE
+    SSOS_EPS_TEST_SCENARIOS="${CMAKE_CURRENT_SOURCE_DIR}/test/scenarios"
+    SSOS_THERMAL_STATION_CONFIG="${ssos_thermal_DIR}/../config/station_thermal_nodes.yaml")
+
   ament_add_gtest(test_eps_parameter_bridge test/ros/test_eps_parameter_bridge.cpp
     ENV ROS_DOMAIN_ID=62)
   target_link_libraries(test_eps_parameter_bridge eps_ros)

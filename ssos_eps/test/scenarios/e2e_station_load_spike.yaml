@@ -1,0 +1,16 @@
+scenario:
+  name: e2e_station_load_spike
+  duration_s: 600
+  sim_rate_hz: 20
+  time_scale: 20.0
+
+  faults:
+    - name: station_load_spike
+      type: load_spike
+      target_subsystem: eps
+      trigger:
+        type: time
+        at_s: 30.0
+      params:
+        demand_scale: 6.0
+      duration_s: 20

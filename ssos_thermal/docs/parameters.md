@@ -13,7 +13,8 @@ step timer at the new period).
 | `cooling_trigger_threshold` | `330.0` | [°C] Average temperature above which a cooling goal is sent |
 | `max_temp_threshold` | `420.0` | [°C] Hottest-node temperature above which the node reports unhealthy (only checked if `enable_failure`) |
 | `cooling_rate` | `0.05` | Fractional rate of heat removed during cooling (currently unused by `updateSimulation`, kept for parity with the legacy solver) |
-| `thermal_update_dt` | `0.5` | [s] Step timer period / RK4 integration step |
+| `thermal_update_dt` | `0.5` | [s] Step timer period and the largest RK4 sub-step; each tick integrates the ROS time elapsed since the last one (capped at 600 s) |
+| `heat_load_timeout_s` | `10.0` | [s] A `/thermal/heat_loads` source that has not published for this long is dropped |
 | `thermal_config_file` | `"config/thermal_nodes.yaml"` | Path to the node/link graph; relative paths resolve against the package share dir, absolute paths are used as-is |
 
 Plus the lifecycle-autostart parameters shared with every `ssos_eclss`-style

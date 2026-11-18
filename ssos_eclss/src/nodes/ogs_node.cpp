@@ -19,6 +19,9 @@ OgsNode::OgsNode(const rclcpp::NodeOptions & options)
   this->declare_parameter("stack_current_a", stack_current_a_);
   this->declare_parameter("o2_required_kg_day", o2_required_kg_day_);
   this->declare_parameter("enable_auto_faults", enable_auto_faults_);
+  if (!this->has_parameter("eps_coupling")) {
+    this->declare_parameter("eps_coupling", eps_coupling_);
+  }
   autostart_timer_ = EclssDiagnostics::maybe_autostart(this);
 }
 
@@ -41,6 +44,8 @@ CallbackReturn OgsNode::on_configure(const rclcpp_lifecycle::State &)
   fault_pub_ = this->create_publisher<FaultEvent>("/ssos/fault_event", 10);
   register_client_ =
     this->create_client<RegisterSubsystem>("/ssos/register_subsystem");
+  eps_coupling_ = this->get_parameter("eps_coupling").as_bool();
+  power_.start(eps_coupling_);
   param_cb_handle_ = this->add_on_set_parameters_callback(
     std::bind(&OgsNode::on_set_parameters, this, _1));
   return CallbackReturn::SUCCESS;
@@ -103,6 +108,7 @@ CallbackReturn OgsNode::on_cleanup(const rclcpp_lifecycle::State &)
   heartbeat_pub_.reset();
   fault_pub_.reset();
   register_client_.reset();
+  power_.stop();
   ogs_.reset();
   return CallbackReturn::SUCCESS;
 }
@@ -120,7 +126,13 @@ void OgsNode::step()
   first_step_ = false;
   last_step_time_ = now;
 
-  last_result_ = ogs_->step(dt, stack_current_a_, 1.0e9);
+  // Electrolysis rate follows the current EPS can deliver.
+  const double supply = power_.powered_fraction();
+  last_result_ = ogs_->step(dt, stack_current_a_ * supply, 1.0e9);
+  if (supply > 0.999) {
+    full_power_w_ = last_result_.stack_power_w;
+  }
+  power_.update_demand(full_power_w_);
 
   std_msgs::msg::Float64 o2;
   o2.data = last_result_.o2_production_kg_day;
@@ -142,6 +154,8 @@ void OgsNode::step()
   kv("stack_voltage", last_result_.stack_voltage);
   kv("stack_power_w", last_result_.stack_power_w);
   kv("stack_temp_k", last_result_.stack_temperature_k);
+  kv("power_demand_w", full_power_w_);
+  kv("power_supply_fraction", supply);
   status.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
   status.message = "nominal";
   diag.status.push_back(status);
@@ -155,6 +169,10 @@ void OgsNode::step()
     fault_pub_->publish(EclssDiagnostics::make_fault(
       now, "ogs", "o2_production_low", FaultEvent::SEVERITY_CRITICAL, msg,
       {"/ssos/ogs/o2_kg_day"}));
+  }
+  if (!power_.powered()) {
+    healthy = false;
+    msg = power_.status();
   }
   heartbeat_pub_->publish(EclssDiagnostics::make_heartbeat(
     now, "ogs", SubsystemHeartbeat::LIFECYCLE_ACTIVE, healthy, msg));

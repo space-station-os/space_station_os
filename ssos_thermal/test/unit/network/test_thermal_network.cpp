@@ -174,3 +174,97 @@ TEST_F(ThermalNetworkTest, LinkToUndeclaredNodeCarriesNoHeat)
     }
   }
 }
+
+namespace
+{
+
+class ThermalSinkTest : public ::testing::Test
+{
+protected:
+  void SetUp() override
+  {
+    path_ = (std::filesystem::temp_directory_path() /
+      "ssos_thermal_test_sink_network.yaml").string();
+    std::ofstream out(path_);
+    out <<
+      "- node_name: \"sink\"\n"
+      "  parent_link: \"\"\n"
+      "  heat_capacity: 1.0e6\n"
+      "  internal_power: 0.0\n"
+      "  conductance: 0.0\n"
+      "  fixed_temperature_c: 17.0\n"
+      "\n"
+      "- node_name: \"plate\"\n"
+      "  parent_link: \"sink\"\n"
+      "  heat_capacity: 500.0\n"
+      "  internal_power: 0.0\n"
+      "  conductance: 100.0\n";
+  }
+
+  void TearDown() override
+  {
+    std::filesystem::remove(path_);
+  }
+
+  std::string path_;
+};
+
+}  // namespace
+
+TEST_F(ThermalSinkTest, FixedNodeHoldsItsTemperature)
+{
+  auto net = ThermalNetwork::load_from_yaml(path_);
+  EXPECT_TRUE(net.nodes().at("sink").fixed);
+  EXPECT_DOUBLE_EQ(net.node_temperature("sink"), 17.0);
+  ASSERT_TRUE(net.set_external_power("plate", 2000.0));
+  for (int i = 0; i < 200; ++i) {
+    net.step(0.5);
+  }
+  EXPECT_DOUBLE_EQ(net.node_temperature("sink"), 17.0);
+}
+
+TEST_F(ThermalSinkTest, ExternalPowerSettlesAtSinkPlusPowerOverConductance)
+{
+  auto net = ThermalNetwork::load_from_yaml(path_);
+  ASSERT_TRUE(net.set_external_power("plate", 1500.0));
+  EXPECT_DOUBLE_EQ(net.total_power("plate"), 1500.0);
+  // Time constant C/G = 5 s; 100 s is 20 time constants.
+  for (int i = 0; i < 200; ++i) {
+    net.step(0.5);
+  }
+  EXPECT_NEAR(net.node_temperature("plate"), 17.0 + 1500.0 / 100.0, 1.0e-3);
+
+  net.clear_external_power();
+  for (int i = 0; i < 200; ++i) {
+    net.step(0.5);
+  }
+  EXPECT_NEAR(net.node_temperature("plate"), 17.0, 1.0e-3);
+  EXPECT_FALSE(net.set_external_power("missing", 10.0));
+}
+
+TEST_F(ThermalSinkTest, BoundaryNodesAreLeftOutOfAggregates)
+{
+  auto net = ThermalNetwork::load_from_yaml(path_);
+  net.set_all_temperatures(40.0);
+  EXPECT_DOUBLE_EQ(net.node_temperature("sink"), 17.0);
+  EXPECT_DOUBLE_EQ(net.node_temperature("plate"), 40.0);
+  EXPECT_DOUBLE_EQ(net.average_temperature(), 40.0);
+  EXPECT_EQ(net.hottest().name, "plate");
+}
+
+TEST(StationThermalNetwork, ShippedConfigSettlesNearCoolantLoop)
+{
+  auto net = ThermalNetwork::load_from_yaml(
+    std::string(SSOS_THERMAL_SOURCE_DIR) + "/config/station_thermal_nodes.yaml");
+  ASSERT_EQ(net.nodes().count("itcs_sink"), 1u);
+  ASSERT_EQ(net.nodes().count("itcs_coldplate"), 1u);
+  // ~31 kW of station load into the cabin, ~2.5 kW of EPS losses on the plate.
+  net.set_external_power("base_link", 30000.0);
+  net.set_external_power("itcs_coldplate", 2500.0);
+  for (int i = 0; i < 2000; ++i) {
+    net.step(0.5);
+  }
+  EXPECT_NEAR(net.node_temperature("base_link"), 17.0 + (30000.0 + 1380.0 + 20.0) / 6000.0,
+              0.05);
+  EXPECT_NEAR(net.node_temperature("itcs_coldplate"), 17.0 + 2500.0 / 1000.0, 0.05);
+}

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <cmath>
 #include <memory>
 #include <string>
 #include <thread>
@@ -8,6 +9,7 @@
 
 #include "lifecycle_msgs/msg/state.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "space_station_interfaces/msg/thermal_node_data_array.hpp"
 
 #include "ssos_eps/nodes/eps_node.hpp"
 
@@ -445,6 +447,116 @@ TEST_F(EpsNodeTest, InjectedFaultsStackWithParametersAndClear)
   EXPECT_FALSE(node_->last_state().array_degraded);
   EXPECT_NEAR(node_->last_state().load_demand_w, 30000.0, 1.0);
   EXPECT_NEAR(node_->last_state().generation_w, full, 0.01 * full);
+
+  tear_down();
+}
+
+TEST_F(EpsNodeTest, PublishesLoadStatusAndHeatLoads)
+{
+  using space_station_interfaces::msg::HeatLoadArray;
+  using space_station_interfaces::msg::LoadStatusArray;
+  LoadStatusArray::SharedPtr loads;
+  HeatLoadArray::SharedPtr heat;
+  auto loads_sub = probe_->create_subscription<LoadStatusArray>(
+    "/ssos/eps/loads", 10, [&](LoadStatusArray::SharedPtr m) {loads = m;});
+  auto heat_sub = probe_->create_subscription<HeatLoadArray>(
+    "/thermal/heat_loads", 10, [&](HeatLoadArray::SharedPtr m) {heat = m;});
+
+  node_->set_parameter(rclcpp::Parameter("step_rate_hz", 30.0));
+  bring_up();
+  spin_for(400ms);
+
+  ASSERT_TRUE(loads);
+  EXPECT_EQ(loads->loads.size(), node_->last_state().loads.size());
+  bool found_ogs = false;
+  for (const auto & l : loads->loads) {
+    if (l.load_id == "eclss_ogs") {
+      found_ogs = true;
+      EXPECT_EQ(l.priority, 1);
+      EXPECT_GE(l.ddcu_index, 0);
+      EXPECT_DOUBLE_EQ(l.requested_power, 3500.0);
+      EXPECT_DOUBLE_EQ(l.served_power, 3500.0);
+      EXPECT_FALSE(l.shed);
+    }
+  }
+  EXPECT_TRUE(found_ogs);
+
+  ASSERT_TRUE(heat);
+  EXPECT_EQ(heat->source, "eps");
+  ASSERT_EQ(heat->loads.size(), 2u);
+  EXPECT_EQ(heat->loads[0].node_name, "itcs_coldplate");
+  EXPECT_GT(heat->loads[0].power, 0.0);
+  EXPECT_EQ(heat->loads[1].node_name, "base_link");
+  EXPECT_NEAR(heat->loads[1].power, node_->last_state().load_served_w, 1.0);
+
+  tear_down();
+}
+
+TEST_F(EpsNodeTest, ColdPlateTemperatureComesFromThermal)
+{
+  using diagnostic_msgs::msg::DiagnosticArray;
+  using space_station_interfaces::msg::ThermalNodeData;
+  using space_station_interfaces::msg::ThermalNodeDataArray;
+  std::string coldplate, source;
+  auto diag_sub = probe_->create_subscription<DiagnosticArray>(
+    "/ssos/eps/diagnostics", 10, [&](DiagnosticArray::SharedPtr m) {
+      for (const auto & st : m->status) {
+        for (const auto & kv : st.values) {
+          if (kv.key == "coldplate_temp_c") {coldplate = kv.value;}
+          if (kv.key == "coldplate_source") {source = kv.value;}
+        }
+      }
+    });
+  auto thermal_pub = probe_->create_publisher<ThermalNodeDataArray>("/thermal/nodes/state", 10);
+
+  node_->set_parameter(rclcpp::Parameter("step_rate_hz", 30.0));
+  bring_up();
+  spin_for(200ms);
+  EXPECT_EQ(source, "config");
+  EXPECT_TRUE(std::isnan(node_->coldplate_temp_c()));
+
+  ThermalNodeDataArray msg;
+  ThermalNodeData plate;
+  plate.name = "itcs_coldplate";
+  plate.temperature = 31.25;
+  msg.nodes = {plate};
+  for (int i = 0; i < 3; ++i) {
+    thermal_pub->publish(msg);
+    spin_for(100ms);
+  }
+  EXPECT_DOUBLE_EQ(node_->coldplate_temp_c(), 31.25);
+  EXPECT_EQ(source, "thermal");
+  EXPECT_EQ(coldplate, "31.25");
+
+  tear_down();
+}
+
+TEST_F(EpsNodeTest, ThermalCouplingCanBeDisabled)
+{
+  using space_station_interfaces::msg::HeatLoadArray;
+  using space_station_interfaces::msg::ThermalNodeData;
+  using space_station_interfaces::msg::ThermalNodeDataArray;
+  int heat_msgs = 0;
+  auto heat_sub = probe_->create_subscription<HeatLoadArray>(
+    "/thermal/heat_loads", 10, [&](HeatLoadArray::SharedPtr) {++heat_msgs;});
+  auto thermal_pub = probe_->create_publisher<ThermalNodeDataArray>("/thermal/nodes/state", 10);
+
+  recreate_node(rclcpp::NodeOptions().parameter_overrides({
+      rclcpp::Parameter("step_rate_hz", 30.0),
+      rclcpp::Parameter("thermal.enable_coupling", false)}));
+  bring_up();
+  ThermalNodeDataArray msg;
+  ThermalNodeData plate;
+  plate.name = "itcs_coldplate";
+  plate.temperature = 60.0;
+  msg.nodes = {plate};
+  for (int i = 0; i < 4; ++i) {
+    thermal_pub->publish(msg);
+    spin_for(100ms);
+  }
+
+  EXPECT_EQ(heat_msgs, 0);
+  EXPECT_TRUE(std::isnan(node_->coldplate_temp_c()));
 
   tear_down();
 }

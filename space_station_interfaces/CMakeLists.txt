@@ -35,6 +35,10 @@ set(msg_files
   "eps/msg/BCDUStatus.msg"
   "eps/msg/MBSUStatus.msg"
   "eps/msg/DDCUStatus.msg"
+  "eps/msg/LoadStatus.msg"
+  "eps/msg/LoadStatusArray.msg"
+  "atcs/msg/HeatLoad.msg"
+  "atcs/msg/HeatLoadArray.msg"
   # ATCS
   "atcs/msg/CoolantStatus.msg"
   "atcs/msg/ExternalLoopStatus.msg"

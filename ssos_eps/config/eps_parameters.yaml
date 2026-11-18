@@ -21,6 +21,14 @@ eps_node:
     eps.channel_mbsu: [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3]
     eps.ddcu_mbsu: [0, 0, 1, 1, 2, 2, 3, 3]
 
+    # Thermal coupling: EPS losses heat thermal.coldplate_node and the power
+    # delivered to loads heats thermal.cabin_node (/thermal/heat_loads); the
+    # cold plate's temperature from /thermal/nodes/state replaces the DDCU and
+    # battery cold-plate parameters while ssos_thermal is running.
+    thermal.enable_coupling: true
+    thermal.coldplate_node: "itcs_coldplate"
+    thermal.cabin_node: "base_link"
+
     eps.low_soc_threshold: 0.20
     # Battery state of health below this reports EPS degraded.
     eps.min_state_of_health: 0.80

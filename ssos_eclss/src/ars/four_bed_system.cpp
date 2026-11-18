@@ -238,6 +238,8 @@ ArsResult FourBedSystem::step(double dt, const CabinConditions & cabin)
   res.system_pressure_drop_pa = des_out.pressure_drop_pa + ads_out.pressure_drop_pa;
   res.blower_flow_scfm = units::m3s_to_scfm(q_air);
   res.blower_power_w = blower.power_w;
+  res.heater_power_w = ads_cmd.desiccant_heater_w + ads_cmd.adsorbent_heater_w +
+    regen_cmd.desiccant_heater_w + regen_cmd.adsorbent_heater_w;
   res.precooler_exit_temp_k = pc.air_outlet_temp;
   res.max_bed_temp_k = std::max({desiccant_[0]->max_solid_temperature(),
                                  desiccant_[1]->max_solid_temperature(),

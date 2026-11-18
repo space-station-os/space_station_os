@@ -28,7 +28,10 @@ add_library(thermal_network_physics
   src/coolant/coolant_loop.cpp
 )
 target_link_libraries(thermal_network_physics yaml-cpp)
-target_include_directories(thermal_network_physics PUBLIC include)
+target_include_directories(thermal_network_physics PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
 # NOTE: thermal_network_physics links NOTHING from ROS
 
 # ---- ROS node library ----
@@ -54,6 +57,7 @@ ament_target_dependencies(coolant_node rclcpp rclcpp_lifecycle rclcpp_action)
 
 # ---- Install ----
 install(TARGETS thermal_network_physics thermal_network_ros
+  EXPORT export_ssos_thermal
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
@@ -73,6 +77,8 @@ if(BUILD_TESTING)
 
   ament_add_gtest(test_thermal_network test/unit/network/test_thermal_network.cpp)
   target_link_libraries(test_thermal_network thermal_network_physics)
+  target_compile_definitions(test_thermal_network PRIVATE
+    SSOS_THERMAL_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 
   ament_add_gtest(test_coolant_loop test/unit/coolant/test_coolant_loop.cpp)
   target_link_libraries(test_coolant_loop thermal_network_physics)
@@ -97,5 +103,11 @@ if(BUILD_TESTING)
   set_tests_properties(test_coolant_node PROPERTIES
     ENVIRONMENT "ROS_DOMAIN_ID=215")
 endif()
+
+# Exported so other packages' integration tests can run the thermal nodes.
+ament_export_targets(export_ssos_thermal HAS_LIBRARY_TARGET)
+ament_export_include_directories(include)
+ament_export_dependencies(rclcpp rclcpp_lifecycle rclcpp_action ament_index_cpp
+  space_station_interfaces diagnostic_msgs lifecycle_msgs yaml-cpp)
 
 ament_package()

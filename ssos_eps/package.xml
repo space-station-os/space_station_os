@@ -26,6 +26,8 @@
   <test_depend>ament_cmake_gtest</test_depend>
   <test_depend>ssos_core</test_depend>
   <test_depend>ssos_sim</test_depend>
+  <test_depend>ssos_eclss</test_depend>
+  <test_depend>ssos_thermal</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

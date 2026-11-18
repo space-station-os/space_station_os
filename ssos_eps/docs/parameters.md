@@ -38,6 +38,9 @@ factory functions supply defaults only. Names mirror the physics structs.
 | `faults.faulted_bcdu` | -1 | channel whose BCDU is faulted (-1 = none) |
 | `eps.low_soc_threshold` | 0.20 | bank SOC below which EPS is unhealthy |
 | `eps.min_state_of_health` | 0.80 | battery state of health below which EPS is degraded |
+| `thermal.enable_coupling` | true | publish heat on `/thermal/heat_loads` and take the cold-plate temperature from `/thermal/nodes/state` |
+| `thermal.coldplate_node` | `itcs_coldplate` | thermal node for conversion losses and ORU heat; its temperature replaces `ddcu.coldplate_temp_c` and `battery.coldplate_temp_c` |
+| `thermal.cabin_node` | `base_link` | thermal node for the power delivered to loads |
 
 ## Solar
 
@@ -47,9 +50,9 @@ factory functions supply defaults only. Names mirror the physics structs.
 | `solar.array.cell_efficiency` | 0.165 | BOL efficiency (≈84 kW at 1361 W/m²) |
 | `solar.array.degradation_factor` | 1.0 | fraction of BOL output |
 | `solar.array.sunrise_ramp_s` | 480 | half-cosine re-acquisition after eclipse exit [s] |
-| `solar.array.derate_with_beta_cosine` | true | apply cos(β) |
+| `solar.array.derate_with_beta_cosine` | false | apply cos(β); off because the beta gimbals track β (legacy: true) |
 | `solar.array.beta_max_deg` | 75 | peak β over a precession cycle |
-| `solar.array.beta_precession_orbits` | 10 | orbits per β cycle (counted on sunrise) |
+| `solar.array.beta_precession_orbits` | 930 | orbits per β cycle, counted on sunrise; ~60 days (legacy: 10) |
 | `solar.array.beta_lock_limit_deg` | 72 | \|β\| at which the SARJ locks |
 | `solar.array.gimbal_lock_derate` | 0.6 | extra factor while locked |
 | `solar.array.use_fixed_beta` / `fixed_beta_deg` | false / 0 | hold β constant |

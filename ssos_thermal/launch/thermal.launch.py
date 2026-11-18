@@ -36,7 +36,8 @@ def generate_launch_description():
         namespace='',
         output='screen',
         parameters=[os.path.join(share, 'config', 'thermal_network.yaml'),
-                    {'autostart': True, 'autostart_delay_ms': delay}])
+                    {'autostart': True, 'autostart_delay_ms': delay,
+                     'thermal_config_file': LaunchConfiguration('thermal_config_file')}])
 
     coolant = LifecycleNode(
         package='ssos_thermal',
@@ -64,6 +65,10 @@ def generate_launch_description():
                                           'viewer. Set false when included from a '
                                           'parent launch (e.g. space_station.launch.py) '
                                           'whose own GUI already has a Thermal panel.'),
+        DeclareLaunchArgument('thermal_config_file', default_value='config/thermal_nodes.yaml',
+                              description='Thermal node/link YAML, relative to the '
+                                          'ssos_thermal share dir or absolute. The full '
+                                          'station uses config/station_thermal_nodes.yaml.'),
         thermal_network,
         coolant,
         visualization,

@@ -3,6 +3,8 @@ ogs_node:
   ros__parameters:
     use_sim_time: true
     step_rate_hz: 1.0
+    # Request power from ssos_eps as load eclss_ogs; without EPS running the unit runs as if fully powered.
+    eps_coupling: true
     stack_current_a: 27.0
     o2_required_kg_day: 2.3
     # Faults are injected explicitly (sim fault-injection), not auto-tripped.

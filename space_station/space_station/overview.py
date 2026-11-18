@@ -125,11 +125,12 @@ class OverviewWidget(QWidget):
         life_hdr.setFont(theme.label_font(11, tracking=2.0))
         life_hdr.setContentsMargins(14, 12, 14, 8)
         ll.addWidget(life_hdr)
-        self.lifecycle_roster = SubsystemRoster(["ARS", "OGS", "WRS", "Cabin", "EPS"])
+        self.lifecycle_roster = SubsystemRoster(
+            ["ARS", "OGS", "WRS", "Sabatier", "Cabin", "EPS"])
         # Hide the inner "SUBSYSTEMS" header of the nested roster.
         self.lifecycle_roster.layout().itemAt(0).widget().hide()
         ll.addWidget(self.lifecycle_roster)
-        for name in ("ARS", "OGS", "WRS", "Cabin", "EPS"):
+        for name in ("ARS", "OGS", "WRS", "Sabatier", "Cabin", "EPS"):
             self.lifecycle_roster.set_status(name, "unconfigured")
         body.addWidget(life_card)
 
@@ -154,7 +155,7 @@ class OverviewWidget(QWidget):
     def set_lifecycle(self, name, lifecycle_word, healthy, unhealthy_status="fault"):
         """Update one node's lifecycle/transition state on the overview."""
         label = {"ars": "ARS", "ogs": "OGS", "wrs": "WRS",
-                 "cabin": "Cabin", "eps": "EPS"}.get(str(name).lower())
+                 "sabatier": "Sabatier", "cabin": "Cabin", "eps": "EPS"}.get(str(name).lower())
         if label is None:
             return
         # An active-but-unhealthy node reads as FAULT (or the caller's finer

@@ -180,7 +180,8 @@ TEST(EpsOrbit, GimbalLockReducesGeneration)
   const EpsState & a = nominal.step(1.0, EpsInput{1361.0, false});
   const EpsState & b = locked.step(1.0, EpsInput{1361.0, false});
   EXPECT_TRUE(b.array.gimbal_locked);
-  EXPECT_LT(b.generation_w, 0.2 * a.generation_w);
+  EXPECT_NEAR(b.generation_w, p.solar.array.gimbal_lock_derate * a.generation_w,
+              0.01 * a.generation_w);
 }
 
 TEST(EpsOrbit, BcduFaultIsReportedAndCleared)
