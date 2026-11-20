@@ -12,7 +12,9 @@ eps_node:
     solar.array.beta_max_deg: 75.0
     # ~60 day beta cycle. The legacy space_station_eps value was 10 orbits.
     solar.array.beta_precession_orbits: 930
-    solar.array.beta_lock_limit_deg: 72.0
+    # Above beta_max_deg: the SARJ never locks in a nominal run, only in the
+    # array_gimbal_lock drill.
+    solar.array.beta_lock_limit_deg: 76.0
     solar.array.gimbal_lock_derate: 0.6
     solar.array.use_fixed_beta: false
     solar.array.fixed_beta_deg: 0.0

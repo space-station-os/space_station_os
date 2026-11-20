@@ -1,0 +1,22 @@
+# Crew metabolic and water loads for ssos_eclss/crew_node. Gas and latent
+# water rates per activity follow ICES-2021-365; water streams are per person
+# per day from the ISS water balance.
+crew_node:
+  ros__parameters:
+    use_sim_time: true
+    step_rate_hz: 1.0
+    crew_size: 4
+    # Crew time when the simulation starts: mid-morning of a work day.
+    initial_time_of_day_hr: 10.75
+    sleep_start_hr: 21.5
+    sleep_hours: 8.0
+    # One crew member exercises at a time: 08:00, 10:00, 12:00, 14:00.
+    first_exercise_hr: 8.0
+    exercise_spacing_hr: 2.0
+    metabolic_scale: 1.0
+    thermal_node: "base_link"
+    drink_kg_day: 2.20
+    flush_kg_day: 0.30
+    urine_kg_day: 1.20
+    feces_water_kg_day: 0.15
+    trash_water_kg_day: 0.20

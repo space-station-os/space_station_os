@@ -32,9 +32,10 @@ def generate_launch_description():
         DeclareLaunchArgument('autostart_delay_ms', default_value='300',
                               description='ms after startup before ECLSS nodes '
                                           'self-configure+activate'),
+        node('crew_node', 'crew_node', 'crew_parameters.yaml'),
+        node('cabin_node', 'cabin_node', 'cabin_parameters.yaml'),
         node('ars_node', 'ars_node', 'ars_parameters.yaml'),
         node('ogs_node', 'ogs_node', 'ogs_parameters.yaml'),
         node('wrs_node', 'wrs_node', 'wrs_parameters.yaml'),
-        node('cabin_node', 'cabin_node', 'cabin_parameters.yaml'),
         node('sabatier_node', 'sabatier_node', 'sabatier_parameters.yaml'),
     ])

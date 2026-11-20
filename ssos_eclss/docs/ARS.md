@@ -147,7 +147,8 @@ holdup loss the cell model does not resolve, reproducing the paper's 0.82–0.84
 
 | Direction | Topic / service | Type |
 |-----------|-----------------|------|
-| sub | `/sim/world_state` | `WorldState` (cabin ppCO₂, temp, pressure — Epic A boundary) |
+| sub | `/ssos/cabin/atmosphere` | `CabinAtmosphere` (cabin ppCO₂, ppH₂O, temperature, pressure from cabin_node) |
+| sub | `/ssos/fault_event` | `FaultEvent` (ARS drills) |
 | pub | `/ssos/ars/co2_removal_kg_day` | `std_msgs/Float64` |
 | pub | `/ssos/ars/diagnostics` | `diagnostic_msgs/DiagnosticArray` (scrubbed CO₂, ΔP, bed temps, blower flow, train) |
 | pub | `/ssos/ars/heartbeat` | `SubsystemHeartbeat` |
@@ -155,10 +156,13 @@ holdup loss the cell model does not resolve, reproducing the paper's 0.82–0.84
 | client | `/ssos/register_subsystem` | `RegisterSubsystem` |
 
 Each tick: read cabin conditions, advance `FourBedSystem.step(dt, cabin)`,
-publish the removal rate + telemetry + heartbeat. **Fault detection:** if CO₂
-removal drops below `co2_required_kg_day` (default 4.16) it publishes a
-`co2_removal_below_requirement` `CRITICAL` fault and marks the heartbeat
-unhealthy.
+publish the removal rate + telemetry + heartbeat. **Fault detection:** the
+single-pass capture efficiency (CO₂ removed over CO₂ drawn in), averaged over
+about a half-cycle, below `min_capture_efficiency` (0.5) raises
+`co2_removal_low`; process flow under 10% of design raises
+`ars_no_process_flow`. Both are `CRITICAL`, sent once on the transition, with
+the heartbeat unhealthy until they clear. Capture efficiency does not move with
+the crew's day and night, unlike the removal rate itself.
 
 ### Parameters (mapped by `EclssParameterBridge`, validated)
 

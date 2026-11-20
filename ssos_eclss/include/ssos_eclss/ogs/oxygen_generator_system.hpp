@@ -37,6 +37,8 @@ public:
   explicit OxygenGeneratorSystem(const OgsParameters & params = default_ogs_parameters());
 
   void reset(double temperature_k = 330.0);
+  /// Start at the stack's steady temperature for this current.
+  void settle(double current_a);
 
   /// Advance the OGS by dt.
   /// @param dt                timestep [s]

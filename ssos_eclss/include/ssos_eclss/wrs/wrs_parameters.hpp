@@ -29,6 +29,7 @@ struct MultifiltrationParams
   double bed_capacity_kg;       // contaminant capacity before breakthrough [kg]
   double removal_efficiency;    // fraction of contaminant removed [-]
   double inlet_conductivity_us; // typical feed conductivity [uS/cm]
+  double breakthrough_onset;    // bed utilisation where removal starts to fall [-]
 };
 
 /// Catalytic reactor (volatile removal) parameters.

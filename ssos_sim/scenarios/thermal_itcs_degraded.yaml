@@ -1,0 +1,30 @@
+scenario:
+  # The internal coolant loop runs warm (26 C) for 30 min. The EPS cold plate
+  # passes its 28 C limit within about a minute and thermal reports it
+  # (DEGRADED); temperatures settle back once the loop recovers.
+  name: thermal_itcs_degraded
+  duration_s: 7200
+  sim_rate_hz: 20
+  time_scale: 30.0
+
+  faults:
+    - name: itcs_warm
+      type: itcs_loop_degraded
+      target_subsystem: thermal
+      trigger:
+        type: time
+        at_s: 300.0
+      params:
+        sink_temp_c: 26.0
+      duration_s: 1800
+
+  expected_outcomes:
+    - state_transition:
+        from: NOMINAL
+        to: DEGRADED
+        before_s: 420.0
+    - state_transition:
+        from: DEGRADED
+        to: NOMINAL
+        via: RECOVERY
+        before_s: 3900.0

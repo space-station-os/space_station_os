@@ -19,6 +19,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(lifecycle_msgs REQUIRED)
 find_package(yaml-cpp REQUIRED)
+find_package(ssos_sim REQUIRED)
 
 include_directories(include)
 
@@ -40,7 +41,7 @@ add_library(thermal_network_ros
   src/nodes/coolant_node.cpp
   src/nodes/thermal_diagnostics.cpp
 )
-target_link_libraries(thermal_network_ros thermal_network_physics)
+target_link_libraries(thermal_network_ros thermal_network_physics ssos_sim::ssos_fault_format)
 ament_target_dependencies(thermal_network_ros
   rclcpp rclcpp_lifecycle rclcpp_action ament_index_cpp
   space_station_interfaces diagnostic_msgs lifecycle_msgs
@@ -74,6 +75,7 @@ install(PROGRAMS
 # ---- Tests ----
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
+  find_package(rosgraph_msgs REQUIRED)
 
   ament_add_gtest(test_thermal_network test/unit/network/test_thermal_network.cpp)
   target_link_libraries(test_thermal_network thermal_network_physics)
@@ -89,9 +91,9 @@ if(BUILD_TESTING)
   ament_add_gtest(test_thermal_network_node test/ros/test_thermal_network_node.cpp)
   target_link_libraries(test_thermal_network_node thermal_network_ros)
   ament_target_dependencies(test_thermal_network_node rclcpp rclcpp_lifecycle
-    space_station_interfaces diagnostic_msgs lifecycle_msgs)
+    space_station_interfaces diagnostic_msgs lifecycle_msgs rosgraph_msgs)
   target_compile_definitions(test_thermal_network_node PRIVATE
-    SSOS_THERMAL_CONFIG_FILE="${CMAKE_CURRENT_SOURCE_DIR}/config/thermal_nodes.yaml")
+    SSOS_THERMAL_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 
   ament_add_gtest(test_coolant_node test/ros/test_coolant_node.cpp)
   target_link_libraries(test_coolant_node thermal_network_ros)
@@ -108,6 +110,6 @@ endif()
 ament_export_targets(export_ssos_thermal HAS_LIBRARY_TARGET)
 ament_export_include_directories(include)
 ament_export_dependencies(rclcpp rclcpp_lifecycle rclcpp_action ament_index_cpp
-  space_station_interfaces diagnostic_msgs lifecycle_msgs yaml-cpp)
+  space_station_interfaces diagnostic_msgs lifecycle_msgs yaml-cpp ssos_sim)
 
 ament_package()

@@ -80,12 +80,13 @@ _STATE_NAMES = {0: "INIT", 1: "NOMINAL", 2: "DEGRADED", 3: "RECOVERY", 4: "SAFE"
 _SEVERITY_NAMES = {0: "warning", 1: "critical", 2: "emergency"}
 # SubsystemHeartbeat.LIFECYCLE_* -> transition-mode word.
 _LIFECYCLE_NAMES = {0: "UNCONFIGURED", 1: "INACTIVE", 2: "ACTIVE", 3: "FINALIZED"}
-_ECLSS_NODES = ("ars", "ogs", "wrs", "cabin", "sabatier")
+_ECLSS_NODES = ("ars", "ogs", "wrs", "cabin", "sabatier", "crew")
 _THERMAL_NODES = ("thermal", "coolant")
 
 # Map subsystem_name strings published by ssos nodes -> roster row names.
 _SUBSYS_ALIASES = {
     "ars": "ECLSS", "ogs": "ECLSS", "wrs": "ECLSS", "cabin": "ECLSS", "sabatier": "ECLSS",
+    "crew": "ECLSS",
     "eclss": "ECLSS", "gnc": "GNC", "eps": "EPS",
     "thermal": "Thermal", "coolant": "Thermal", "comms": "Comms",
 }
@@ -440,7 +441,7 @@ class MainWindow(QMainWindow):
                 SystemState, "/ssos/system_state", self._on_system_state, 10)
             self.node.create_subscription(
                 FaultEvent, "/ssos/fault_event", self._on_fault_event, 10)
-            for sub in ("ars", "ogs", "wrs", "cabin", "sabatier", "eps",
+            for sub in ("ars", "ogs", "wrs", "cabin", "sabatier", "crew", "eps",
                         "thermal", "coolant"):
                 self.node.create_subscription(
                     SubsystemHeartbeat, f"/ssos/{sub}/heartbeat",

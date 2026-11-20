@@ -33,10 +33,15 @@ this simulation unchanged.
 `eclss_ros` (Layer 3) depends on `eclss_physics` plus `rclcpp`,
 `rclcpp_lifecycle` and `space_station_interfaces`.
 
-## Data flow (Epic A boundary)
+## Data flow
 
 ```
-ssos_sim  --/sim/world_state-->  ArsNode/CabinNode/...  (cabin conditions in)
+crew_node   --/ssos/crew/*_kg_day-->        cabin_node, wrs_node
+cabin_node  --/ssos/cabin/atmosphere-->     ars_node, ogs_node
+cabin_node  --/ssos/cabin/condensate_kg_day--> wrs_node
+ars/ogs     --removal, O2-->                cabin_node, sabatier_node
+wrs_node    --/ssos/wrs/potable_available_kg--> ogs_node (feedwater)
+ssos_sim    --/ssos/fault_event (drills)--> the addressed node
 ECLSS nodes --/ssos/<name>/heartbeat--> system_manager
 ECLSS nodes --/ssos/fault_event-->       system_manager
 ECLSS nodes --/ssos/register_subsystem-> system_manager (on activate)

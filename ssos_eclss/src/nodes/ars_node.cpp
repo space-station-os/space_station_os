@@ -17,14 +17,25 @@ namespace nodes
 {
 
 ArsNode::ArsNode(const rclcpp::NodeOptions & options)
-: rclcpp_lifecycle::LifecycleNode("ars_node", options)
+: rclcpp_lifecycle::LifecycleNode("ars_node", options),
+  drills_(this, "ars"),
+  health_(this, "ars",
+    {"/ssos/ars/co2_removal_kg_day", "/ssos/ars/diagnostics", "/ssos/ars/bed_states",
+      "/ssos/ars/cycle_phase"},
+    {"/ssos/cabin/atmosphere"})
 {
   // use_sim_time defaults declared by the node; allow override.
   if (!this->has_parameter("step_rate_hz")) {
     this->declare_parameter("step_rate_hz", step_rate_hz_);
   }
-  if (!this->has_parameter("co2_required_kg_day")) {
-    this->declare_parameter("co2_required_kg_day", co2_required_kg_day_);
+  if (!this->has_parameter("min_capture_efficiency")) {
+    this->declare_parameter("min_capture_efficiency", min_capture_efficiency_);
+  }
+  if (!this->has_parameter("capture_time_constant_s")) {
+    this->declare_parameter("capture_time_constant_s", capture_time_constant_s_);
+  }
+  if (!this->has_parameter("warm_start_s")) {
+    this->declare_parameter("warm_start_s", warm_start_s_);
   }
   if (!this->has_parameter("enable_auto_faults")) {
     this->declare_parameter("enable_auto_faults", enable_auto_faults_);
@@ -38,20 +49,37 @@ ArsNode::ArsNode(const rclcpp::NodeOptions & options)
 CallbackReturn ArsNode::on_configure(const rclcpp_lifecycle::State &)
 {
   step_rate_hz_ = this->get_parameter("step_rate_hz").as_double();
-  co2_required_kg_day_ = this->get_parameter("co2_required_kg_day").as_double();
+  min_capture_efficiency_ = this->get_parameter("min_capture_efficiency").as_double();
+  capture_time_constant_s_ = this->get_parameter("capture_time_constant_s").as_double();
   enable_auto_faults_ = this->get_parameter("enable_auto_faults").as_bool();
+  warm_start_s_ = this->get_parameter("warm_start_s").as_double();
 
   bridge_ = std::make_unique<EclssParameterBridge>(this);
   bridge_->declare_ars_parameters(ars::default_ars_parameters());
   const ars::ArsParameters params = bridge_->read_ars_parameters();
   ars_ = std::make_unique<ars::FourBedSystem>(params);
+  active_params_ = params;
+  saturation_ = 0.0;
 
-  // Default cabin conditions until the first world-state arrives.
+  // Design cabin conditions until cabin_node reports.
   cabin_.co2_partial_pressure_pa = units::torr_to_pa(params.operating.inlet_ppco2_torr);
   cabin_.h2o_partial_pressure_pa =
-    gas::water_pp_from_rh(0.40, params.operating.cabin_temp_k);
+    gas::water_pp_from_rh(0.45, params.operating.cabin_temp_k);
   cabin_.temperature_k = params.operating.cabin_temp_k;
   cabin_.total_pressure_pa = params.operating.cabin_pressure_pa;
+
+  // The station is already running: cycle the beds at design conditions so
+  // they start loaded and mid-cycle rather than clean. At least one step, so
+  // the first telemetry and power request are real values.
+  constexpr double kWarmStepS = 5.0;
+  double t = 0.0;
+  do {
+    last_result_ = ars_->step(kWarmStepS, cabin_);
+    t += kWarmStepS;
+  } while (t < warm_start_s_);
+  full_power_w_ = last_result_.heater_power_w + last_result_.blower_power_w;
+  design_flow_scfm_ = params.operating.inlet_flow_scfm;
+  capture_ema_ = capture_efficiency();
 
   // Publishers.
   co2_removal_pub_ =
@@ -62,22 +90,11 @@ CallbackReturn ArsNode::on_configure(const rclcpp_lifecycle::State &)
     "/ssos/ars/bed_states", 10);
   cycle_phase_pub_ = this->create_publisher<std_msgs::msg::Float64MultiArray>(
     "/ssos/ars/cycle_phase", 10);
-  heartbeat_pub_ =
-    this->create_publisher<SubsystemHeartbeat>("/ssos/ars/heartbeat", 10);
-  fault_pub_ = this->create_publisher<FaultEvent>("/ssos/fault_event", 10);
 
-  // Subscriber to the simulation world state.
-  world_state_sub_ = this->create_subscription<WorldState>(
-    "/sim/world_state", 10, std::bind(&ArsNode::on_world_state, this, _1));
-
-  // Closed-loop feedback: prefer the live cabin CO2 from cabin_node so the
-  // ARS inlet tracks the actual cabin and the loop self-regulates.
-  cabin_co2_sub_ = this->create_subscription<std_msgs::msg::Float64>(
-    "/ssos/cabin/co2_ppm", 10, std::bind(&ArsNode::on_cabin_co2, this, _1));
-
-  // Registration client.
-  register_client_ =
-    this->create_client<RegisterSubsystem>("/ssos/register_subsystem");
+  cabin_sub_ = this->create_subscription<space_station_interfaces::msg::CabinAtmosphere>(
+    "/ssos/cabin/atmosphere", 10, std::bind(&ArsNode::on_cabin, this, _1));
+  health_.configure();
+  drills_.start();
   eps_coupling_ = this->get_parameter("eps_coupling").as_bool();
   power_.start(eps_coupling_);
 
@@ -96,32 +113,25 @@ CallbackReturn ArsNode::on_activate(const rclcpp_lifecycle::State &)
   telemetry_pub_->on_activate();
   bed_states_pub_->on_activate();
   cycle_phase_pub_->on_activate();
-  heartbeat_pub_->on_activate();
-  fault_pub_->on_activate();
-
-  first_step_ = true;
+  health_.activate();
+  clock_.reset();
   const auto period = std::chrono::duration<double>(1.0 / std::max(step_rate_hz_, 1.0e-3));
   step_timer_ = this->create_wall_timer(
     std::chrono::duration_cast<std::chrono::nanoseconds>(period),
     std::bind(&ArsNode::step, this));
 
-  register_with_manager();
   RCLCPP_INFO(get_logger(), "ARS activated");
   return CallbackReturn::SUCCESS;
 }
 
 CallbackReturn ArsNode::on_deactivate(const rclcpp_lifecycle::State &)
 {
-  if (step_timer_) {
-    step_timer_->cancel();
-    step_timer_.reset();
-  }
+  step_timer_.reset();
   co2_removal_pub_->on_deactivate();
   telemetry_pub_->on_deactivate();
   bed_states_pub_->on_deactivate();
   cycle_phase_pub_->on_deactivate();
-  heartbeat_pub_->on_deactivate();
-  fault_pub_->on_deactivate();
+  health_.deactivate();
   return CallbackReturn::SUCCESS;
 }
 
@@ -132,58 +142,82 @@ CallbackReturn ArsNode::on_cleanup(const rclcpp_lifecycle::State &)
   telemetry_pub_.reset();
   bed_states_pub_.reset();
   cycle_phase_pub_.reset();
-  heartbeat_pub_.reset();
-  fault_pub_.reset();
-  world_state_sub_.reset();
-  cabin_co2_sub_.reset();
-  register_client_.reset();
+  cabin_sub_.reset();
+  health_.cleanup();
+  drills_.stop();
   power_.stop();
   ars_.reset();
   bridge_.reset();
   return CallbackReturn::SUCCESS;
 }
 
-void ArsNode::on_world_state(const WorldState::SharedPtr msg)
+void ArsNode::on_cabin(const space_station_interfaces::msg::CabinAtmosphere::SharedPtr msg)
 {
-  const double total_p = units::kpa_to_pa(msg->cabin_pressure_kpa);
-  cabin_.total_pressure_pa = total_p;
-  cabin_.temperature_k = units::celsius_to_kelvin(msg->cabin_temp_celsius);
-  // Only seed CO2 from the simulator until the cabin_node feedback arrives;
-  // afterwards on_cabin_co2() owns the inlet ppCO2 (closed loop).
-  if (!have_cabin_co2_) {
-    cabin_.co2_partial_pressure_pa =
-      units::ppm_to_fraction(msg->atmospheric_co2_ppm) * total_p;
-  }
-  cabin_.h2o_partial_pressure_pa =
-    gas::water_pp_from_rh(0.40, cabin_.temperature_k);
-  have_world_state_ = true;
+  cabin_.total_pressure_pa = units::kpa_to_pa(msg->total_pressure_kpa);
+  cabin_.temperature_k = units::celsius_to_kelvin(msg->temperature_c);
+  cabin_.co2_partial_pressure_pa = units::kpa_to_pa(msg->co2_partial_pressure_kpa);
+  cabin_.h2o_partial_pressure_pa = units::kpa_to_pa(msg->h2o_partial_pressure_kpa);
 }
 
-void ArsNode::on_cabin_co2(const std_msgs::msg::Float64::SharedPtr msg)
+double ArsNode::capture_efficiency() const
 {
-  // ppm -> partial pressure using the current cabin total pressure.
-  cabin_.co2_partial_pressure_pa =
-    units::ppm_to_fraction(msg->data) * cabin_.total_pressure_pa;
-  have_cabin_co2_ = true;
+  // CO2 drawn in with the process air [kg/s].
+  const double co2_in = units::scfm_to_m3s(last_result_.blower_flow_scfm) *
+    cabin_.co2_partial_pressure_pa / (units::R_GAS * cabin_.temperature_k) * units::M_CO2;
+  return co2_in > 1.0e-12 ? last_result_.co2_removal_rate_kg_s / co2_in : 0.0;
+}
+
+void ArsNode::apply_parameters()
+{
+  // Drills act on the hardware the parameters describe: a degraded sorbent,
+  // a stopped blower or dead bed heaters.
+  active_params_ = bridge_->read_ars_parameters();
+  if (drills_.active("ars_scrubber_degraded")) {
+    active_params_.efficiency.capture_efficiency = drills_.param("capture_efficiency", 0.2);
+  } else if (drills_.active("ars_blower_failure")) {
+    active_params_.operating.inlet_flow_scfm = 0.01;
+  } else if (drills_.active("ars_heater_failure")) {
+    active_params_.heater.total_power_w = 0.0;
+    active_params_.heater.central_power_w = 0.0;
+  }
+  apply_saturation();
+}
+
+void ArsNode::apply_saturation()
+{
+  // The system removal is the cycle-average capture; beds that are not being
+  // regenerated capture less each half-cycle.
+  ars::ArsParameters p = active_params_;
+  p.efficiency.capture_efficiency *= 1.0 - 0.9 * saturation_;
+  ars_->set_parameters(p);
+}
+
+void ArsNode::update_saturation(double dt)
+{
+  const double decay = std::exp(-dt / active_params_.cycle.half_cycle_s());
+  const double before = saturation_;
+  saturation_ = drills_.active("ars_heater_failure") ?
+    1.0 - (1.0 - saturation_) * decay : saturation_ * decay;
+  if (saturation_ < 1.0e-4) {
+    saturation_ = 0.0;
+  }
+  if (saturation_ != before) {
+    apply_saturation();
+  }
 }
 
 void ArsNode::step()
 {
   const rclcpp::Time now = this->now();
-  double dt = 1.0 / std::max(step_rate_hz_, 1.0e-3);
-  if (!first_step_) {
-    const double measured = (now - last_step_time_).seconds();
-    if (measured > 0.0 && measured < 100.0) {
-      dt = measured;
-    }
-  }
-  first_step_ = false;
-  last_step_time_ = now;
-
-  // Apply any committed dynamic parameter changes before stepping.
-  if (params_dirty_) {
-    ars_->set_parameters(bridge_->read_ars_parameters());
+  if (drills_.update(now) || params_dirty_) {
+    apply_parameters();
     params_dirty_ = false;
+  }
+  const double dt = clock_.advance(now);
+  if (clock_.capped()) {
+    static rclcpp::Clock wall(RCL_STEADY_TIME);
+    RCLCPP_WARN_THROTTLE(get_logger(), wall, 60000,
+      "simulation is running faster than the ARS can follow; raise step_rate_hz");
   }
 
   // Cap the physics step so accelerated sim time (large dt) stays stable: split
@@ -195,11 +229,16 @@ void ArsNode::step()
   // Without the blower and bed heaters the 4BMS does nothing: hold the beds
   // and report no removal until EPS powers it again.
   const double supply = power_.powered_fraction();
-  if (supply > 0.999) {
+  if (dt <= 0.0) {
+    // Paused: hold the beds.
+  } else if (supply > 0.999) {
+    update_saturation(dt);
     for (int i = 0; i < chunks; ++i) {
       last_result_ = ars_->step(h, cabin_);
     }
     full_power_w_ = last_result_.heater_power_w + last_result_.blower_power_w;
+    capture_ema_ += (capture_efficiency() - capture_ema_) *
+      (1.0 - std::exp(-dt / std::max(capture_time_constant_s_, 1.0)));
   } else {
     last_result_.co2_removal_rate_kg_s = 0.0;
     last_result_.co2_removal_rate_kg_day = 0.0;
@@ -232,6 +271,8 @@ void ArsNode::step()
   kv("blower_flow_scfm", last_result_.blower_flow_scfm);
   kv("precooler_exit_k", last_result_.precooler_exit_temp_k);
   kv("adsorbing_train", last_result_.adsorbing_train);
+  kv("capture_efficiency", capture_efficiency());
+  kv("capture_efficiency_avg", capture_ema_);
   kv("power_demand_w", full_power_w_);
   kv("power_supply_fraction", supply);
   status.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
@@ -286,47 +327,19 @@ void ArsNode::step()
     cycle_phase_pub_->publish(phase);
   }
 
-  // Fault detection (edge-triggered: publish a fault only when health changes,
-  // never every step, so a momentary dip can't spam the fault bus / flip state).
-  bool healthy = true;
-  std::string health_msg = "nominal";
-  if (enable_auto_faults_ &&
-      EclssDiagnostics::ars_co2_removal_low(last_result_.co2_removal_rate_kg_day,
-                                            co2_required_kg_day_)) {
-    healthy = false;
-    health_msg = "CO2 removal below requirement";
-  }
-  if (!healthy && was_healthy_) {
-    fault_pub_->publish(EclssDiagnostics::make_fault(
-      now, "ars", "co2_removal_below_requirement",
-      FaultEvent::SEVERITY_CRITICAL, health_msg, {"/ssos/ars/co2_removal_kg_day"}));
-  }
-  was_healthy_ = healthy;
-
+  std::string fault, msg = "nominal";
   if (!power_.powered()) {
-    healthy = false;
-    health_msg = power_.status();
+    fault = "ars_power_loss";
+    msg = power_.status();
+  } else if (enable_auto_faults_ && last_result_.blower_flow_scfm < 0.1 * design_flow_scfm_) {
+    fault = "ars_no_process_flow";
+    msg = "no process air flow through the beds";
+  } else if (enable_auto_faults_ && capture_ema_ < min_capture_efficiency_) {
+    fault = "co2_removal_low";
+    msg = "CO2 capture efficiency below limit";
   }
-
-  // Heartbeat.
-  heartbeat_pub_->publish(EclssDiagnostics::make_heartbeat(
-    now, "ars", SubsystemHeartbeat::LIFECYCLE_ACTIVE, healthy, health_msg));
-}
-
-void ArsNode::register_with_manager()
-{
-  if (!register_client_->wait_for_service(std::chrono::milliseconds(200))) {
-    RCLCPP_WARN(get_logger(),
-                "system_manager registration service unavailable; continuing");
-    return;
-  }
-  auto req = std::make_shared<RegisterSubsystem::Request>();
-  req->subsystem_name = "ars";
-  req->published_topics = {"/ssos/ars/co2_removal_kg_day", "/ssos/ars/diagnostics",
-                           "/ssos/ars/bed_states", "/ssos/ars/cycle_phase"};
-  req->subscribed_topics = {"/sim/world_state"};
-  req->heartbeat_topic = "/ssos/ars/heartbeat";
-  register_client_->async_send_request(req);
+  health_.report(now, fault, msg, FaultEvent::SEVERITY_CRITICAL,
+    {"/ssos/ars/co2_removal_kg_day"});
 }
 
 rcl_interfaces::msg::SetParametersResult ArsNode::on_set_parameters(
@@ -348,8 +361,8 @@ rcl_interfaces::msg::SetParametersResult ArsNode::on_set_parameters(
       enable_auto_faults_ = p.as_bool();
       continue;
     }
-    if (n == "co2_required_kg_day") {
-      co2_required_kg_day_ = p.as_double();
+    if (n == "min_capture_efficiency") {
+      min_capture_efficiency_ = p.as_double();
       continue;
     }
     if (n == "step_rate_hz") {

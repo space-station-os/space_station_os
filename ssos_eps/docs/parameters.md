@@ -53,7 +53,7 @@ factory functions supply defaults only. Names mirror the physics structs.
 | `solar.array.derate_with_beta_cosine` | false | apply cos(β); off because the beta gimbals track β (legacy: true) |
 | `solar.array.beta_max_deg` | 75 | peak β over a precession cycle |
 | `solar.array.beta_precession_orbits` | 930 | orbits per β cycle, counted on sunrise; ~60 days (legacy: 10) |
-| `solar.array.beta_lock_limit_deg` | 72 | \|β\| at which the SARJ locks |
+| `solar.array.beta_lock_limit_deg` | 76 | \|β\| at which the SARJ locks; above `beta_max_deg`, so only the `array_gimbal_lock` drill locks it |
 | `solar.array.gimbal_lock_derate` | 0.6 | extra factor while locked |
 | `solar.array.use_fixed_beta` / `fixed_beta_deg` | false / 0 | hold β constant |
 | `solar.thermal.ambient_temp_c` | 20 | panel temperature with no generation [°C] |
@@ -80,9 +80,9 @@ factory functions supply defaults only. Names mirror the physics structs.
 | `battery.min_cell_voltage_v` | 3.00 | discharge cut-off per cell [V] |
 | `battery.thermal_mass_j_k` | 2.0e5 | lumped heat capacity [J/K] |
 | `battery.heat_transfer_w_k` | 20 | conductance to cold plate [W/K] |
-| `battery.coldplate_temp_c` | 10 | cold plate temperature [°C] |
+| `battery.coldplate_temp_c` | 20 | cold plate temperature [°C] |
 | `battery.max_temp_c` | 35 | over-temperature limit [°C] |
-| `battery.initial_soc` / `initial_temp_c` | 0.80 / 10 | state at configure |
+| `battery.initial_soc` / `initial_temp_c` | 0.95 / 20 | state at configure; the first step moves each ORU to its thermal equilibrium |
 
 ## BCDU
 
@@ -132,7 +132,7 @@ clears the regulated band.
 | `ddcu.heat_transfer_w_k` | 8 | conductance to cold plate [W/K] |
 | `ddcu.coldplate_temp_c` | 18 | cold plate temperature [°C] |
 | `ddcu.trip_temp_c` / `reset_temp_c` | 70 / 55 | over-temperature trip and reset [°C] |
-| `ddcu.initial_temp_c` | 20 | temperature at configure [°C] |
+| `ddcu.initial_temp_c` | 20 | temperature at configure [°C]; the first step moves each DDCU to its thermal equilibrium (`coldplate + loss / heat_transfer`), so there is no warm-up |
 
 ## Loads
 

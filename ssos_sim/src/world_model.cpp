@@ -5,9 +5,9 @@
 namespace ssos_sim
 {
 
-/// Default LEO world model.
-/// Models basic orbital eclipse cycling and holds atmosphere/thermal state.
-/// Physics refinement (drag, J2, thermal dynamics) comes in later iterations.
+/// Default LEO world model: eclipse cycling on a circular orbit. The cabin
+/// fields are initial conditions only; cabin_node owns the cabin atmosphere
+/// and the thermal network owns temperatures once they are running.
 class DefaultWorldModel : public WorldModel
 {
 public:
@@ -23,23 +23,7 @@ public:
   void step(double dt) override
   {
     elapsed_s_ += dt;
-
-    // Eclipse cycling based on orbital period
-    bool was_in_eclipse = state_.in_eclipse;
     update_illumination();
-
-    // Slight cabin temp drift during eclipse (simplified thermal model)
-    if (state_.in_eclipse) {
-      state_.cabin_temp_celsius -= 0.001 * dt;  // Very slow cooling
-    } else {
-      // Drift back toward nominal 22°C
-      state_.cabin_temp_celsius += 0.001 * dt * (22.0 - state_.cabin_temp_celsius);
-    }
-
-    // Clamp cabin temp to reasonable range
-    state_.cabin_temp_celsius = std::max(18.0, std::min(26.0, state_.cabin_temp_celsius));
-
-    (void)was_in_eclipse;  // Available for event detection in future
   }
 
   WorldState get_state() const override

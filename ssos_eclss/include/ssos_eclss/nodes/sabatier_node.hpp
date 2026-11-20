@@ -9,11 +9,9 @@
 
 #include "diagnostic_msgs/msg/diagnostic_array.hpp"
 #include "std_msgs/msg/float64.hpp"
-#include "space_station_interfaces/msg/fault_event.hpp"
-#include "space_station_interfaces/msg/subsystem_heartbeat.hpp"
-#include "space_station_interfaces/srv/register_subsystem.hpp"
 
 #include "ssos_eclss/nodes/eps_power_client.hpp"
+#include "ssos_eclss/nodes/node_support.hpp"
 #include "ssos_eclss/sabatier/sabatier_system.hpp"
 
 // Lifecycle node wrapping the Sabatier CO2-reduction reactor. Closes the ECLSS
@@ -25,9 +23,6 @@ namespace ssos_eclss
 namespace nodes
 {
 
-using RegisterSubsystem = space_station_interfaces::srv::RegisterSubsystem;
-using SubsystemHeartbeat = space_station_interfaces::msg::SubsystemHeartbeat;
-using FaultEvent = space_station_interfaces::msg::FaultEvent;
 using CallbackReturn =
   rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
 
@@ -43,30 +38,30 @@ public:
 
 private:
   void step();
-  void register_with_manager();
+  void publish(const rclcpp::Time & now, double co2_in_mol_s, double supply);
 
   std::unique_ptr<sabatier::SabatierSystem> sabatier_;
   sabatier::SabatierResult last_result_{};
 
-  // Closed-loop inputs (latched from topics).
-  double co2_available_kg_s_{0.0};  // from ARS desorption
-  double h2_available_mol_s_{0.0};  // derived from OGS O2 (2 H2 per O2)
+  // Feed streams: ARS CO2 removal [kg/s] and OGS O2 [kg/s] (2 H2 per O2);
+  // nothing arrives from a silent unit.
+  LatchedValue co2_in_{kKgDayToKgS, 0.0};
+  LatchedValue ogs_o2_{kKgDayToKgS, 0.0};
 
   rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float64>::SharedPtr water_pub_;
   rclcpp_lifecycle::LifecyclePublisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr
     telemetry_pub_;
-  rclcpp_lifecycle::LifecyclePublisher<SubsystemHeartbeat>::SharedPtr heartbeat_pub_;
-  rclcpp_lifecycle::LifecyclePublisher<FaultEvent>::SharedPtr fault_pub_;
-
-  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr ars_co2_sub_;
-  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr ogs_o2_sub_;
-  rclcpp::Client<RegisterSubsystem>::SharedPtr register_client_;
   rclcpp::TimerBase::SharedPtr step_timer_;
   rclcpp::TimerBase::SharedPtr autostart_timer_;
 
+  StepClock clock_;
+  InjectedFaults drills_;
+  HealthReporter health_;
+
   double step_rate_hz_{1.0};
-  rclcpp::Time last_step_time_;
-  bool first_step_{true};
+  double min_reactor_temp_k_{550.0};
+  bool stepped_{false};   // conversion is only judged after a reactor step
+  bool enable_auto_faults_{true};
 
   // Power from ssos_eps; full_power_w_ is the demand at full function.
   EpsPowerClient power_{this, "eclss_sabatier", 2};

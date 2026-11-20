@@ -2,6 +2,7 @@
 #define SSOS_SIM__SIMULATION_CONTROLLER_HPP_
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -49,6 +50,15 @@ public:
   const std::string & scenario_name() const { return scenario_name_; }
   const std::vector<ScheduledFault> & fault_schedule() const { return fault_schedule_; }
 
+  /// The drill currently running: one fault at a time across the station.
+  struct ActiveDrill
+  {
+    std::string target;
+    std::string type;
+    double expires_s;   // < 0 = until cleared
+  };
+  const std::optional<ActiveDrill> & active_drill() const { return drill_; }
+
 private:
   // Publishers
   rclcpp_lifecycle::LifecyclePublisher<WorldState>::SharedPtr world_state_pub_;
@@ -71,6 +81,7 @@ private:
   bool paused_{false};  // true while time_scale <= 0 (sim time frozen)
   std::string scenario_name_;
   std::vector<ScheduledFault> fault_schedule_;
+  std::optional<ActiveDrill> drill_;
 
   // Callbacks
   void step();
@@ -86,8 +97,11 @@ private:
   // Fault processing
   void check_fault_schedule();
   void fire_fault(const ScheduledFault & fault);
-  void apply_fault_effects(const std::string & target, const std::string & fault_type,
-                           const std::string & parameters_json);
+  // Admit a drill (or a clear_faults) if no other drill is running.
+  bool start_drill(const std::string & target, const std::string & type,
+                   const std::string & parameters_json, double duration_s, std::string & reason);
+  void publish_fault(const std::string & target, const std::string & type,
+                     const std::string & description, const std::string & interface = "");
 };
 
 }  // namespace ssos_sim

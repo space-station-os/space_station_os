@@ -40,16 +40,6 @@ FaultEvent EclssDiagnostics::make_fault(const rclcpp::Time & stamp,
   return ev;
 }
 
-bool EclssDiagnostics::ars_co2_removal_low(double removal_kg_day, double required_kg_day)
-{
-  return removal_kg_day < required_kg_day;
-}
-
-bool EclssDiagnostics::bed_underheated(double max_bed_temp_k, double target_temp_k)
-{
-  return max_bed_temp_k < target_temp_k;
-}
-
 rclcpp::TimerBase::SharedPtr EclssDiagnostics::maybe_autostart(
   rclcpp_lifecycle::LifecycleNode * node, int delay_ms)
 {

@@ -1,17 +1,24 @@
+# Standalone network with no heat sink: base_link warms by about 0.04 degC/s
+# from its own internal power, so it has no steady state and no per-node
+# limits; only max_temp_threshold applies. Everything starts at 20 degC.
+
 - node_name: "base_link"
   parent_link: ""
   heat_capacity: 30300.0
   internal_power: 1380.0
   conductance: 0.0
+  initial_temperature_c: 20.0
 
 - node_name: "SolarPanel1"
   parent_link: "base_link"
   heat_capacity: 1200.0
   internal_power: 10.0
   conductance: 0.5
+  initial_temperature_c: 20.0
 
 - node_name: "SolarPanel2"
   parent_link: "base_link"
   heat_capacity: 1200.0
   internal_power: 10.0
   conductance: 0.5
+  initial_temperature_c: 20.0

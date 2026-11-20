@@ -43,6 +43,33 @@ bool ThermalDiagnostics::should_raise_fault(bool healthy)
   return raise;
 }
 
+void ThermalDiagnostics::register_with_manager(
+  rclcpp::Client<RegisterSubsystem> & client,
+  const std::function<RegisterSubsystem::Request::SharedPtr()> & make_request)
+{
+  const auto now = std::chrono::steady_clock::now();
+  if (register_pending_ && now - register_sent_ > std::chrono::seconds(5)) {
+    client.remove_pending_request(register_request_id_);
+    register_pending_ = false;
+  }
+  if (registered_ || register_pending_ || !client.service_is_ready()) {
+    return;
+  }
+  register_pending_ = true;
+  register_sent_ = now;
+  register_request_id_ = client.async_send_request(
+    make_request(), [this](rclcpp::Client<RegisterSubsystem>::SharedFuture response) {
+      register_pending_ = false;
+      registered_ = response.get()->accepted;
+    }).request_id;
+}
+
+void ThermalDiagnostics::reset_registration()
+{
+  registered_ = false;
+  register_pending_ = false;
+}
+
 rclcpp::TimerBase::SharedPtr ThermalDiagnostics::maybe_autostart(
   rclcpp_lifecycle::LifecycleNode * node, int delay_ms)
 {

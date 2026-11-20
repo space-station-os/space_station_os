@@ -92,11 +92,27 @@ TEST(SolarArray, GimbalLockAppliesExtraDerate)
 {
   SolarArrayParams p = zero_beta();
   p.derate_with_beta_cosine = true;
-  p.fixed_beta_deg = -75.0;
+  p.fixed_beta_deg = -80.0;
   SolarArrayModel array(p);
   const SolarArrayState & s = array.step(1.0, 1361.0, false);
   EXPECT_TRUE(s.gimbal_locked);
-  EXPECT_NEAR(s.beta_derate, std::cos(units::deg_to_rad(75.0)) * p.gimbal_lock_derate, 1.0e-9);
+  EXPECT_NEAR(s.beta_derate, std::cos(units::deg_to_rad(80.0)) * p.gimbal_lock_derate, 1.0e-9);
+}
+
+TEST(SolarArray, NominalBetaNeverLocksButALockCanBeForced)
+{
+  SolarArrayParams p = zero_beta();
+  p.fixed_beta_deg = p.beta_max_deg;
+  SolarArrayModel array(p);
+  EXPECT_FALSE(array.step(1.0, 1361.0, false).gimbal_locked);
+
+  array.set_gimbal_lock(true);
+  const SolarArrayState & s = array.step(1.0, 1361.0, false);
+  EXPECT_TRUE(s.gimbal_locked);
+  EXPECT_DOUBLE_EQ(s.beta_derate, p.gimbal_lock_derate);
+
+  array.set_gimbal_lock(false);
+  EXPECT_FALSE(array.step(1.0, 1361.0, false).gimbal_locked);
 }
 
 TEST(SolarArray, BetaPrecessesOncePerCycleOfSunrises)

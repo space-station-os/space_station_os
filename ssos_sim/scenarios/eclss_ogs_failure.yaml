@@ -1,0 +1,28 @@
+scenario:
+  # The OGS stack fails for 6 h. O2 production stops and cabin ppO2 falls
+  # about 0.7 kPa/day; the OGS reports the failure (DEGRADED). When it is
+  # repaired the ppO2 controller restores the cabin.
+  name: eclss_ogs_failure
+  duration_s: 28800
+  sim_rate_hz: 20
+  time_scale: 60.0
+
+  faults:
+    - name: ogs_stack_failure
+      type: ogs_generation_failure
+      target_subsystem: ogs
+      trigger:
+        type: time
+        at_s: 600.0
+      duration_s: 21600
+
+  expected_outcomes:
+    - state_transition:
+        from: NOMINAL
+        to: DEGRADED
+        before_s: 660.0
+    - state_transition:
+        from: DEGRADED
+        to: NOMINAL
+        via: RECOVERY
+        before_s: 22800.0

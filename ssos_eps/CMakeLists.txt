@@ -16,6 +16,7 @@ find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(lifecycle_msgs REQUIRED)
+find_package(ssos_sim REQUIRED)
 
 # ---- Pure physics library (NO ROS) ----
 add_library(eps_physics
@@ -48,7 +49,7 @@ add_library(eps_ros
   src/nodes/eps_fault_injection.cpp
   src/nodes/eps_node.cpp
 )
-target_link_libraries(eps_ros eps_physics)
+target_link_libraries(eps_ros eps_physics ssos_sim::ssos_fault_format)
 ament_target_dependencies(eps_ros
   rclcpp rclcpp_lifecycle space_station_interfaces
   std_msgs sensor_msgs diagnostic_msgs lifecycle_msgs
@@ -120,7 +121,6 @@ if(BUILD_TESTING)
 
   # End-to-end with ssos_core's system_manager and ssos_sim's controller.
   find_package(ssos_core REQUIRED)
-  find_package(ssos_sim REQUIRED)
   ament_add_gtest(test_eps_scenario test/ros/test_eps_scenario.cpp
     ENV ROS_DOMAIN_ID=63
     TIMEOUT 120)
@@ -151,6 +151,6 @@ endif()
 ament_export_targets(export_ssos_eps HAS_LIBRARY_TARGET)
 ament_export_include_directories(include)
 ament_export_dependencies(rclcpp rclcpp_lifecycle space_station_interfaces
-  std_msgs sensor_msgs diagnostic_msgs lifecycle_msgs)
+  std_msgs sensor_msgs diagnostic_msgs lifecycle_msgs ssos_sim)
 
 ament_package()

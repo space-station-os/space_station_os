@@ -4,16 +4,21 @@
 ars_node:
   ros__parameters:
     use_sim_time: true
-    # Stepped at 10 Hz: with sim time_scale up to ~30x this keeps each physics
-    # step small enough (a few sim-seconds) for a stable, CFL-respecting bed PDE.
-    step_rate_hz: 10.0
+    # The bed PDE sub-steps itself at 5 s, so its cost follows sim time, not
+    # the tick rate; 1 Hz keeps the CPU low at 1x and is fine up to 60x.
+    step_rate_hz: 1.0
     # Request power from ssos_eps as load eclss_ars; without EPS running the unit runs as if fully powered.
     eps_coupling: true
-    co2_required_kg_day: 4.16
-    # Faults are injected explicitly (sim fault-injection), not auto-tripped. In
-    # the closed loop, removal settles at the crew production rate (== this
-    # requirement), so an auto threshold check there is a knife-edge.
-    enable_auto_faults: false
+    # Alarm when single-pass CO2 capture, averaged over about a half-cycle,
+    # falls below this (nominal is well above it, day and night).
+    min_capture_efficiency: 0.5
+    capture_time_constant_s: 4800.0
+    # Beds are cycled this long at design conditions before going live, so the
+    # station starts with loaded beds rather than clean ones (a quarter of the
+    # first half-cycle, not a full cyclic steady state). Each 5 s of pre-roll
+    # costs about 30 ms at configure.
+    warm_start_s: 1200.0
+    enable_auto_faults: true
 
     ars:
       bed:

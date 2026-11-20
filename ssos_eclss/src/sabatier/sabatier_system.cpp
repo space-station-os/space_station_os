@@ -1,6 +1,7 @@
 #include "ssos_eclss/sabatier/sabatier_system.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 #include "ssos_eclss/common/units.hpp"
 
@@ -50,23 +51,35 @@ SabatierResult SabatierSystem::step(double dt, double co2_in_mol_s, double h2_in
   // Exothermic heat release.
   r.reaction_heat_w = r.co2_consumed_mol_s * params_.kinetics.heat_of_reaction;
 
-  // Lumped reactor thermal update with a thermostatic trim heater:
-  //   dT/dt = (Q_rxn + Q_heater - UA(T - Tamb)) / C.
-  // The heater makes up the deficit between heat loss and the exotherm and adds
-  // a proportional pull toward the operating setpoint, so the reactor holds
-  // temperature (and conversion) instead of collapsing at low throughput. It
-  // never cools (>= 0); if the exotherm exceeds the loss at high throughput the
-  // heater backs off to zero and the equilibrium limit caps conversion.
-  const double q_loss = params_.reactor.heat_loss_coeff_w_k *
-                        (reactor_temp_k_ - params_.reactor.ambient_temp_k);
-  const double setpoint = params_.reactor.operating_temp_k;
-  double q_heater = (q_loss - r.reaction_heat_w) +
-                    params_.reactor.heater_gain_w_k * (setpoint - reactor_temp_k_);
-  q_heater = std::clamp(q_heater, 0.0, params_.reactor.trim_heater_max_w);
-  r.heater_power_w = q_heater;
-  const double dT = (r.reaction_heat_w + q_heater - q_loss) /
-                    std::max(params_.reactor.thermal_mass_j_k, 1.0);
-  reactor_temp_k_ += dT * dt;
+  // Lumped reactor thermal model with a thermostatic trim heater:
+  //   C dT/dt = Q_rxn + Q_heater - UA (T - Tamb).
+  // The heater makes up the loss not covered by the exotherm and pulls toward
+  // the setpoint, never cooling. While it is within its range the reactor
+  // follows C dT/dt = K (Tset - T); when it saturates, the reactor relaxes
+  // toward the balance of loss against exotherm plus heater. Both are solved
+  // exactly, so large steps stay stable.
+  const auto & rp = params_.reactor;
+  const double c = std::max(rp.thermal_mass_j_k, 1.0);
+  const double ua = rp.heat_loss_coeff_w_k;
+  const double setpoint = rp.operating_temp_k;
+  auto heater_command = [&](double t) {
+      return ua * (t - rp.ambient_temp_k) - r.reaction_heat_w + rp.heater_gain_w_k * (setpoint - t);
+    };
+  const double command = heater_command(reactor_temp_k_);
+  const double q_heater = std::clamp(command, 0.0, rp.trim_heater_max_w);
+  if (q_heater == command && rp.heater_gain_w_k > 0.0) {
+    reactor_temp_k_ = setpoint +
+      (reactor_temp_k_ - setpoint) * std::exp(-rp.heater_gain_w_k * dt / c);
+    r.heater_power_w = std::clamp(heater_command(reactor_temp_k_), 0.0, rp.trim_heater_max_w);
+  } else {
+    r.heater_power_w = q_heater;
+    if (ua > 0.0) {
+      const double t_eq = rp.ambient_temp_k + (r.reaction_heat_w + q_heater) / ua;
+      reactor_temp_k_ = t_eq + (reactor_temp_k_ - t_eq) * std::exp(-ua * dt / c);
+    } else {
+      reactor_temp_k_ += (r.reaction_heat_w + q_heater) * dt / c;
+    }
+  }
   r.reactor_temp_k = reactor_temp_k_;
   return r;
 }

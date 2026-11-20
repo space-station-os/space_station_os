@@ -25,6 +25,16 @@ void WaterRecoverySystem::reset()
   multifiltration_->reset();
 }
 
+void WaterRecoverySystem::exhaust_multifiltration()
+{
+  multifiltration_->exhaust();
+}
+
+void WaterRecoverySystem::replace_multifiltration()
+{
+  multifiltration_->reset();
+}
+
 void WaterRecoverySystem::set_parameters(const WrsParameters & params)
 {
   params_ = params;
@@ -87,7 +97,10 @@ MultifiltrationParams default_multifiltration_params()
   MultifiltrationParams p{};
   p.bed_capacity_kg = 0.5;          // contaminant capacity [kg]
   p.removal_efficiency = 0.999;
-  p.inlet_conductivity_us = 2000.0; // feed conductivity [uS/cm]
+  // WPA influent (UPA distillate + condensate); at about 16 kg/day the bed
+  // lasts over 200 days before breakthrough.
+  p.inlet_conductivity_us = 150.0;
+  p.breakthrough_onset = 0.9;
   return p;
 }
 

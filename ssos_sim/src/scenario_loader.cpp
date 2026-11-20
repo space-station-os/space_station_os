@@ -135,6 +135,12 @@ Scenario load_scenario_file(const std::string & path)
         }
         fault.trigger_time_s = trigger["at_s"].as<double>();
         fault.parameters_json = params_to_json(f["params"], fault.name);
+        std::string reason;
+        if (!validate_drill(fault.target_subsystem, fault.fault_type,
+          parse_fault_params(fault.parameters_json), reason))
+        {
+          throw std::runtime_error("fault '" + fault.name + "': " + reason);
+        }
         fault.duration_s = f["duration_s"] ? f["duration_s"].as<double>() : 0.0;
         scenario.faults.push_back(fault);
       }
@@ -153,16 +159,6 @@ Scenario load_scenario_file(const std::string & path)
       return a.trigger_time_s < b.trigger_time_s;
     });
   return scenario;
-}
-
-std::string fault_description(const std::string & prefix, const std::string & label,
-                              const std::string & parameters_json, double duration_s)
-{
-  std::ostringstream ss;
-  ss << prefix << ": " << label << " (params: "
-     << (parameters_json.empty() ? "{}" : parameters_json)
-     << ", duration: " << std::setprecision(6) << duration_s << " s)";
-  return ss.str();
 }
 
 }  // namespace ssos_sim

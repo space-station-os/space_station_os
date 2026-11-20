@@ -20,8 +20,10 @@ MultifiltrationResult MultifiltrationModel::process(double dt, double feed_kg_s,
   const double cap = std::max(params_.bed_capacity_kg, 1.0e-12);
   const double utilization = accumulated_kg_ / cap;
 
-  // Removal efficiency degrades as the bed approaches breakthrough.
-  const double remaining = std::clamp(1.0 - utilization, 0.0, 1.0);
+  // Ion-exchange beds hold their removal until the front nears the outlet,
+  // then fall off over the last part of the capacity.
+  const double onset = std::clamp(params_.breakthrough_onset, 0.0, 0.999);
+  const double remaining = std::clamp((1.0 - utilization) / (1.0 - onset), 0.0, 1.0);
   const double eff = std::clamp(params_.removal_efficiency, 0.0, 1.0) * remaining;
 
   r.product_kg_s = feed_kg_s;

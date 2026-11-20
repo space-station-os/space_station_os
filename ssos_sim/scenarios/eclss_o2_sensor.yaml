@@ -1,36 +1,31 @@
 scenario:
+  # The cabin O2 sensor sticks at 23% for 2 h. The cabin analyser flags the
+  # disagreement (DEGRADED), the OGS throttles back on the false reading, and
+  # everything recovers once the sensor is restored.
   name: eclss_o2_sensor_fault
-  duration_s: 300
-  sim_rate_hz: 10
-
-  initial_conditions:
-    altitude_km: 408.0
-    orbital_velocity_mps: 7660.0
-    atmospheric_o2_pct: 20.9
-    atmospheric_co2_ppm: 400.0
-    cabin_pressure_kpa: 101.3
-    cabin_temp_celsius: 22.0
-    solar_flux_w_m2: 1361.0
-    in_eclipse: false
+  duration_s: 14400
+  sim_rate_hz: 20
+  time_scale: 60.0
 
   faults:
-    - name: o2_sensor_stuck
-      type: sensor_stuck_at
-      target_subsystem: eclss
-      target_interface: /eclss/o2_reading
+    - name: o2_sensor_stuck_high
+      type: o2_sensor_stuck
+      target_subsystem: cabin
+      target_interface: /ssos/cabin/atmosphere
       trigger:
         type: time
-        at_s: 120.0
+        at_s: 600.0
       params:
-        stuck_value: 0.0
-      duration_s: 0  # Permanent until cleared
+        value_pct: 23.0
+      duration_s: 7200
 
   expected_outcomes:
     - state_transition:
         from: NOMINAL
         to: DEGRADED
-        before_s: 125.0
+        before_s: 660.0
     - state_transition:
         from: DEGRADED
         to: NOMINAL
-        before_s: 200.0
+        via: RECOVERY
+        before_s: 8100.0

@@ -8,10 +8,9 @@ step timer at the new period).
 
 | Parameter | Default | Meaning |
 |-----------|---------|---------|
-| `enable_failure` | `false` | Gate for overheat fault/heartbeat-unhealthy detection |
 | `enable_cooling` | `true` | Gate for sending `Coolant` action goals |
 | `cooling_trigger_threshold` | `330.0` | [°C] Average temperature above which a cooling goal is sent |
-| `max_temp_threshold` | `420.0` | [°C] Hottest-node temperature above which the node reports unhealthy (only checked if `enable_failure`) |
+| `max_temp_threshold` | `420.0` | [°C] Limit for nodes without `max_temperature_c`; the shipped `thermal_network.yaml` sets 500 |
 | `cooling_rate` | `0.05` | Fractional rate of heat removed during cooling (currently unused by `updateSimulation`, kept for parity with the legacy solver) |
 | `thermal_update_dt` | `0.5` | [s] Step timer period and the largest RK4 sub-step; each tick integrates the ROS time elapsed since the last one (capped at 600 s) |
 | `heat_load_timeout_s` | `10.0` | [s] A `/thermal/heat_loads` source that has not published for this long is dropped |
@@ -25,6 +24,20 @@ Config lives in `config/thermal_network.yaml` (these parameters) and
 `config/thermal_nodes.yaml` (the node/link graph: `node_name`,
 `parent_link`, `heat_capacity`, `internal_power`, `conductance` per entry —
 same shape as the legacy solver, loaded by `ThermalNetwork::load_from_yaml`).
+
+Optional per-node keys in the graph:
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `initial_temperature_c` | 20 °C | [°C] Start temperature |
+| `max_temperature_c` | `max_temp_threshold` | [°C] Node limit; unhealthy above it, clears 1 °C below it |
+| `fixed_temperature_c` | — | [°C] Makes the node a boundary held at this temperature |
+
+`config/station_thermal_nodes.yaml` sets the initial temperatures to the
+steady state for the nominal EPS loads and gives `base_link` 27 °C,
+`itcs_coldplate` 28 °C and the solar panels 80 °C limits, and `base_link` a
+10 MJ/K lumped capacity for cabin air, structure and equipment (see the
+[README](../README.md#networks)).
 
 `thermal_nodes.yaml` is now a 3-node star: `base_link` (`parent_link: ""`,
 the root — its `heat_capacity`/`internal_power` are the sums of the ~46
@@ -42,8 +55,7 @@ see [REFACTOR_PLAN.md](../REFACTOR_PLAN.md) for the fix.
 # Accepted (dynamic):
 ros2 param set /thermal_network max_temp_threshold 350.0
 
-# Force an overheat fault for testing:
-ros2 param set /thermal_network enable_failure true
+# Force an overheat fault on the standalone network (no per-node limits):
 ros2 param set /thermal_network max_temp_threshold 25.0
 ```
 

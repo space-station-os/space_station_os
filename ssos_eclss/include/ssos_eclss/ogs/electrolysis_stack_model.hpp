@@ -32,6 +32,9 @@ public:
 
   /// Reset the stack temperature.
   void reset(double temperature_k);
+  /// Set the stack to its steady temperature at this current, where waste
+  /// heat equals the heat taken by the coolant.
+  void settle(double current_a, double pressure_pa, double coolant_temp_k);
 
   /// Advance the stack thermal state and compute the operating point.
   /// @param dt          timestep [s]

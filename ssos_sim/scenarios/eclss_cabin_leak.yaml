@@ -1,0 +1,30 @@
+scenario:
+  # A 2 mm hole (3e-6 m^2) for 1 h: about 38 kg/day of air lost. The cabin
+  # reports the leak rate (DEGRADED) while pressure control holds pressure
+  # from the N2 tanks and the OGS raises O2 production.
+  name: eclss_cabin_leak
+  duration_s: 10800
+  sim_rate_hz: 20
+  time_scale: 60.0
+
+  faults:
+    - name: hull_leak
+      type: cabin_leak
+      target_subsystem: cabin
+      trigger:
+        type: time
+        at_s: 600.0
+      params:
+        area_m2: 3.0e-6
+      duration_s: 3600
+
+  expected_outcomes:
+    - state_transition:
+        from: NOMINAL
+        to: DEGRADED
+        before_s: 660.0
+    - state_transition:
+        from: DEGRADED
+        to: NOMINAL
+        via: RECOVERY
+        before_s: 4800.0

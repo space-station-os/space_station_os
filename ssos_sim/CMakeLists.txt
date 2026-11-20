@@ -16,6 +16,13 @@ find_package(ament_index_cpp REQUIRED)
 find_package(yaml-cpp REQUIRED)
 
 # Simulation library (exported so other packages' tests can run it)
+# Fault description format shared with the subsystems (no ROS).
+add_library(ssos_fault_format src/fault_format.cpp)
+target_include_directories(ssos_fault_format PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
 add_library(ssos_sim_lib
   src/simulation_controller.cpp
   src/scenario_loader.cpp
@@ -25,7 +32,7 @@ target_include_directories(ssos_sim_lib PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
-target_link_libraries(ssos_sim_lib yaml-cpp)
+target_link_libraries(ssos_sim_lib ssos_fault_format yaml-cpp)
 ament_target_dependencies(ssos_sim_lib
   rclcpp
   rclcpp_lifecycle
@@ -44,7 +51,7 @@ ament_target_dependencies(simulation_controller
 )
 
 # Install
-install(TARGETS ssos_sim_lib
+install(TARGETS ssos_fault_format ssos_sim_lib
   EXPORT export_ssos_sim
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Fault-injection dialog.
+"""Fault-injection (drill) dialog.
 
-A small operator tool to trigger a chosen ECLSS or EPS fault. Each fault goes
-through the simulation controller's /sim/inject_fault service (published as a
-FaultEvent the system manager, event feed and target subsystem pick up). ECLSS
-recipes also change live parameters on the target node to produce the physical
-effect; EPS applies its injected faults itself. "Restore Nominal" reverts the
-ECLSS parameters and sends clear_faults to EPS.
+Every drill goes through the simulation controller's /sim/inject_fault
+service. The controller allows one drill at a time and announces it on
+/ssos/fault_event; the target subsystem applies it to its own physics, and
+system_manager and the event feed see it there. "Restore Nominal" sends
+clear_faults to the subsystem running the drill.
 """
+import json
 import time
 
 from PyQt5.QtWidgets import (
@@ -15,9 +15,6 @@ from PyQt5.QtWidgets import (
     QPushButton
 )
 from PyQt5.QtCore import Qt
-
-from rcl_interfaces.srv import SetParameters
-from rcl_interfaces.msg import Parameter as RclParameter, ParameterValue, ParameterType
 
 try:
     from space_station_interfaces.srv import InjectFault
@@ -28,110 +25,102 @@ except Exception:
 
 from space_station import theme
 
-# Each fault: apply/restore are (node, param, value) triples applied live via
-# SetParameters; the /sim/inject_fault call announces it on /ssos/fault_event.
-FAULTS = [
-    {
-        "label": "O₂ Generation Failure (OGS)",
-        "desc": "OGS electrolysis stack current → 0 A. O₂ production stops, the "
-                "cabin O₂ balance turns negative, and the OGS reports a fault.",
-        "target": "ogs", "type": "ogs_generation_failure", "params_json": "{}",
-        "apply": [("ogs_node", "stack_current_a", 0.0),
-                  ("ogs_node", "enable_auto_faults", True)],
-        "restore": [("ogs_node", "stack_current_a", 27.0),
-                    ("ogs_node", "enable_auto_faults", False)],
-    },
-    {
-        "label": "UPA Assembly Failure (WRS)",
-        "desc": "Urine Processor stops (throughput → 0 kg/day). The wastewater "
-                "tank fills and potable water steadily declines.",
-        "target": "wrs", "type": "upa_assembly_failure", "params_json": "{}",
-        "apply": [("wrs_node", "max_urine_process_kg_day", 0.0)],
-        "restore": [("wrs_node", "max_urine_process_kg_day", 13.6)],
-    },
-    {
-        "label": "CO₂ Scrubber Degraded (ARS)",
-        "desc": "ARS capture efficiency → 0.2. CO₂ removal collapses and cabin "
-                "CO₂ climbs toward the alarm; ARS and cabin report faults.",
-        "target": "ars", "type": "ars_scrubber_degraded", "params_json": "{}",
-        "apply": [("ars_node", "ars.efficiency.capture_efficiency", 0.2),
-                  ("ars_node", "enable_auto_faults", True),
-                  ("cabin_node", "enable_auto_faults", True)],
-        "restore": [("ars_node", "ars.efficiency.capture_efficiency", 0.84),
-                    ("ars_node", "enable_auto_faults", False),
-                    ("cabin_node", "enable_auto_faults", False)],
-    },
-    # EPS faults go through the simulation fault path only: ssos_sim publishes
-    # them on /ssos/fault_event and eps_node applies them to the physics.
-    # "Restore Nominal" sends clear_faults to EPS.
-    {
-        "label": "Solar Array Degradation (EPS)",
-        "desc": "Array output → 30% of beginning-of-life. Daylight surplus shrinks, "
-                "the batteries stop recovering and the bank drains orbit by orbit.",
-        "target": "eps", "type": "solar_array_degraded",
-        "params_json": '{"factor": 0.3}',
-        "apply": [], "restore": [], "clear": "eps",
-    },
-    {
-        "label": "Battery Degradation (EPS)",
-        "desc": "Battery state of health → 50%: every ORU holds half its rated "
-                "charge, so eclipse discharges go twice as deep.",
-        "target": "eps", "type": "battery_degraded",
-        "params_json": '{"state_of_health": 0.5}',
-        "apply": [], "restore": [], "clear": "eps",
-    },
-    {
-        "label": "Low Battery (EPS)",
-        "desc": "The battery bank is drained to 15%. In daylight the arrays recharge "
-                "it past the 20% threshold and EPS recovers on its own.",
-        "target": "eps", "type": "battery_low_soc", "params_json": '{"soc": 0.15}',
-        "apply": [], "restore": [], "clear": "eps",
-    },
-    {
-        "label": "Battery ORU Failure (EPS)",
-        "desc": "Battery ORU 0 fails and is isolated. Its channel partner carries "
-                "the channel load alone; EPS reports degraded.",
-        "target": "eps", "type": "battery_oru_failed", "params_json": '{"oru": 0}',
-        "apply": [], "restore": [], "clear": "eps",
-    },
-    {
-        "label": "BCDU Fault (EPS)",
-        "desc": "BCDU on channel 0 isolates its batteries. MBSU 0 reroutes the "
-                "channel's share onto channels 1 and 2; EPS reports degraded.",
-        "target": "eps", "type": "bcdu_fault", "params_json": '{"channel": 0}',
-        "apply": [], "restore": [], "clear": "eps",
-    },
-    {
-        "label": "Load Spike (EPS)",
-        "desc": "Every station load doubles (60 kW requested). DDCUs above their "
-                "6.25 kW rating shed their least critical loads first, and the "
-                "batteries discharge even in daylight.",
-        "target": "eps", "type": "load_spike", "params_json": '{"demand_scale": 2.0}',
-        "apply": [], "restore": [], "clear": "eps",
-    },
-    {
-        "label": "DDCU Fault (EPS)",
-        "desc": "DDCU 0 trips. The loads it carries lose power and are reported "
-                "shed; new load requests are placed on the other DDCUs.",
-        "target": "eps", "type": "ddcu_fault", "params_json": '{"ddcu": 0}',
-        "apply": [], "restore": [], "clear": "eps",
-    },
-    {
-        "label": "Channel Loss (EPS)",
-        "desc": "The feeder from power channel 0 to MBSU 0 opens. The MBSU "
-                "reroutes its demand onto channels 1 and 2, so no load is lost.",
-        "target": "eps", "type": "mbsu_channel_loss", "params_json": '{"channel": 0}',
-        "apply": [], "restore": [], "clear": "eps",
-    },
-    {
-        "label": "O₂ Sensor Stuck (inject)",
-        "desc": "Injects a stuck cabin O₂-sensor fault via /sim/inject_fault, "
-                "announced to the system manager and event feed.",
-        "target": "eclss", "type": "sensor_stuck_at",
-        "params_json": '{"stuck_value": 15.0}',
-        "apply": [], "restore": [],
-    },
+
+def _drill(label, target, fault_type, desc, **params):
+    return {"label": label, "target": target, "type": fault_type,
+            "params": params, "desc": desc}
+
+
+# Each drill: (list label, target subsystem, fault type, description, params).
+# See the fault catalogs in ssos_eclss, ssos_eps and ssos_thermal.
+DRILLS = [
+    ("ECLSS", [
+        _drill("Crew metabolic surge", "crew", "crew_metabolic_surge",
+               "Crew CO2, O2 and humidity loads double (EVA prep, heavy work). "
+               "Cabin CO2 climbs until the ARS catches up.", scale=2.0),
+        _drill("Cabin leak", "cabin", "cabin_leak",
+               "A 2 mm hole: about 38 kg/day of air lost. Pressure control "
+               "draws N2 from the tanks and the OGS raises O2 production.",
+               area_m2=3.0e-6),
+        _drill("O2 sensor stuck high", "cabin", "o2_sensor_stuck",
+               "The cabin O2 sensor reads 23% regardless of the air. The OGS "
+               "throttles back and the analyser flags the disagreement.",
+               value_pct=23.0),
+        _drill("CHX failure", "cabin", "chx_failure",
+               "The condensing heat exchanger stops removing humidity. Cabin RH "
+               "rises past 75% in about 6 hours."),
+        _drill("CO2 scrubber degraded (ARS)", "ars", "ars_scrubber_degraded",
+               "Sorbent capture efficiency drops to 0.2. CO2 removal collapses "
+               "and cabin CO2 climbs toward the alarm.", capture_efficiency=0.2),
+        _drill("ARS blower failure", "ars", "ars_blower_failure",
+               "No process air through the beds: CO2 removal stops."),
+        _drill("ARS bed heater failure", "ars", "ars_heater_failure",
+               "Beds cannot regenerate. Capture fades as the sorbent saturates; "
+               "the ARS flags low removal after about 2 hours."),
+        _drill("O2 generation failure (OGS)", "ogs", "ogs_generation_failure",
+               "The OGS stack stops. Cabin O2 falls about 0.7 kPa/day until "
+               "O2 makeup from the tanks takes over."),
+        _drill("UPA failure (WRS)", "wrs", "upa_assembly_failure",
+               "The urine processor stops. The wastewater tank fills and potable "
+               "water recovery drops."),
+        _drill("Multifiltration breakthrough (WRS)", "wrs",
+               "wpa_multifiltration_breakthrough",
+               "The water processor bed is exhausted: product water goes out of "
+               "spec and is recycled. Clearing the drill swaps in a new bed."),
+        _drill("Sabatier reactor failure", "sabatier", "sabatier_reactor_failure",
+               "No CO2 reduction: all CO2 from the ARS is vented and Sabatier "
+               "water to the WRS stops."),
+    ]),
+    ("EPS", [
+        _drill("Solar array degradation", "eps", "solar_array_degraded",
+               "Array output drops to 30% of beginning-of-life; the batteries "
+               "drain orbit by orbit.", factor=0.3),
+        _drill("Solar array gimbal lock", "eps", "array_gimbal_lock",
+               "The arrays stop tracking and output falls to 60%."),
+        _drill("Battery degradation", "eps", "battery_degraded",
+               "Battery state of health drops to 50%; eclipse discharges go twice "
+               "as deep.", state_of_health=0.5),
+        _drill("Low battery", "eps", "battery_low_soc",
+               "The bank is drained to 15%. In daylight the arrays recharge it.",
+               soc=0.15),
+        _drill("Battery ORU failure", "eps", "battery_oru_failed",
+               "Battery ORU 0 fails and is isolated; its channel partner carries "
+               "the channel.", oru=0),
+        _drill("Battery ORU overheat", "eps", "battery_oru_overheat",
+               "Extra heat in ORU 0 takes it past its temperature limit in about "
+               "an hour.", oru=0, heat_w=800.0),
+        _drill("BCDU fault", "eps", "bcdu_fault",
+               "The BCDU on channel 0 isolates its batteries; MBSU 0 reroutes.",
+               channel=0),
+        _drill("Channel feeder open", "eps", "mbsu_channel_loss",
+               "The feeder from channel 0 to MBSU 0 opens; the MBSU reroutes "
+               "onto channels 1 and 2.", channel=0),
+        _drill("MBSU fault", "eps", "mbsu_fault",
+               "MBSU 0 is isolated and its DDCUs lose power.", mbsu=0),
+        _drill("DDCU fault", "eps", "ddcu_fault",
+               "DDCU 0 trips and its loads are shed.", ddcu=0),
+        _drill("DDCU overheat", "eps", "ddcu_overheat",
+               "Extra heat in DDCU 0 trips it on over-temperature after about "
+               "40 minutes; its loads are shed until it cools.", ddcu=0,
+               heat_w=400.0),
+        _drill("Load spike", "eps", "load_spike",
+               "Every station load doubles; DDCUs over their rating shed their "
+               "least critical loads.", demand_scale=2.0),
+    ]),
+    ("Thermal", [
+        _drill("ITCS loop degraded", "thermal", "itcs_loop_degraded",
+               "The internal coolant loop runs at 26 C: the EPS cold plate passes "
+               "its 28 C limit within about a minute and the cabin warms toward "
+               "31 C.", sink_temp_c=26.0),
+        _drill("Cold-plate conductance loss", "thermal",
+               "coldplate_conductance_loss",
+               "The EPS cold plate keeps 35% of its coupling to the coolant and "
+               "passes its 28 C limit within a few minutes.", factor=0.35),
+    ]),
 ]
+
+FAULTS = [d for _, drills in DRILLS for d in drills]
+TARGETS = sorted({d["target"] for d in FAULTS})
 
 
 class FaultInjectorDialog(QDialog):
@@ -139,21 +128,27 @@ class FaultInjectorDialog(QDialog):
         super().__init__(parent)
         self.node = node
         self.executor = executor
+        self._active_target = None
         self.setWindowTitle("Fault Injection")
-        self.resize(560, 460)
+        self.resize(620, 560)
 
         root = QVBoxLayout(self)
         root.setContentsMargins(16, 16, 16, 16)
         root.setSpacing(12)
 
-        title = QLabel("INJECT FAULT")
+        title = QLabel("RUN A DRILL  ·  one at a time")
         title.setFont(theme.label_font(13, tracking=2.0))
         root.addWidget(title)
 
         self.list = QListWidget()
-        for f in FAULTS:
-            QListWidgetItem(f["label"], self.list)
-        self.list.setCurrentRow(0)
+        self._rows = []
+        for group, drills in DRILLS:
+            header = QListWidgetItem(group.upper(), self.list)
+            header.setFlags(Qt.NoItemFlags)
+            self._rows.append(None)
+            for d in drills:
+                QListWidgetItem("    " + d["label"], self.list)
+                self._rows.append(d)
         self.list.currentRowChanged.connect(self._on_select)
         root.addWidget(self.list, 1)
 
@@ -164,6 +159,7 @@ class FaultInjectorDialog(QDialog):
         root.addWidget(self.desc)
 
         self.status = QLabel("")
+        self.status.setWordWrap(True)
         self.status.setStyleSheet(f"color: {theme.color('txt3')};")
         root.addWidget(self.status)
 
@@ -175,7 +171,7 @@ class FaultInjectorDialog(QDialog):
         self.btn_close = QPushButton("Close")
         self.btn_close.clicked.connect(self.accept)
         btns.addWidget(self.btn_close)
-        self.btn_inject = QPushButton("Inject Fault")
+        self.btn_inject = QPushButton("Start Drill")
         self.btn_inject.setDefault(True)
         self.btn_inject.setStyleSheet(
             f"color: {theme.color('red')}; font-weight: bold;")
@@ -183,7 +179,7 @@ class FaultInjectorDialog(QDialog):
         btns.addWidget(self.btn_inject)
         root.addLayout(btns)
 
-        self._on_select(0)
+        self.list.setCurrentRow(1)
 
     # ---------------- ROS helpers ----------------
     def _call_sync(self, client, req, timeout=2.0):
@@ -199,74 +195,47 @@ class FaultInjectorDialog(QDialog):
                 break
         return fut.result() if fut.done() else None
 
-    @staticmethod
-    def _param_value(v):
-        if isinstance(v, bool):
-            return ParameterValue(type=ParameterType.PARAMETER_BOOL, bool_value=v)
-        if isinstance(v, int):
-            return ParameterValue(type=ParameterType.PARAMETER_INTEGER, integer_value=v)
-        if isinstance(v, float):
-            return ParameterValue(type=ParameterType.PARAMETER_DOUBLE, double_value=v)
-        return ParameterValue(type=ParameterType.PARAMETER_STRING, string_value=str(v))
-
-    def _set_params(self, triples):
-        by_node = {}
-        for node_name, name, val in triples:
-            by_node.setdefault(node_name, []).append(
-                RclParameter(name=name, value=self._param_value(val)))
-        ok = True
-        for node_name, params in by_node.items():
-            cli = self.node.create_client(
-                SetParameters, f"/{node_name}/set_parameters")
-            req = SetParameters.Request()
-            req.parameters = params
-            resp = self._call_sync(cli, req)
-            self.node.destroy_client(cli)
-            if resp is None or not all(r.successful for r in resp.results):
-                ok = False
-        return ok
-
-    def _inject(self, fault):
+    def _inject(self, target, fault_type, params):
         if not _HAVE_INJECT:
             return None
         cli = self.node.create_client(InjectFault, "/sim/inject_fault")
         req = InjectFault.Request()
-        req.target_subsystem = fault["target"]
-        req.fault_type = fault["type"]
-        req.parameters_json = fault.get("params_json", "{}")
-        req.duration_s = -1.0
+        req.target_subsystem = target
+        req.fault_type = fault_type
+        req.parameters_json = json.dumps(params)
+        req.duration_s = 0.0          # until Restore Nominal
         resp = self._call_sync(cli, req)
         self.node.destroy_client(cli)
         return resp
 
     # ---------------- UI actions ----------------
-    def _on_select(self, row):
-        if 0 <= row < len(FAULTS):
-            self.desc.setText(FAULTS[row]["desc"])
+    def _selected(self):
+        row = self.list.currentRow()
+        return self._rows[row] if 0 <= row < len(self._rows) else None
+
+    def _on_select(self, _row):
+        drill = self._selected()
+        self.btn_inject.setEnabled(drill is not None)
+        self.desc.setText(drill["desc"] if drill else "")
 
     def _on_inject(self):
-        row = self.list.currentRow()
-        if not (0 <= row < len(FAULTS)):
+        drill = self._selected()
+        if drill is None:
             return
-        fault = FAULTS[row]
-        resp = self._inject(fault)
-        params_ok = self._set_params(fault["apply"]) if fault["apply"] else True
-        announced = "announced" if resp is not None else "no sim service"
-        if params_ok:
-            self.status.setText(f"Injected '{fault['label']}' ({announced}).")
+        resp = self._inject(drill["target"], drill["type"], drill["params"])
+        if resp is None:
+            self.status.setText("Simulation controller not available.")
+        elif resp.success:
+            self._active_target = drill["target"]
+            self.status.setText(f"Drill running: {drill['label']}.")
         else:
-            self.status.setText(
-                f"'{fault['label']}' {announced}, but some parameters were "
-                f"rejected (is the node running?).")
+            self.status.setText(f"Not started: {resp.message}")
 
     def _on_restore(self):
-        triples = []
-        for f in FAULTS:
-            triples.extend(f["restore"])
-        ok = self._set_params(triples) if triples else True
-        for target in sorted({f["clear"] for f in FAULTS if f.get("clear")}):
-            ok = self._inject({"target": target, "type": "clear_faults",
-                               "params_json": "{}"}) is not None and ok
-        self.status.setText(
-            "Restored nominal parameters." if ok else
-            "Restore incomplete — some nodes may be unavailable.")
+        # The running drill's subsystem if we started it; otherwise every
+        # subsystem, since the drill may have come from a scenario.
+        targets = [self._active_target] if self._active_target else TARGETS
+        ok = all(self._inject(t, "clear_faults", {}) is not None for t in targets)
+        self._active_target = None
+        self.status.setText("Drill cleared; systems returning to nominal." if ok else
+                            "Simulation controller not available.")

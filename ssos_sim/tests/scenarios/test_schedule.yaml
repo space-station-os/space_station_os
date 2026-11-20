@@ -28,5 +28,5 @@ scenario:
       params:
         channel: 3
         note: "quoted"
-        clear: false
-      duration_s: 0
+        enabled: false
+      duration_s: 20

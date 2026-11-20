@@ -63,6 +63,7 @@ CallbackReturn CoolantNode::on_configure(const rclcpp_lifecycle::State &)
   radiator_client_ = this->create_client<space_station_interfaces::srv::VentHeat>(
     "/tcs/radiator_a/vent_heat");
   register_client_ = this->create_client<RegisterSubsystem>("/ssos/register_subsystem");
+  diag_.reset_registration();
 
   action_server_ = rclcpp_action::create_server<Coolant>(
     this, "coolant_heat_transfer",
@@ -86,10 +87,10 @@ CallbackReturn CoolantNode::on_activate(const rclcpp_lifecycle::State &)
 
   heartbeat_timer_ = this->create_wall_timer(1s, [this]() {
       publishHeartbeat();
+      registerWithManager();
       publishStatus();
     });
 
-  registerWithManager();
   RCLCPP_INFO(get_logger(), "Coolant node activated");
   return CallbackReturn::SUCCESS;
 }
@@ -162,17 +163,13 @@ void CoolantNode::publishStatus()
 
 void CoolantNode::registerWithManager()
 {
-  if (!register_client_->wait_for_service(std::chrono::milliseconds(200))) {
-    RCLCPP_WARN(get_logger(),
-                "system_manager registration service unavailable; continuing");
-    return;
-  }
-  auto req = std::make_shared<RegisterSubsystem::Request>();
-  req->subsystem_name = "coolant";
-  req->published_topics = {"/thermal/coolant/status"};
-  req->subscribed_topics = {};
-  req->heartbeat_topic = "/ssos/coolant/heartbeat";
-  register_client_->async_send_request(req);
+  diag_.register_with_manager(*register_client_, [] {
+      auto req = std::make_shared<RegisterSubsystem::Request>();
+      req->subsystem_name = "coolant";
+      req->published_topics = {"/thermal/coolant/status"};
+      req->heartbeat_topic = "/ssos/coolant/heartbeat";
+      return req;
+    });
 }
 
 rclcpp_action::GoalResponse CoolantNode::handleGoal(

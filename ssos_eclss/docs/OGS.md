@@ -128,8 +128,11 @@ detection:** O₂ production below `o2_required_kg_day` raises an `o2_production
 
 ```
 step_rate_hz           # node step rate [Hz]
-stack_current_a        # PSM current [A], selectable 10-46.9 (default 27 ~ 5.3 kg/day)
-o2_required_kg_day     # life-support requirement for fault detection
+stack_current_a        # starting PSM current [A] (17.5 ~ 3.45 kg/day for 4 crew + leakage)
+o2_setpoint_kpa        # cabin ppO2 the controller holds (21.0)
+o2_kp_a_per_kpa        # PI proportional gain [A/kPa]
+o2_integral_time_s     # PI integral time [s]
+max_current_a          # PSM current limit (46.9 A)
 ```
 
 The full electrochemical parameter set (cell area, i0, R_membrane,
@@ -138,12 +141,14 @@ extended to the parameter bridge for live tuning.
 
 ### How it emulates the ISS unit
 
-The node mirrors the OGA control concept: a selectable PSM current drives a
-28-cell stack, the model returns the resulting O₂ (to cabin) and H₂ (to
-Sabatier) at the paper's rates, and the stack thermal state evolves like the
-real recirculation-loop-cooled stack. Setting `stack_current_a` to 46.9 A
-reproduces the OGA's maximum 9.25 kg/day; lower currents emulate part-load
-operation for a smaller crew.
+The node mirrors the OGA control concept: the PSM current drives a 28-cell
+stack, the model returns the resulting O₂ (to cabin) and H₂ (to Sabatier) at
+the paper's rates, and the stack thermal state evolves like the real
+recirculation-loop-cooled stack. The current is set by a PI loop on the cabin
+ppO2 reading, so production follows crew consumption and leakage (about
+3.45 kg/day for 4 crew); at the 46.9 A limit the stack makes the OGA's maximum
+9.25 kg/day. Feedwater comes from the WRS potable tank. Health is judged from
+O2 output against the commanded current.
 
 ---
 
@@ -152,7 +157,7 @@ operation for a smaller crew.
 ```bash
 ros2 launch ssos_eclss ogs_only.launch.py
 ros2 topic echo /ssos/ogs/o2_kg_day
-ros2 param set /ogs_node stack_current_a 46.9      # OGA maximum -> ~9.25 kg/day
+ros2 param set /ogs_node o2_setpoint_kpa 21.5     # the controller raises O2 production
 ```
 
 Tests (`test_electrolysis`) include `MaxRateMatchesAOGA` (9.25 kg/day @ 46.9 A),

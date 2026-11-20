@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <fstream>
+
 #include <stdexcept>
 #include <string>
 
@@ -38,9 +40,9 @@ TEST(ScenarioLoader, SortsFaultsAndConvertsParamsToJson)
   EXPECT_EQ(s.faults[0].target_subsystem, "eps");
   EXPECT_EQ(s.faults[0].target_interface, "/ssos/eps/bcdu/status");
   EXPECT_DOUBLE_EQ(s.faults[0].trigger_time_s, 10.0);
-  EXPECT_DOUBLE_EQ(s.faults[0].duration_s, 0.0);
+  EXPECT_DOUBLE_EQ(s.faults[0].duration_s, 20.0);
   EXPECT_EQ(s.faults[0].parameters_json,
-            "{\"channel\": 3, \"note\": \"quoted\", \"clear\": false}");
+            "{\"channel\": 3, \"note\": \"quoted\", \"enabled\": false}");
   EXPECT_EQ(s.faults[1].name, "late_fault");
   EXPECT_EQ(s.faults[1].parameters_json, "{\"demand_scale\": 2.0}");
   EXPECT_DOUBLE_EQ(s.faults[1].duration_s, 30.0);
@@ -69,4 +71,29 @@ TEST(ScenarioLoader, FaultDescriptionFormat)
             "Injected fault: bcdu_fault (params: {\"channel\": 2}, duration: 60 s)");
   EXPECT_EQ(fault_description("Scheduled fault", "x", "", 0.0),
             "Scheduled fault: x (params: {}, duration: 0 s)");
+}
+
+TEST(ScenarioLoader, RejectsUnknownDrills)
+{
+  const std::string path = ::testing::TempDir() + "/unknown_drill.yaml";
+  {
+    std::ofstream out(path);
+    out << "scenario:\n  name: x\n  faults:\n    - name: typo\n      type: bcdu_falt\n"
+        << "      target_subsystem: eps\n      trigger: {type: time, at_s: 1.0}\n";
+  }
+  EXPECT_THROW(ssos_sim::load_scenario_file(path), std::runtime_error);
+}
+
+TEST(FaultFormat, CatalogCoversEverySubsystem)
+{
+  for (const char * unit : {"crew", "cabin", "ars", "ogs", "wrs", "sabatier", "eps", "thermal"}) {
+    EXPECT_TRUE(ssos_sim::drill_catalog().count(unit)) << unit;
+  }
+  EXPECT_TRUE(ssos_sim::is_known_drill("eps", "bcdu_fault"));
+  EXPECT_FALSE(ssos_sim::is_known_drill("cabin", "bcdu_fault"));
+  std::string reason;
+  EXPECT_TRUE(ssos_sim::validate_drill("eps", "ddcu_fault", {{"ddcu", 7.0}}, reason));
+  EXPECT_FALSE(ssos_sim::validate_drill("eps", "ddcu_fault", {{"ddcu", 8.0}}, reason));
+  EXPECT_FALSE(ssos_sim::validate_drill("eps", "bcdu_fault", {{"channel", 1.5}}, reason));
+  EXPECT_FALSE(ssos_sim::validate_drill("eps", "load_spike", {{"clear", 1.0}}, reason));
 }

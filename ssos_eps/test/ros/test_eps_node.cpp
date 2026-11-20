@@ -2,6 +2,8 @@
 
 #include <chrono>
 #include <cmath>
+#include <functional>
+#include <map>
 #include <memory>
 #include <string>
 #include <thread>
@@ -12,6 +14,7 @@
 #include "space_station_interfaces/msg/thermal_node_data_array.hpp"
 
 #include "ssos_eps/nodes/eps_node.hpp"
+#include "ssos_sim/fault_format.hpp"
 
 using namespace std::chrono_literals;
 using lifecycle_msgs::msg::State;
@@ -66,6 +69,19 @@ protected:
       executor_.spin_some();
       std::this_thread::sleep_for(5ms);
     }
+  }
+
+  bool spin_until(const std::function<bool()> & done, std::chrono::milliseconds timeout)
+  {
+    const auto end = std::chrono::steady_clock::now() + timeout;
+    while (std::chrono::steady_clock::now() < end && rclcpp::ok()) {
+      executor_.spin_some();
+      if (done()) {
+        return true;
+      }
+      std::this_thread::sleep_for(5ms);
+    }
+    return false;
   }
 
   void bring_up()
@@ -255,7 +271,7 @@ TEST_F(EpsNodeTest, OruOverTemperatureReachesHeartbeatAndFaultEvent)
   ASSERT_FALSE(heartbeats.empty());
   EXPECT_TRUE(heartbeats.back().healthy);
 
-  // Same reproduction as review: limit below the ORU temperature (~10 C).
+  // Limit below the ORU temperature (~20 C).
   ASSERT_TRUE(node_->set_parameter(rclcpp::Parameter("battery.max_temp_c", 5.0)).successful);
   spin_for(300ms);
   EXPECT_TRUE(node_->last_state().oru_overheat);
@@ -557,6 +573,174 @@ TEST_F(EpsNodeTest, ThermalCouplingCanBeDisabled)
 
   EXPECT_EQ(heat_msgs, 0);
   EXPECT_TRUE(std::isnan(node_->coldplate_temp_c()));
+
+  tear_down();
+}
+
+TEST_F(EpsNodeTest, StartsOnOrbitSettled)
+{
+  node_->set_parameter(rclcpp::Parameter("step_rate_hz", 30.0));
+  bring_up();
+  spin_for(200ms);
+
+  const auto & s = node_->last_state();
+  const auto & battery = ssos_eps::battery::default_battery_oru_params();
+  const auto & ddcu = ssos_eps::ddcu::default_ddcu_params();
+  EXPECT_TRUE(s.healthy) << s.status_message;
+  EXPECT_NEAR(s.battery_soc, 0.95, 1.0e-3);
+  EXPECT_FALSE(s.array.gimbal_locked);
+  for (const auto & d : s.ddcus) {
+    EXPECT_NEAR(d.temperature_c, ddcu.coldplate_temp_c + d.heat_w / ddcu.heat_transfer_w_k, 1.0);
+  }
+  for (const auto & o : s.orus) {
+    EXPECT_NEAR(o.temperature_c,
+                battery.coldplate_temp_c + o.heat_w / battery.heat_transfer_w_k, 1.0);
+  }
+
+  tear_down();
+}
+
+TEST_F(EpsNodeTest, EveryDrillIsDetectedOnceAndRecovers)
+{
+  struct Drill
+  {
+    std::string type;
+    std::string params;
+    std::string detected;
+  };
+  const std::vector<Drill> drills = {
+    {"solar_array_degraded", "{}", "solar_array_degraded"},
+    {"array_gimbal_lock", "{}", "solar_array_gimbal_lock"},
+    {"battery_degraded", "{}", "battery_degraded"},
+    {"battery_oru_failed", "{\"oru\": 2}", "battery_oru_failed"},
+    {"battery_oru_overheat", "{\"oru\": 2}", "battery_oru_overtemp"},
+    {"bcdu_fault", "{\"channel\": 1}", "bcdu_fault"},
+    {"mbsu_channel_loss", "{\"channel\": 4}", "mbsu_feeder_open"},
+    {"mbsu_fault", "{\"mbsu\": 1}", "mbsu_bus_unstable"},
+    {"ddcu_fault", "{\"ddcu\": 3}", "ddcu_fault"},
+    {"ddcu_overheat", "{\"ddcu\": 3}", "ddcu_fault"},
+    {"load_spike", "{}", "ddcu_overload"},
+  };
+
+  // Every event EPS detects itself, by type: one drill must raise exactly one.
+  std::map<std::string, int> detected;
+  auto fault_sub = probe_->create_subscription<FaultEvent>(
+    "/ssos/fault_event", 50, [&](FaultEvent::SharedPtr m) {
+      if (m->subsystem_name == "eps" && m->description.rfind("Injected", 0) != 0) {
+        ++detected[m->fault_type];
+      }
+    });
+  auto fault_pub = probe_->create_publisher<FaultEvent>("/ssos/fault_event", 10);
+  auto inject = [&](const std::string & type, const std::string & params, double duration_s) {
+      FaultEvent ev;
+      ev.subsystem_name = "eps";
+      ev.fault_type = type;
+      ev.description = ssos_sim::fault_description("Injected fault", type, params, duration_s);
+      fault_pub->publish(ev);
+    };
+
+  // Small thermal masses so the overheat drills play out in wall time.
+  recreate_node(rclcpp::NodeOptions().parameter_overrides({
+      rclcpp::Parameter("step_rate_hz", 30.0),
+      rclcpp::Parameter("battery.thermal_mass_j_k", 4.0),
+      rclcpp::Parameter("ddcu.thermal_mass_j_k", 2.0)}));
+  bring_up();
+  const auto healthy = [this] {return node_->last_state().healthy;};
+  ASSERT_TRUE(spin_until(healthy, 1s));
+
+  for (std::size_t i = 0; i < drills.size(); ++i) {
+    const auto & d = drills[i];
+    // Alternate between ending the drill with clear_faults and by expiry.
+    const bool expires = i % 2 == 1;
+    detected.clear();
+    inject(d.type, d.params, expires ? 1.5 : 0.0);
+    EXPECT_TRUE(spin_until([this] {return !node_->last_state().healthy;}, 1s)) << d.type;
+    if (!expires) {
+      spin_for(300ms);
+      inject("clear_faults", "{}", 0.0);
+    }
+    EXPECT_TRUE(spin_until(healthy, 3s)) << d.type << ": " << node_->last_state().status_message;
+    spin_for(100ms);
+    EXPECT_EQ(detected, (std::map<std::string, int>{{d.detected, 1}})) << d.type;
+  }
+
+  // battery_low_soc recovers by recharging, which takes most of a daylight
+  // pass; ending the drill must not hand the charge back.
+  detected.clear();
+  inject("battery_low_soc", "{}", 0.0);
+  EXPECT_TRUE(spin_until([this] {return node_->last_state().low_soc;}, 1s));
+  spin_for(300ms);
+  inject("clear_faults", "{}", 0.0);
+  spin_for(300ms);
+  const double soc_after_clear = node_->last_state().battery_soc;
+  EXPECT_NEAR(soc_after_clear, 0.15, 1.0e-3);
+  spin_for(500ms);
+  EXPECT_GT(node_->last_state().battery_soc, soc_after_clear);
+  EXPECT_TRUE(node_->last_state().low_soc);
+  EXPECT_EQ(detected, (std::map<std::string, int>{{"low_battery_soc", 1}}));
+
+  tear_down();
+}
+
+TEST_F(EpsNodeTest, RegistrationRetriesUntilAccepted)
+{
+  using ssos_eps::nodes::RegisterSubsystem;
+  node_->set_parameter(rclcpp::Parameter("step_rate_hz", 30.0));
+  bring_up();
+  // system_manager comes up after EPS and turns the first request down.
+  spin_for(200ms);
+  int requests = 0;
+  auto srv = probe_->create_service<RegisterSubsystem>(
+    "/ssos/register_subsystem",
+    [&](const RegisterSubsystem::Request::SharedPtr req,
+    RegisterSubsystem::Response::SharedPtr res) {
+      EXPECT_EQ(req->subsystem_name, "eps");
+      EXPECT_EQ(req->heartbeat_topic, "/ssos/eps/heartbeat");
+      res->accepted = ++requests > 1;
+    });
+  EXPECT_TRUE(spin_until([&] {return requests >= 2;}, 2s));
+  spin_for(300ms);
+  EXPECT_EQ(requests, 2);
+
+  tear_down();
+}
+
+TEST_F(EpsNodeTest, DrillsSurviveDeactivateAndArriveWhileInactive)
+{
+  auto fault_pub = probe_->create_publisher<FaultEvent>("/ssos/fault_event", 10);
+  auto inject = [&](const std::string & type, const std::string & params) {
+      FaultEvent ev;
+      ev.subsystem_name = "eps";
+      ev.fault_type = type;
+      ev.description = ssos_sim::fault_description("Injected fault", type, params, 0.0);
+      fault_pub->publish(ev);
+    };
+  node_->set_parameter(rclcpp::Parameter("step_rate_hz", 30.0));
+  bring_up();
+  ASSERT_TRUE(spin_until([this] {return node_->last_state().healthy;}, 1s));
+
+  inject("ddcu_fault", "{\"ddcu\": 2}");
+  ASSERT_TRUE(spin_until([this] {return node_->last_state().ddcu_fault;}, 1s));
+
+  // Still faulted after a deactivate/activate cycle.
+  ASSERT_EQ(node_->deactivate().id(), State::PRIMARY_STATE_INACTIVE);
+  spin_for(200ms);
+  ASSERT_EQ(node_->activate().id(), State::PRIMARY_STATE_ACTIVE);
+  spin_for(200ms);
+  EXPECT_TRUE(node_->last_state().ddcu_fault);
+  EXPECT_EQ(node_->last_state().ddcus[2].mode, ssos_eps::ddcu::DdcuMode::TRIPPED);
+
+  // Cleared and replaced while inactive: applied on activation.
+  ASSERT_EQ(node_->deactivate().id(), State::PRIMARY_STATE_INACTIVE);
+  inject("clear_faults", "{}");
+  spin_for(100ms);
+  inject("bcdu_fault", "{\"channel\": 5}");
+  spin_for(200ms);
+  ASSERT_EQ(node_->activate().id(), State::PRIMARY_STATE_ACTIVE);
+  spin_for(200ms);
+  EXPECT_FALSE(node_->last_state().ddcu_fault);
+  EXPECT_TRUE(node_->last_state().bcdu_fault);
+  EXPECT_EQ(node_->last_state().channels[5].mode, ssos_eps::bcdu::BcduMode::FAULT);
 
   tear_down();
 }

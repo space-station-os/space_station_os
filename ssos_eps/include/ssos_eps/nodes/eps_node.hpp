@@ -1,6 +1,7 @@
 #ifndef SSOS_EPS__NODES__EPS_NODE_HPP_
 #define SSOS_EPS__NODES__EPS_NODE_HPP_
 
+#include <chrono>
 #include <limits>
 #include <memory>
 #include <string>
@@ -137,8 +138,10 @@ private:
   bool ddcu_overload_reported_{false};
   bool mbsu_unstable_reported_{false};
   bool redundancy_reported_{false};
+  bool feeder_open_reported_{false};
   bool array_degraded_reported_{false};
   bool battery_degraded_reported_{false};
+  bool gimbal_lock_reported_{false};
 
   // Thermal coupling: EPS heat goes to the network, the cold-plate
   // temperature comes back as the DDCU/battery cold plate.
@@ -150,6 +153,10 @@ private:
 
   EpsFaultInjection injection_;
   uint64_t applied_injection_revision_{0};
+
+  bool registered_{false};
+  bool registration_pending_{false};
+  std::chrono::steady_clock::time_point registration_sent_;
 
   rclcpp::Time last_step_time_;
   bool first_step_{true};

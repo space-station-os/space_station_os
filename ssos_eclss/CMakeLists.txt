@@ -16,6 +16,7 @@ find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(lifecycle_msgs REQUIRED)
+find_package(ssos_sim REQUIRED)
 
 include_directories(include)
 
@@ -37,12 +38,15 @@ add_library(eclss_physics
   src/ogs/electrolysis_stack_model.cpp
   src/ogs/gas_separator_model.cpp
   src/ogs/oxygen_generator_system.cpp
+  src/ogs/o2_controller.cpp
+  src/crew/crew_simulator.cpp
   src/wrs/distillation_model.cpp
   src/wrs/multifiltration_model.cpp
   src/wrs/catalytic_reactor_model.cpp
   src/wrs/water_recovery_system.cpp
   src/sabatier/reactor_kinetics.cpp
   src/sabatier/sabatier_system.cpp
+  src/cabin/atmosphere_control.cpp
   src/cabin/cabin_atmosphere.cpp
   src/cabin/crew_metabolic_model.cpp
   src/cabin/leak_model.cpp
@@ -67,8 +71,10 @@ add_library(eclss_ros
   src/nodes/cabin_node.cpp
   src/nodes/sabatier_node.cpp
   src/nodes/eps_power_client.cpp
+  src/nodes/node_support.cpp
+  src/nodes/crew_node.cpp
 )
-target_link_libraries(eclss_ros eclss_physics)
+target_link_libraries(eclss_ros eclss_physics ssos_sim::ssos_fault_format)
 ament_target_dependencies(eclss_ros
   rclcpp rclcpp_lifecycle space_station_interfaces
   std_msgs sensor_msgs diagnostic_msgs lifecycle_msgs
@@ -91,6 +97,10 @@ add_executable(cabin_node src/main/cabin_main.cpp)
 target_link_libraries(cabin_node eclss_ros)
 ament_target_dependencies(cabin_node rclcpp rclcpp_lifecycle)
 
+add_executable(crew_node src/main/crew_main.cpp)
+target_link_libraries(crew_node eclss_ros)
+ament_target_dependencies(crew_node rclcpp rclcpp_lifecycle)
+
 add_executable(sabatier_node src/main/sabatier_main.cpp)
 target_link_libraries(sabatier_node eclss_ros)
 ament_target_dependencies(sabatier_node rclcpp rclcpp_lifecycle)
@@ -110,7 +120,7 @@ install(TARGETS eclss_physics eclss_ros
   EXPORT export_ssos_eclss
   ARCHIVE DESTINATION lib LIBRARY DESTINATION lib RUNTIME DESTINATION bin
   INCLUDES DESTINATION include)
-install(TARGETS ars_node ogs_node wrs_node cabin_node sabatier_node
+install(TARGETS ars_node ogs_node wrs_node cabin_node sabatier_node crew_node
   RUNTIME DESTINATION lib/${PROJECT_NAME})
 install(TARGETS ars_validation parameter_sweep breakthrough_curve_gen
   RUNTIME DESTINATION lib/${PROJECT_NAME})
@@ -151,7 +161,8 @@ if(BUILD_TESTING)
   target_link_libraries(test_cycle_state_machine eclss_physics)
 
   # ---- ARS integration test ----
-  ament_add_gtest(test_four_bed_system test/integration/test_four_bed_system.cpp)
+  ament_add_gtest(test_four_bed_system test/integration/test_four_bed_system.cpp
+    TIMEOUT 300)
   target_link_libraries(test_four_bed_system eclss_physics)
 
   # ---- Cabin tests ----
@@ -182,6 +193,15 @@ if(BUILD_TESTING)
   ament_add_gtest(test_sabatier test/unit/wrs/test_sabatier.cpp)
   target_link_libraries(test_sabatier eclss_physics)
 
+  ament_add_gtest(test_o2_controller test/unit/ogs/test_o2_controller.cpp)
+  target_link_libraries(test_o2_controller eclss_physics)
+
+  ament_add_gtest(test_crew_simulator test/unit/crew/test_crew_simulator.cpp)
+  target_link_libraries(test_crew_simulator eclss_physics)
+
+  ament_add_gtest(test_atmosphere_control test/unit/cabin/test_atmosphere_control.cpp)
+  target_link_libraries(test_atmosphere_control eclss_physics)
+
   # ---- ROS lifecycle / parameter tests ----
   ament_add_gtest(test_ars_node test/ros/test_ars_node.cpp
     ENV ROS_DOMAIN_ID=68)
@@ -195,6 +215,16 @@ if(BUILD_TESTING)
   ament_target_dependencies(test_eps_power_client rclcpp rclcpp_lifecycle
     space_station_interfaces)
 
+  find_package(rosgraph_msgs REQUIRED)
+  # Several simulated hours of the ECLSS loop, including drills that take
+  # hours to show: allow for a loaded CI machine.
+  ament_add_gtest(test_eclss_station test/ros/test_eclss_station.cpp
+    ENV ROS_DOMAIN_ID=70
+    TIMEOUT 900)
+  target_link_libraries(test_eclss_station eclss_ros)
+  ament_target_dependencies(test_eclss_station rclcpp rclcpp_lifecycle
+    space_station_interfaces diagnostic_msgs lifecycle_msgs rosgraph_msgs)
+
   ament_add_gtest(test_parameter_bridge test/ros/test_parameter_bridge.cpp
     ENV ROS_DOMAIN_ID=69)
   target_link_libraries(test_parameter_bridge eclss_ros)
@@ -205,6 +235,6 @@ endif()
 ament_export_include_directories(include)
 ament_export_targets(export_ssos_eclss HAS_LIBRARY_TARGET)
 ament_export_dependencies(rclcpp rclcpp_lifecycle space_station_interfaces
-  std_msgs sensor_msgs diagnostic_msgs lifecycle_msgs)
+  std_msgs sensor_msgs diagnostic_msgs lifecycle_msgs ssos_sim)
 
 ament_package()

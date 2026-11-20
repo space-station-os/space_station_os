@@ -18,7 +18,9 @@
 // array -> SSU, works out what every channel can supply, routes DDCU demand
 // through the MBSUs onto the channels (shedding the least critical loads when
 // a DDCU is over its rating or an MBSU cannot cover its demand), then steps
-// the BCDUs/batteries and the DDCUs. No ROS.
+// the BCDUs/batteries and the DDCUs. The first step after a reset puts every
+// DDCU and ORU at its thermal equilibrium, so the station starts settled
+// instead of warming up from the initial temperature. No ROS.
 
 namespace ssos_eps
 {
@@ -76,13 +78,14 @@ struct EpsState
   bool bcdu_fault;             // at least one BCDU faulted
   bool oru_failed;             // at least one ORU failed
   bool oru_overheat;           // at least one ORU above its temperature limit
-  bool ddcu_fault;             // a DDCU with loads is tripped or off
+  bool ddcu_fault;             // a DDCU with loads is tripped, or off with its MBSU bus up
   bool ddcu_overload;          // a DDCU's requested load exceeds its rating
   bool mbsu_unstable;          // an MBSU has no usable bus
   bool redundancy_lost;        // an MBSU is down to fewer than its redundant sources
+  bool feeder_open;            // a channel's feeder to its MBSU is open
   bool array_degraded;         // array output below beginning of life
   bool battery_degraded;       // battery state of health below the minimum
-  bool healthy;                // none of the above
+  bool healthy;                // none of the above, and the array not gimbal-locked
   std::string status_message;
 };
 
@@ -128,6 +131,10 @@ public:
   void set_mbsu_fault(int index, bool faulted);
   /// Open the feeder from a channel to its MBSU.
   void set_channel_offline(int channel, bool offline);
+  /// Heat added to one ORU's or DDCU's thermal node [W].
+  void set_oru_extra_heat(int index, double heat_w);
+  void set_ddcu_extra_heat(int index, double heat_w);
+  void set_gimbal_lock(bool locked);
 
 private:
   bool ddcu_admits(int d) const;

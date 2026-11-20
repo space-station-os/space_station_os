@@ -1,0 +1,13 @@
+scenario:
+  # Station on orbit with no drills for 16 orbits (about 25 h) at 60x. Every
+  # subsystem should stay NOMINAL: cabin air, water, power and temperatures
+  # hold steady.
+  name: nominal_multi_orbit
+  duration_s: 90000
+  sim_rate_hz: 20
+  time_scale: 60.0
+
+  faults: []
+
+  expected_outcomes:
+    - no_state_change_after_s: 60

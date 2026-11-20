@@ -2,7 +2,6 @@
 
 #include <cmath>
 #include <iomanip>
-#include <limits>
 #include <sstream>
 
 #include "ament_index_cpp/get_package_share_directory.hpp"
@@ -14,10 +13,23 @@ namespace ssos_thermal
 namespace nodes
 {
 
+namespace
+{
+
+// Drills thermal accepts from the simulation (see docs/fault_catalog.md).
+// Defaults trip a thermal limit while keeping the EPS hardware on the cold
+// plate inside its own limits, so a drill never cascades.
+constexpr const char * kLoopDegraded = "itcs_loop_degraded";
+constexpr const char * kConductanceLoss = "coldplate_conductance_loss";
+constexpr const char * kColdplateNode = "itcs_coldplate";
+
+constexpr double kLimitHysteresisC = 1.0;
+
+}  // namespace
+
 ThermalNetworkNode::ThermalNetworkNode(const rclcpp::NodeOptions & options)
 : rclcpp_lifecycle::LifecycleNode("thermal_network", options)
 {
-  this->declare_parameter("enable_failure", enable_failure_);
   this->declare_parameter("enable_cooling", enable_cooling_);
   this->declare_parameter("cooling_trigger_threshold", cooling_trigger_threshold_);
   this->declare_parameter("max_temp_threshold", max_temp_threshold_);
@@ -31,7 +43,6 @@ ThermalNetworkNode::ThermalNetworkNode(const rclcpp::NodeOptions & options)
 
 CallbackReturn ThermalNetworkNode::on_configure(const rclcpp_lifecycle::State &)
 {
-  enable_failure_ = this->get_parameter("enable_failure").as_bool();
   enable_cooling_ = this->get_parameter("enable_cooling").as_bool();
   cooling_trigger_threshold_ = this->get_parameter("cooling_trigger_threshold").as_double();
   max_temp_threshold_ = this->get_parameter("max_temp_threshold").as_double();
@@ -40,7 +51,9 @@ CallbackReturn ThermalNetworkNode::on_configure(const rclcpp_lifecycle::State &)
   thermal_config_file_ = this->get_parameter("thermal_config_file").as_string();
   heat_load_timeout_s_ = this->get_parameter("heat_load_timeout_s").as_double();
   cooling_active_ = false;
+  overheated_ = false;
   heat_sources_.clear();
+  diag_.reset_registration();
 
   // An absolute path is used as-is (tests point at the source tree);
   // a relative one resolves against the installed package share dir.
@@ -65,6 +78,8 @@ CallbackReturn ThermalNetworkNode::on_configure(const rclcpp_lifecycle::State &)
   register_client_ = this->create_client<RegisterSubsystem>("/ssos/register_subsystem");
   heat_sub_ = this->create_subscription<space_station_interfaces::msg::HeatLoadArray>(
     "/thermal/heat_loads", 10, std::bind(&ThermalNetworkNode::onHeatLoads, this, _1));
+  fault_sub_ = this->create_subscription<FaultEvent>(
+    "/ssos/fault_event", 10, std::bind(&ThermalNetworkNode::onFaultEvent, this, _1));
 
   param_cb_handle_ = this->add_on_set_parameters_callback(
     std::bind(&ThermalNetworkNode::onSetParameters, this, _1));
@@ -82,12 +97,14 @@ CallbackReturn ThermalNetworkNode::on_activate(const rclcpp_lifecycle::State &)
   heartbeat_pub_->on_activate();
   fault_pub_->on_activate();
 
+  // A drill outlives deactivation (and a reconfigure, which reloads the
+  // network), so put its effect back before stepping again.
+  applyDrill();
   first_step_ = true;
   step_timer_ = this->create_wall_timer(
     std::chrono::duration<double>(thermal_update_dt_),
     std::bind(&ThermalNetworkNode::updateSimulation, this));
 
-  registerWithManager();
   RCLCPP_INFO(get_logger(), "Thermal network activated");
   return CallbackReturn::SUCCESS;
 }
@@ -110,6 +127,7 @@ CallbackReturn ThermalNetworkNode::on_cleanup(const rclcpp_lifecycle::State &)
 {
   step_timer_.reset();
   heat_sub_.reset();
+  fault_sub_.reset();
   heat_sources_.clear();
   node_pub_.reset();
   link_pub_.reset();
@@ -200,6 +218,10 @@ void ThermalNetworkNode::updateSimulation()
   first_step_ = false;
   last_step_time_ = now;
 
+  if (drill_.expire(now.seconds())) {
+    RCLCPP_INFO(get_logger(), "Thermal drill expired; configuration restored");
+    applyDrill();
+  }
   applyHeatLoads();
   if (!cooling_active_ && dt > 0.0) {
     const double max_step = std::max(thermal_update_dt_, 1.0e-3);
@@ -222,7 +244,11 @@ void ThermalNetworkNode::updateSimulation()
     node_msg.nodes.push_back(data);
   }
   node_pub_->publish(node_msg);
-  publishThermalNetworkDiag(hottest);
+
+  const std::string hot = network_->over_limit(
+    max_temp_threshold_, overheated_ ? kLimitHysteresisC : 0.0);
+  overheated_ = !hot.empty();
+  publishThermalNetworkDiag(hottest, hot);
 
   space_station_interfaces::msg::ThermalLinkFlowsArray link_msg;
   for (const auto & link : network_->links()) {
@@ -235,9 +261,8 @@ void ThermalNetworkNode::updateSimulation()
   }
   link_pub_->publish(link_msg);
 
-  const bool healthy = !(enable_failure_ && hottest.temperature > max_temp_threshold_);
-  const std::string status_message = healthy ?
-    "nominal" : "overheating: " + hottest.name;
+  const bool healthy = !overheated_;
+  const std::string status_message = healthy ? "nominal" : "overheating: " + hot;
 
   if (diag_.should_raise_fault(healthy)) {
     fault_pub_->publish(ThermalDiagnostics::make_fault(
@@ -246,10 +271,11 @@ void ThermalNetworkNode::updateSimulation()
   }
   heartbeat_pub_->publish(ThermalDiagnostics::make_heartbeat(
     now, "thermal", SubsystemHeartbeat::LIFECYCLE_ACTIVE, healthy, status_message));
+  registerWithManager();
 }
 
 void ThermalNetworkNode::publishThermalNetworkDiag(
-  const network::ThermalNetwork::Hottest & hottest)
+  const network::ThermalNetwork::Hottest & hottest, const std::string & over_limit)
 {
   using diagnostic_msgs::msg::DiagnosticStatus;
   using diagnostic_msgs::msg::KeyValue;
@@ -257,12 +283,12 @@ void ThermalNetworkNode::publishThermalNetworkDiag(
   DiagnosticStatus st;
   st.name = "ThermalNetwork";
 
-  if (std::isfinite(hottest.temperature) && hottest.temperature > max_temp_threshold_) {
+  if (!over_limit.empty()) {
     st.level = DiagnosticStatus::WARN;
-    st.message = "Node temperature exceeds max_temp_threshold";
+    st.message = "Node over its temperature limit: " + over_limit;
   } else {
     st.level = DiagnosticStatus::OK;
-    st.message = "All node temperatures within threshold";
+    st.message = "All node temperatures within limits";
   }
 
   KeyValue kv1, kv2;
@@ -283,18 +309,15 @@ void ThermalNetworkNode::publishThermalNetworkDiag(
 
 void ThermalNetworkNode::registerWithManager()
 {
-  if (!register_client_->wait_for_service(std::chrono::milliseconds(200))) {
-    RCLCPP_WARN(get_logger(),
-                "system_manager registration service unavailable; continuing");
-    return;
-  }
-  auto req = std::make_shared<RegisterSubsystem::Request>();
-  req->subsystem_name = "thermal";
-  req->published_topics = {"/thermal/nodes/state", "/thermal/links/flux",
-                           "/thermals/diagnostics"};
-  req->subscribed_topics = {"/thermal/heat_loads"};
-  req->heartbeat_topic = "/ssos/thermal/heartbeat";
-  register_client_->async_send_request(req);
+  diag_.register_with_manager(*register_client_, [] {
+      auto req = std::make_shared<RegisterSubsystem::Request>();
+      req->subsystem_name = "thermal";
+      req->published_topics = {"/thermal/nodes/state", "/thermal/links/flux",
+                               "/thermals/diagnostics"};
+      req->subscribed_topics = {"/thermal/heat_loads", "/ssos/fault_event"};
+      req->heartbeat_topic = "/ssos/thermal/heartbeat";
+      return req;
+    });
 }
 
 rcl_interfaces::msg::SetParametersResult ThermalNetworkNode::onSetParameters(
@@ -302,9 +325,7 @@ rcl_interfaces::msg::SetParametersResult ThermalNetworkNode::onSetParameters(
 {
   for (const auto & param : params) {
     const std::string & name = param.get_name();
-    if (name == "enable_failure") {
-      enable_failure_ = param.as_bool();
-    } else if (name == "enable_cooling") {
+    if (name == "enable_cooling") {
       enable_cooling_ = param.as_bool();
     } else if (name == "cooling_trigger_threshold") {
       cooling_trigger_threshold_ = param.as_double();
@@ -359,6 +380,49 @@ void ThermalNetworkNode::applyHeatLoads()
     if (!network_->set_external_power(node, power)) {
       RCLCPP_WARN_THROTTLE(get_logger(), *this->get_clock(), 10000,
                            "Heat load for unknown thermal node '%s'", node.c_str());
+    }
+  }
+}
+
+void ThermalNetworkNode::onFaultEvent(const FaultEvent::SharedPtr msg)
+{
+  // Only drills the simulation injects for thermal; our own over-temperature
+  // events and other subsystems' faults are ignored.
+  if (!network_ || msg->subsystem_name != "thermal") {
+    return;
+  }
+  const auto fault = ssos_sim::parse_injected_fault(msg->fault_type, msg->description);
+  if (!fault) {
+    return;
+  }
+  if (fault->type != ssos_sim::kClearFaults && fault->type != kLoopDegraded &&
+    fault->type != kConductanceLoss)
+  {
+    RCLCPP_WARN(get_logger(), "Ignoring unknown thermal drill '%s'", fault->type.c_str());
+    return;
+  }
+  drill_.apply(*fault, this->now().seconds());
+  applyDrill();
+  RCLCPP_WARN(get_logger(), "Thermal drill: %s",
+              drill_.any() ? drill_.type().c_str() : "cleared");
+}
+
+void ThermalNetworkNode::applyDrill()
+{
+  network_->clear_overrides();
+  if (drill_.active(kLoopDegraded)) {
+    const double sink_c = drill_.param("sink_temp_c", 26.0);
+    bool held = false;
+    for (const auto & [name, node] : network_->nodes()) {
+      held = (node.fixed && network_->set_fixed_temperature(name, sink_c)) || held;
+    }
+    if (!held) {
+      RCLCPP_WARN(get_logger(), "%s: this network has no coolant sink node", kLoopDegraded);
+    }
+  } else if (drill_.active(kConductanceLoss)) {
+    if (network_->scale_conductance(kColdplateNode, drill_.param("factor", 0.35)) == 0) {
+      RCLCPP_WARN(get_logger(), "%s: this network has no %s links", kConductanceLoss,
+                  kColdplateNode);
     }
   }
 }

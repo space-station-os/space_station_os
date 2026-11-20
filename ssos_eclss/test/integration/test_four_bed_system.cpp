@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cmath>
+
 #include "ssos_eclss/ars/four_bed_system.hpp"
 #include "ssos_eclss/common/gas_properties.hpp"
 #include "ssos_eclss/common/units.hpp"
@@ -95,4 +97,24 @@ TEST(FourBedSystem, PrecoolerExitCool)
   // Precooler exit below cabin and above LTL inlet (7 C).
   EXPECT_LT(r.precooler_exit_temp_k, cabin.temperature_k);
   EXPECT_GT(r.precooler_exit_temp_k, units::celsius_to_kelvin(6.0));
+}
+
+TEST(FourBedSystem, BedsStayFiniteThroughRegenerationSwitches)
+{
+  // Two half-cycles plus the third switch, at the 5 s step ars_node uses: the
+  // regenerating beds go under vacuum, where the gas carries almost no heat.
+  FourBedSystem ars(default_ars_parameters());
+  const CabinConditions cabin = nominal_cabin();
+  const double end_s = 2.0 * ars.cycle().timing().half_cycle_s() + 600.0;
+  for (double t = 0.0; t < end_s; t += 5.0) {
+    ars.step(5.0, cabin);
+    for (int b = 0; b < 2; ++b) {
+      for (const BedModel * bed : {&ars.adsorbent_bed(b), &ars.desiccant_bed(b)}) {
+        ASSERT_TRUE(std::isfinite(bed->max_solid_temperature())) << "t=" << t;
+        ASSERT_LT(bed->max_solid_temperature(), 600.0) << "t=" << t;
+        ASSERT_GE(bed->loading_fraction(), 0.0) << "t=" << t;
+        ASSERT_LE(bed->loading_fraction(), 1.0 + 1e-9) << "t=" << t;
+      }
+    }
+  }
 }

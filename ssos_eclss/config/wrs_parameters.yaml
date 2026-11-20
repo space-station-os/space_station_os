@@ -1,12 +1,18 @@
-# WRS (urine processor + water processor) parameters for ssos_eclss/wrs_node.
+# WRS (urine processor + water processor) and the station water inventory for
+# ssos_eclss/wrs_node. Feeds come from the crew, the cabin CHX and Sabatier.
 wrs_node:
   ros__parameters:
     use_sim_time: true
     step_rate_hz: 1.0
     # Request power from ssos_eps as load eclss_wrs; without EPS running the unit runs as if fully powered.
     eps_coupling: true
-    urine_kg_day: 6.0
-    condensate_kg_day: 3.0
     potable_limit_us: 100.0
-    # Faults are injected explicitly (sim fault-injection), not auto-tripped.
-    enable_auto_faults: false
+    wastewater_capacity_kg: 22.0      # WSTA
+    potable_capacity_kg: 1000.0       # potable bus plus stowed CWCs
+    initial_potable_kg: 400.0
+    initial_wastewater_kg: 8.0
+    max_urine_process_kg_day: 13.6    # UPA batch rate
+    upa_start_fraction: 0.70
+    upa_stop_fraction: 0.05
+    low_supply_days: 7.0
+    enable_auto_faults: true

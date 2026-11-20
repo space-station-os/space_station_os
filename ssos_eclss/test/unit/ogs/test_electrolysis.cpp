@@ -100,3 +100,15 @@ TEST(Electrolysis, StackHeatsUnderLoad)
   // Waste heat above thermoneutral raises stack temperature above coolant.
   EXPECT_GT(r.stack_temperature_k, units::celsius_to_kelvin(18.0));
 }
+
+TEST(OgsSystem, SettleStartsAtTheSteadyStackTemperature)
+{
+  ssos_eclss::ogs::OxygenGeneratorSystem ogs;
+  ogs.settle(17.5);
+  const auto first = ogs.step(1.0, 17.5, 1.0e9);
+  ssos_eclss::ogs::OgsResult later{};
+  for (int i = 0; i < 2880; ++i) {
+    later = ogs.step(30.0, 17.5, 1.0e9);
+  }
+  EXPECT_NEAR(first.stack_temperature_k, later.stack_temperature_k, 0.05);
+}

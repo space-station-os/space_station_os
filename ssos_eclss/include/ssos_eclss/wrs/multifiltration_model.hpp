@@ -29,6 +29,8 @@ public:
 
   /// Reset accumulated contaminant loading.
   void reset();
+  /// Use up the bed's capacity (breakthrough).
+  void exhaust() {accumulated_kg_ = params_.bed_capacity_kg;}
 
   /// Treat a feed stream of given conductivity for dt seconds.
   /// @param dt                timestep [s]

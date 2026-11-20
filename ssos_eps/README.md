@@ -60,7 +60,8 @@ ros2 launch ssos_eps eps_system.launch.py   # system_manager + simulation_contro
 `/sim/world_state` (`solar_flux_w_m2`, `in_eclipse`), `/ssos/fault_event`
 (simulation-injected faults) and `/thermal/nodes/state` (cold-plate
 temperature), registers with the
-`system_manager` via `/ssos/register_subsystem`, and publishes:
+`system_manager` via `/ssos/register_subsystem` (retried each step, after the
+heartbeat, until it is accepted), and publishes:
 
 | Topic | Type |
 |-------|------|

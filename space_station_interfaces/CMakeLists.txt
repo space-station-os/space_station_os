@@ -30,6 +30,7 @@ set(msg_files
   "eclss/action/OxygenGeneration.action"
   "eclss/action/WaterRecovery.action"
   "eclss/msg/AstronautHealth.msg"
+  "eclss/msg/CabinAtmosphere.msg"
   # EPS
   "eps/srv/Load.srv"
   "eps/msg/BCDUStatus.msg"

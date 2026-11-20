@@ -21,11 +21,10 @@
   <depend>lifecycle_msgs</depend>
 
   <exec_depend>ssos_core</exec_depend>
-  <exec_depend>ssos_sim</exec_depend>
+  <depend>ssos_sim</depend>
 
   <test_depend>ament_cmake_gtest</test_depend>
   <test_depend>ssos_core</test_depend>
-  <test_depend>ssos_sim</test_depend>
   <test_depend>ssos_eclss</test_depend>
   <test_depend>ssos_thermal</test_depend>
 

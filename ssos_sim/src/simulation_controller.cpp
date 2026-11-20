@@ -48,6 +48,7 @@ SimulationController::SimulationController(const rclcpp::NodeOptions & options)
 
 CallbackReturn SimulationController::on_configure(const rclcpp_lifecycle::State &)
 {
+  drill_.reset();
   RCLCPP_INFO(get_logger(), "Configuring...");
 
   sim_rate_hz_ = this->get_parameter("sim_rate_hz").as_double();
@@ -103,6 +104,13 @@ CallbackReturn SimulationController::on_activate(const rclcpp_lifecycle::State &
   world_state_pub_->on_activate();
   clock_pub_->on_activate();
   fault_event_pub_->on_activate();
+  // A fresh run has no drill: tell every subsystem to drop any it still holds
+  // from before this controller (re)started.
+  for (const auto & [target, types] : drill_catalog()) {
+    (void)types;
+    publish_fault(target, kClearFaults, fault_description(
+        "Injected fault", kClearFaults, "{}", 0.0));
+  }
 
   // Start stepping now that publishers are active
   double period_ms = 1000.0 / sim_rate_hz_;
@@ -169,6 +177,11 @@ void SimulationController::step()
   if (!paused) {
     world_model_->step(dt);
     sim_time_s_ += dt;
+    if (drill_ && drill_->expires_s >= 0.0 && sim_time_s_ >= drill_->expires_s) {
+      RCLCPP_INFO(get_logger(), "Drill %s on %s ended at T+%.1fs", drill_->type.c_str(),
+                  drill_->target.c_str(), sim_time_s_);
+      drill_.reset();
+    }
     check_fault_schedule();
   }
 
@@ -192,81 +205,89 @@ void SimulationController::handle_inject_fault(
   const InjectFault::Request::SharedPtr req,
   InjectFault::Response::SharedPtr res)
 {
+  std::string reason;
+  if (!start_drill(req->target_subsystem, req->fault_type, req->parameters_json, req->duration_s,
+    reason))
+  {
+    RCLCPP_WARN(get_logger(), "Fault injection rejected: %s", reason.c_str());
+    res->success = false;
+    res->message = reason;
+    return;
+  }
   RCLCPP_WARN(get_logger(), "Fault injection: target=%s type=%s duration=%.1fs",
-    req->target_subsystem.c_str(),
-    req->fault_type.c_str(),
-    req->duration_s);
-
-  // Build and publish a FaultEvent for the system_manager and the target
-  auto fault_msg = FaultEvent();
-  fault_msg.stamp = rclcpp::Clock().now();
-  fault_msg.subsystem_name = req->target_subsystem;
-  fault_msg.fault_type = req->fault_type;
-  fault_msg.severity = FaultEvent::SEVERITY_CRITICAL;  // Default for injected faults
-  fault_msg.description = fault_description(
-    "Injected fault", req->fault_type, req->parameters_json, req->duration_s);
-  fault_msg.affected_interfaces = {};
-
-  fault_event_pub_->publish(fault_msg);
-  apply_fault_effects(req->target_subsystem, req->fault_type, req->parameters_json);
-
+    req->target_subsystem.c_str(), req->fault_type.c_str(), req->duration_s);
+  publish_fault(req->target_subsystem, req->fault_type, fault_description(
+      "Injected fault", req->fault_type, req->parameters_json, req->duration_s));
   res->success = true;
   res->message = "Fault injected: " + req->fault_type + " on " + req->target_subsystem;
+}
+
+bool SimulationController::start_drill(
+  const std::string & target, const std::string & type, const std::string & parameters_json,
+  double duration_s, std::string & reason)
+{
+  if (type == kClearFaults) {
+    // Only the subsystem running the drill can end it.
+    if (drill_ && drill_->target == target) {
+      RCLCPP_INFO(get_logger(), "Drill %s on %s cleared", drill_->type.c_str(),
+                  drill_->target.c_str());
+      drill_.reset();
+    }
+    return true;
+  }
+  if (!validate_drill(target, type, parse_fault_params(parameters_json), reason)) {
+    return false;
+  }
+  if (drill_) {
+    reason = "drill " + drill_->type + " on " + drill_->target +
+      " is still active; clear it before starting another";
+    return false;
+  }
+  drill_ = ActiveDrill{target, type, duration_s > 0.0 ? sim_time_s_ + duration_s : -1.0};
+  return true;
+}
+
+void SimulationController::publish_fault(
+  const std::string & target, const std::string & type, const std::string & description,
+  const std::string & interface)
+{
+  FaultEvent msg;
+  msg.stamp = rclcpp::Clock().now();
+  msg.subsystem_name = target;
+  msg.fault_type = type;
+  msg.severity = FaultEvent::SEVERITY_CRITICAL;
+  msg.description = description;
+  if (!interface.empty()) {
+    msg.affected_interfaces = {interface};
+  }
+  fault_event_pub_->publish(msg);
 }
 
 void SimulationController::check_fault_schedule()
 {
   for (auto & fault : fault_schedule_) {
     if (!fault.fired && sim_time_s_ >= fault.trigger_time_s) {
-      RCLCPP_WARN(get_logger(), "Scheduled fault firing at T+%.1fs: %s on %s",
-        sim_time_s_, fault.fault_type.c_str(), fault.target_subsystem.c_str());
-      fire_fault(fault);
       fault.fired = true;
+      fire_fault(fault);
     }
   }
 }
 
 void SimulationController::fire_fault(const ScheduledFault & fault)
 {
-  auto fault_msg = FaultEvent();
-  fault_msg.stamp = rclcpp::Clock().now();
-  fault_msg.subsystem_name = fault.target_subsystem;
-  fault_msg.fault_type = fault.fault_type;
-  fault_msg.severity = FaultEvent::SEVERITY_CRITICAL;
-  fault_msg.description = fault_description(
-    "Scheduled fault", fault.name, fault.parameters_json, fault.duration_s);
-  if (!fault.target_interface.empty()) {
-    fault_msg.affected_interfaces = {fault.target_interface};
+  std::string reason;
+  if (!start_drill(fault.target_subsystem, fault.fault_type, fault.parameters_json,
+    fault.duration_s, reason))
+  {
+    RCLCPP_WARN(get_logger(), "Scheduled fault %s skipped: %s", fault.name.c_str(),
+                reason.c_str());
+    return;
   }
-
-  fault_event_pub_->publish(fault_msg);
-  apply_fault_effects(fault.target_subsystem, fault.fault_type, fault.parameters_json);
-}
-
-// ---------------------------------------------------------------------------
-// Environment side of a fault (world model perturbations)
-// ---------------------------------------------------------------------------
-void SimulationController::apply_fault_effects(
-  const std::string & target, const std::string & fault_type,
-  const std::string & parameters_json)
-{
-  // An ECLSS O2 sensor stuck-at is modelled as the O2 reading in the world
-  // state. Expected params: {"stuck_value": <pct>}
-  if (fault_type == "sensor_stuck_at" && target == "eclss") {
-    auto pos = parameters_json.find("stuck_value");
-    if (pos != std::string::npos) {
-      auto colon = parameters_json.find(':', pos);
-      if (colon != std::string::npos) {
-        try {
-          double val = std::stod(parameters_json.substr(colon + 1));
-          world_model_->apply_perturbation("atmospheric_o2_pct", val);
-          RCLCPP_WARN(get_logger(), "Applied O2 perturbation: %.1f%%", val);
-        } catch (const std::exception &) {
-          RCLCPP_WARN(get_logger(), "sensor_stuck_at: unreadable stuck_value");
-        }
-      }
-    }
-  }
+  RCLCPP_WARN(get_logger(), "Scheduled fault firing at T+%.1fs: %s on %s",
+    sim_time_s_, fault.fault_type.c_str(), fault.target_subsystem.c_str());
+  publish_fault(fault.target_subsystem, fault.fault_type, fault_description(
+      "Scheduled fault", fault.name, fault.parameters_json, fault.duration_s),
+    fault.target_interface);
 }
 
 // ---------------------------------------------------------------------------

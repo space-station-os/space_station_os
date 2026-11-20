@@ -61,12 +61,15 @@ public:
   /// Incremented whenever the active set changes.
   uint64_t revision() const {return revision_;}
 
+  bool has(const std::string & type) const;
+  /// Per-unit faults of one type: unit index -> main value parameter.
+  std::map<int, double> unit_values(const std::string & type) const;
   std::set<int> indices(const std::string & type) const;
   double array_factor() const;    // lowest injected array output factor (1 = none)
   double health_factor() const;   // lowest injected battery state of health (1 = none)
   double demand_scale() const;    // highest injected load multiplier (1 = none)
 
-  /// One-shot state-of-charge override from battery_low_soc, if pending.
+  /// State of charge a newly injected battery_low_soc asks for, once.
   std::optional<double> take_pending_soc();
 
 private:

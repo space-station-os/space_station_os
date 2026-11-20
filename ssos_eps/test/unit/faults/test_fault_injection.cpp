@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <map>
+#include <set>
+#include <vector>
 #include <string>
 
 #include "ssos_eps/nodes/eps_fault_injection.hpp"
@@ -67,17 +70,17 @@ TEST(FaultInjection, PerUnitFaultsAreKeyedByIndex)
   EXPECT_EQ(inj.indices("mbsu_channel_loss"), (std::set<int>{0}));
 }
 
-TEST(FaultInjection, ClearOneTypeOrEverything)
+TEST(FaultInjection, OnlyClearFaultsEndsADrillEarly)
 {
   EpsFaultInjection inj;
   std::string msg;
   inj.apply("ddcu_fault", {{"ddcu", 2.0}}, 0.0, 0.0, msg);
-  inj.apply("ddcu_fault", {{"ddcu", 5.0}}, 0.0, 0.0, msg);
   inj.apply("solar_array_degraded", {{"factor", 0.4}}, 0.0, 0.0, msg);
   EXPECT_DOUBLE_EQ(inj.array_factor(), 0.4);
 
+  // A "clear" parameter is just another parameter, not a way to end a drill.
   inj.apply("ddcu_fault", {{"ddcu", 2.0}, {"clear", 1.0}}, 0.0, 0.0, msg);
-  EXPECT_EQ(inj.indices("ddcu_fault"), (std::set<int>{5}));
+  EXPECT_EQ(inj.indices("ddcu_fault"), (std::set<int>{2}));
 
   const auto rev = inj.revision();
   ASSERT_TRUE(inj.apply("clear_faults", {}, 0.0, 0.0, msg));
@@ -86,7 +89,7 @@ TEST(FaultInjection, ClearOneTypeOrEverything)
   EXPECT_DOUBLE_EQ(inj.array_factor(), 1.0);
 }
 
-TEST(FaultInjection, DefaultsAndOneShotSoc)
+TEST(FaultInjection, DefaultsAndLowSocDrill)
 {
   EpsFaultInjection inj;
   std::string msg;
@@ -95,12 +98,63 @@ TEST(FaultInjection, DefaultsAndOneShotSoc)
   EXPECT_DOUBLE_EQ(inj.health_factor(), 0.5);
   EXPECT_DOUBLE_EQ(inj.array_factor(), 0.3);
 
-  ASSERT_TRUE(inj.apply("battery_low_soc", {{"soc", 0.12}}, 0.0, 0.0, msg));
+  // The SOC is handed over once; the drill itself stays active until it
+  // expires or is cleared, like any other drill.
+  ASSERT_TRUE(inj.apply("battery_low_soc", {{"soc", 0.12}}, 60.0, 0.0, msg));
   auto soc = inj.take_pending_soc();
   ASSERT_TRUE(soc.has_value());
   EXPECT_DOUBLE_EQ(*soc, 0.12);
   EXPECT_FALSE(inj.take_pending_soc().has_value());
-  EXPECT_EQ(inj.active().size(), 2u);
+  EXPECT_TRUE(inj.has("battery_low_soc"));
+  EXPECT_TRUE(inj.expire(60.0));
+  EXPECT_FALSE(inj.has("battery_low_soc"));
+
+  ASSERT_TRUE(inj.apply("battery_low_soc", {}, 0.0, 0.0, msg));
+  inj.apply("clear_faults", {}, 0.0, 0.0, msg);
+  EXPECT_FALSE(inj.take_pending_soc().has_value());
+  EXPECT_TRUE(inj.active().empty());
+}
+
+TEST(FaultInjection, OverheatDrillsCarryHeatPerUnit)
+{
+  EpsFaultInjection inj;
+  std::string msg;
+  ASSERT_TRUE(inj.apply("battery_oru_overheat", {{"oru", 3.0}}, 0.0, 0.0, msg));
+  ASSERT_TRUE(inj.apply("ddcu_overheat", {{"ddcu", 1.0}, {"heat_w", 250.0}}, 30.0, 0.0, msg));
+  EXPECT_EQ(EpsFaultInjection::index_param("battery_oru_overheat"), "oru");
+  EXPECT_EQ(EpsFaultInjection::index_param("ddcu_overheat"), "ddcu");
+  EXPECT_EQ(inj.unit_values("battery_oru_overheat"), (std::map<int, double>{{3, 800.0}}));
+  EXPECT_EQ(inj.unit_values("ddcu_overheat"), (std::map<int, double>{{1, 250.0}}));
+  EXPECT_EQ(inj.indices("ddcu_overheat"), (std::set<int>{1}));
+  EXPECT_TRUE(inj.unit_values("load_spike").empty());
+
+  EXPECT_TRUE(inj.expire(30.0));
+  EXPECT_TRUE(inj.unit_values("ddcu_overheat").empty());
+  EXPECT_EQ(inj.active().size(), 1u);
+}
+
+TEST(FaultInjection, GimbalLockDrillHasNoParameters)
+{
+  EpsFaultInjection inj;
+  std::string msg;
+  EXPECT_FALSE(inj.has("array_gimbal_lock"));
+  ASSERT_TRUE(inj.apply("array_gimbal_lock", {}, 10.0, 0.0, msg));
+  EXPECT_TRUE(inj.has("array_gimbal_lock"));
+  EXPECT_TRUE(EpsFaultInjection::index_param("array_gimbal_lock").empty());
+  inj.expire(10.0);
+  EXPECT_FALSE(inj.has("array_gimbal_lock"));
+}
+
+TEST(FaultInjection, SupportedTypesAreTheSimulationDrillCatalog)
+{
+  // The simulation controller offers exactly these drills for target "eps".
+  const std::vector<std::string> catalog = {"solar_array_degraded", "array_gimbal_lock",
+    "battery_degraded", "battery_low_soc", "battery_oru_failed", "battery_oru_overheat",
+    "bcdu_fault", "mbsu_channel_loss", "mbsu_fault", "ddcu_fault", "ddcu_overheat",
+    "load_spike"};
+  auto types = EpsFaultInjection::supported_types();
+  types.erase(std::remove(types.begin(), types.end(), "clear_faults"), types.end());
+  EXPECT_EQ(types, catalog);
 }
 
 TEST(FaultInjection, RejectsUnknownTypes)

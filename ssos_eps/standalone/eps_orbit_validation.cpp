@@ -2,8 +2,9 @@
 //
 // Runs the generation and storage chain through repeated LEO orbits with the
 // same eclipse geometry as the ssos_sim default world model and prints one
-// summary line per orbit: generation, battery SOC swing, depth of discharge
-// and load supply. Optional CSV of the full time history.
+// summary line per orbit: generation, battery SOC swing, load supply, the
+// hottest DDCU and ORU, and how long EPS reported unhealthy. Optional CSV of
+// the full time history.
 //
 //   eps_orbit_validation [orbits] [load_w] [csv_path]
 //
@@ -46,8 +47,9 @@ int main(int argc, char ** argv)
   eps.set_demand_scale(baseline_w > 0.0 ? load_w / baseline_w : 0.0);
   std::printf("EPS orbit validation: period %.0f s, eclipse %.0f s, load %.0f W\n",
               period_s, period_s * eclipse_fraction, load_w);
-  std::printf("%5s %10s %10s %8s %8s %8s %12s %10s\n", "orbit", "gen_kWh", "load_kWh",
-              "soc_min", "soc_max", "soc_end", "unserved_Wh", "beta_deg");
+  std::printf("%5s %8s %9s %8s %8s %8s %12s %9s %10s %9s %12s\n", "orbit", "gen_kWh",
+              "load_kWh", "soc_min", "soc_max", "soc_end", "unserved_Wh", "beta_deg",
+              "ddcu_max_C", "oru_max_C", "unhealthy_s");
 
   double t = 0.0;
   for (int k = 0; k < orbits; ++k) {
@@ -57,6 +59,9 @@ int main(int argc, char ** argv)
     double soc_min = 1.0;
     double soc_max = 0.0;
     double beta = 0.0;
+    double ddcu_max_c = -273.0;
+    double oru_max_c = -273.0;
+    double unhealthy_s = 0.0;
     const int steps = static_cast<int>(period_s / dt);
     for (int i = 0; i < steps; ++i) {
       const double phase = std::fmod(t, period_s) / period_s;
@@ -71,6 +76,13 @@ int main(int argc, char ** argv)
       soc_min = std::min(soc_min, s.battery_soc);
       soc_max = std::max(soc_max, s.battery_soc);
       beta = s.array.beta_deg;
+      for (const auto & d : s.ddcus) {
+        ddcu_max_c = std::max(ddcu_max_c, d.temperature_c);
+      }
+      for (const auto & o : s.orus) {
+        oru_max_c = std::max(oru_max_c, o.temperature_c);
+      }
+      unhealthy_s += s.healthy ? 0.0 : dt;
       if (csv) {
         std::fprintf(csv, "%.0f,%d,%.1f,%.1f,%.1f,%.1f,%.1f,%.5f,%.2f\n", t,
                      in.in_eclipse ? 1 : 0, s.generation_w, s.available_power_w,
@@ -79,9 +91,10 @@ int main(int argc, char ** argv)
       }
       t += dt;
     }
-    std::printf("%5d %10.1f %10.1f %8.4f %8.4f %8.4f %12.1f %10.1f\n", k + 1,
-                gen_wh / 1000.0, load_wh / 1000.0, soc_min, soc_max,
-                eps.state().battery_soc, unserved_wh, beta);
+    std::printf("%5d %8.1f %9.1f %8.4f %8.4f %8.4f %12.1f %9.1f %10.1f %9.1f %12.0f\n",
+                k + 1, gen_wh / 1000.0, load_wh / 1000.0, soc_min, soc_max,
+                eps.state().battery_soc, unserved_wh, beta, ddcu_max_c, oru_max_c,
+                unhealthy_s);
   }
 
   if (csv) {

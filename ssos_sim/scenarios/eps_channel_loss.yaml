@@ -5,8 +5,9 @@ scenario:
   time_scale: 10.0
 
   faults:
-    # One channel lost: MBSU 0 reroutes onto channels 1 and 2 and keeps
-    # redundancy, so EPS stays healthy.
+    # One feeder from channel 0 to MBSU 0 opens: the MBSU reroutes onto
+    # channels 1 and 2 and keeps its loads, and EPS reports the open feeder
+    # (DEGRADED) until it closes again.
     - name: channel_0_feeder_open
       type: mbsu_channel_loss
       target_subsystem: eps
@@ -16,22 +17,12 @@ scenario:
       params:
         channel: 0
       duration_s: 120
-    # A second channel on the same MBSU: down to one source, redundancy lost.
-    - name: channel_1_feeder_open
-      type: mbsu_channel_loss
-      target_subsystem: eps
-      trigger:
-        type: time
-        at_s: 60.0
-      params:
-        channel: 1
-      duration_s: 60
 
   expected_outcomes:
     - state_transition:
         from: NOMINAL
         to: DEGRADED
-        before_s: 65.0
+        before_s: 35.0
     - state_transition:
         from: DEGRADED
         to: NOMINAL

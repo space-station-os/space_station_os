@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "ssos_sim/fault_format.hpp"
+
 // Scenario files (scenarios/*.yaml) describe a simulation run: duration,
 // rate, initial conditions and a time-ordered fault schedule. Parsing has no
 // ROS dependency so it can be tested on its own.
@@ -57,12 +59,6 @@ struct Scenario
 /// Parse a scenario file. Throws std::runtime_error with a readable message
 /// when the file is missing or malformed.
 Scenario load_scenario_file(const std::string & path);
-
-/// Fault description used on /ssos/fault_event for simulation-originated
-/// faults: "<prefix>: <label> (params: <json>, duration: <s> s)". Subsystems
-/// recognise injected faults by the "Injected fault" / "Scheduled fault" prefix.
-std::string fault_description(const std::string & prefix, const std::string & label,
-                              const std::string & parameters_json, double duration_s);
 
 }  // namespace ssos_sim
 

@@ -21,7 +21,8 @@ SolarArrayParams default_solar_array_params()
   // Beta cycles over about 60 days (~930 orbits); the legacy controller used
   // 10 orbits, which drives the array through high beta within hours.
   p.beta_precession_orbits = 930;
-  p.beta_lock_limit_deg = 72.0;
+  // Above beta_max_deg, so nominal tracking never locks; lock is a drill.
+  p.beta_lock_limit_deg = 76.0;
   p.gimbal_lock_derate = 0.6;
   p.use_fixed_beta = false;
   p.fixed_beta_deg = 0.0;

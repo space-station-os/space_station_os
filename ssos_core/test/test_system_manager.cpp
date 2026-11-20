@@ -92,11 +92,15 @@ TEST_F(SystemManagerTest, RegisterSubsystemAccepted)
   EXPECT_TRUE(accepted);
 }
 
-TEST_F(SystemManagerTest, DegradedWhenHeartbeatMissing)
+TEST_F(SystemManagerTest, WaitsForFirstHeartbeatThenDegradesOnTimeout)
 {
   ASSERT_TRUE(register_client_->wait_for_service(2s));
   register_subsystem("eclss", "/ssos/eclss/heartbeat");
+  // A subsystem that has just registered is not counted against the station.
   spin_for(200ms);
+  EXPECT_EQ(manager_->get_current_state(), SystemState::INIT);
+  // Still silent after the heartbeat timeout (5 s): now it is degraded.
+  spin_for(5500ms);
   EXPECT_EQ(manager_->get_current_state(), SystemState::DEGRADED);
 }
 

@@ -11,7 +11,7 @@
 #include "space_station_interfaces/msg/subsystem_heartbeat.hpp"
 
 // Shared helpers for building heartbeat and fault-event messages and for
-// detecting common ECLSS fault conditions. Used by all subsystem nodes.
+// node autostart. Used by all subsystem nodes.
 
 namespace ssos_eclss
 {
@@ -36,15 +36,6 @@ public:
                                const std::string & fault_type, uint8_t severity,
                                const std::string & description,
                                const std::vector<std::string> & affected_interfaces = {});
-
-  /// True if ARS CO2 removal is below the life-support requirement.
-  /// @param removal_kg_day measured CO2 removal [kg/day]
-  /// @param required_kg_day requirement (default 4.16 kg/day)
-  static bool ars_co2_removal_low(double removal_kg_day,
-                                  double required_kg_day = 4.16);
-
-  /// True if a regeneration bed failed to reach its target temperature.
-  static bool bed_underheated(double max_bed_temp_k, double target_temp_k);
 
   /// If the node has (or is given) an "autostart" parameter set true, return a
   /// one-shot timer that configures then activates the node shortly after

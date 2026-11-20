@@ -31,6 +31,12 @@ Each ECLSS unit owns an `EpsPowerClient` (`ssos_eclss`):
 | WRS | `eclss_wrs` | 1 | distillation and processing power |
 | Sabatier | `eclss_sabatier` | 2 | reactor trim heaters |
 
+ARS, WRS and Sabatier cannot run on part power, so a shed or partly served
+unit does nothing; OGS current scales with the share it gets. The launched
+station's `loads_parameters.yaml` holds the units' measured nominal draw
+(ARS 760 W, OGS 800 W, WRS 60 W) as placeholders, so the station load does not
+jump when they register.
+
 The client requests the load (replacing the EPS baseline placeholder of the
 same id), re-requests when the demand moves by more than 50 W or 5 %, every
 30 s, and whenever EPS stops listing the load (for example after an EPS
@@ -78,17 +84,18 @@ on wall time.
 ## End-to-end test
 
 `test_station_integration` (in this package) runs `system_manager`,
-`simulation_controller` with `test/scenarios/e2e_station_load_spike.yaml`,
-`eps_node`, the four ECLSS nodes and `thermal_network` with the station network
-in one process. It checks that:
+`simulation_controller`, `eps_node`, the crew, cabin and the four ECLSS units,
+and `thermal_network` on the station network, in one process. It checks that:
 
-1. every ECLSS unit registered its load and is served, and OGS makes O2;
-2. EPS heat reaches `itcs_coldplate` and `base_link`, and EPS reads the
+1. the station starts already on orbit: NOMINAL with no DEGRADED on the way;
+2. every ECLSS unit registered its load and is served, and OGS makes O2;
+3. EPS heat reaches `itcs_coldplate` and `base_link`, and EPS reads the
    cold-plate temperature back from thermal;
-3. a 6x load spike sheds OGS (its share exceeds one DDCU's rating) while ARS
-   stays powered, O2 production drops to zero and the station goes DEGRADED;
-4. after the spike the loads are restored, O2 production resumes and the
-   station goes NOMINAL -> DEGRADED -> RECOVERY -> NOMINAL.
+4. a drill tripping the DDCU that feeds OGS (through `/sim/inject_fault`) drops
+   the OGS load, stops O2 production and makes the station DEGRADED, and a
+   second drill is refused while it runs;
+5. `clear_faults` restores the DDCU and OGS, and the station goes
+   NOMINAL -> DEGRADED -> RECOVERY -> NOMINAL.
 
 ## Running the full station
 

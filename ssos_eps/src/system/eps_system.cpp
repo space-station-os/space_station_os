@@ -193,6 +193,25 @@ void EpsSystem::set_channel_offline(int channel, bool offline)
   }
 }
 
+void EpsSystem::set_oru_extra_heat(int index, double heat_w)
+{
+  if (index >= 0 && index < n_orus()) {
+    orus_[static_cast<std::size_t>(index)]->set_extra_heat_w(heat_w);
+  }
+}
+
+void EpsSystem::set_ddcu_extra_heat(int index, double heat_w)
+{
+  if (index >= 0 && index < n_ddcu()) {
+    ddcus_[static_cast<std::size_t>(index)].set_extra_heat_w(heat_w);
+  }
+}
+
+void EpsSystem::set_gimbal_lock(bool locked)
+{
+  array_.set_gimbal_lock(locked);
+}
+
 int EpsSystem::mbsu_of_ddcu(int d) const
 {
   return d >= 0 && d < n_ddcu() ? params_.ddcu_mbsu[static_cast<std::size_t>(d)] : -1;
@@ -448,6 +467,9 @@ const EpsState & EpsSystem::step(double dt, const EpsInput & input)
     state_.channels[c] = bcdus_[c].step(dt, channel_in[c], orus_by_channel_[c]);
   }
   for (std::size_t i = 0; i < orus_.size(); ++i) {
+    if (!stepped_) {
+      orus_[i]->settle_temperature();
+    }
     state_.orus[i] = orus_[i]->state();
   }
 
@@ -474,7 +496,11 @@ const EpsState & EpsSystem::step(double dt, const EpsInput & input)
     din.requested_w = ddcu_requested[d];
     din.demand_w = ddcu_ok[d] ? ddcu_kept[d] : 0.0;
     din.input_limit_w = ddcu_input[d] * ratio;
-    state_.ddcus[d] = ddcus_[d].step(dt, din);
+    ddcus_[d].step(dt, din);
+    if (!stepped_) {
+      ddcus_[d].settle_temperature();
+    }
+    state_.ddcus[d] = ddcus_[d].state();
 
     const double fraction = ddcu_kept[d] > kPowerEpsilonW ?
       std::min(state_.ddcus[d].output_power_w / ddcu_kept[d], 1.0) : 0.0;
@@ -523,11 +549,16 @@ void EpsSystem::summarise()
   state_.distribution_loss_w = 0.0;
   state_.ddcu_fault = false;
   state_.ddcu_overload = false;
-  for (const auto & d : state_.ddcus) {
+  for (std::size_t i = 0; i < state_.ddcus.size(); ++i) {
+    const auto & d = state_.ddcus[i];
     state_.distribution_loss_w += d.heat_w;
     const bool has_load = d.requested_w > kPowerEpsilonW;
+    // A DDCU left without primary power by an unstable MBSU bus is the MBSU's
+    // fault, not the DDCU's.
+    const int m = params_.ddcu_mbsu[i];
+    const bool bus_down = m >= 0 && state_.mbsus[static_cast<std::size_t>(m)].unstable;
     state_.ddcu_fault = state_.ddcu_fault || (has_load &&
-      (d.mode == ddcu::DdcuMode::TRIPPED || d.mode == ddcu::DdcuMode::OFF));
+      (d.mode == ddcu::DdcuMode::TRIPPED || (d.mode == ddcu::DdcuMode::OFF && !bus_down)));
     state_.ddcu_overload = state_.ddcu_overload || d.mode == ddcu::DdcuMode::OVERLOAD;
   }
   state_.mbsu_unstable = false;
@@ -535,6 +566,11 @@ void EpsSystem::summarise()
   for (const auto & m : state_.mbsus) {
     state_.mbsu_unstable = state_.mbsu_unstable || m.unstable;
     state_.redundancy_lost = state_.redundancy_lost || (!m.unstable && m.redundancy_lost);
+  }
+  state_.feeder_open = false;
+  for (std::size_t c = 0; c < channel_offline_.size(); ++c) {
+    state_.feeder_open = state_.feeder_open ||
+      (channel_offline_[c] && params_.channel_mbsu[c] >= 0);
   }
 
   state_.battery_charge_w = 0.0;
@@ -573,7 +609,8 @@ void EpsSystem::summarise()
   state_.healthy = !state_.low_soc && !state_.load_unserved && !state_.load_shed &&
     !state_.bcdu_fault && !state_.oru_failed && !state_.oru_overheat &&
     !state_.ddcu_fault && !state_.ddcu_overload && !state_.mbsu_unstable &&
-    !state_.redundancy_lost && !state_.array_degraded && !state_.battery_degraded;
+    !state_.redundancy_lost && !state_.feeder_open && !state_.array_degraded &&
+    !state_.battery_degraded && !state_.array.gimbal_locked;
 
   if (state_.load_shed) {
     state_.status_message = std::to_string(state_.shed_loads) + " load(s) shed";
@@ -595,10 +632,14 @@ void EpsSystem::summarise()
     state_.status_message = "battery ORU failed";
   } else if (state_.redundancy_lost) {
     state_.status_message = "MBSU source redundancy lost";
+  } else if (state_.feeder_open) {
+    state_.status_message = "MBSU channel feeder open";
   } else if (state_.battery_degraded) {
     state_.status_message = "battery state of health degraded";
   } else if (state_.array_degraded) {
     state_.status_message = "solar array output degraded";
+  } else if (state_.array.gimbal_locked) {
+    state_.status_message = "solar array gimbal locked";
   } else {
     state_.status_message = "nominal";
   }

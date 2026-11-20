@@ -1,9 +1,9 @@
 #include "ssos_eps/nodes/eps_fault_injection.hpp"
 
+#include "ssos_sim/fault_format.hpp"
+
 #include <algorithm>
-#include <cctype>
 #include <cmath>
-#include <cstdlib>
 
 namespace ssos_eps
 {
@@ -25,13 +25,16 @@ const std::vector<TypeInfo> & type_table()
 {
   static const std::vector<TypeInfo> table = {
     {"solar_array_degraded", "", "factor", 0.3},
+    {"array_gimbal_lock", "", "", 0.0},
     {"battery_degraded", "", "state_of_health", 0.5},
     {"battery_low_soc", "", "soc", 0.15},
     {"battery_oru_failed", "oru", "", 0.0},
+    {"battery_oru_overheat", "oru", "heat_w", 800.0},
     {"bcdu_fault", "channel", "", 0.0},
     {"mbsu_channel_loss", "channel", "", 0.0},
     {"mbsu_fault", "mbsu", "", 0.0},
     {"ddcu_fault", "ddcu", "", 0.0},
+    {"ddcu_overheat", "ddcu", "heat_w", 400.0},
     {"load_spike", "", "demand_scale", 2.0},
     {"clear_faults", "", "", 0.0},
   };
@@ -71,79 +74,12 @@ std::string EpsFaultInjection::index_param(const std::string & type)
 bool EpsFaultInjection::parse_description(const std::string & description,
                                           std::string & params_json, double & duration_s)
 {
-  if (description.rfind("Injected fault:", 0) != 0 &&
-    description.rfind("Scheduled fault:", 0) != 0)
-  {
-    return false;
-  }
-  params_json = "{}";
-  duration_s = 0.0;
-
-  const auto p = description.find("(params: ");
-  if (p != std::string::npos) {
-    const auto open = description.find('{', p);
-    if (open != std::string::npos) {
-      int depth = 0;
-      for (std::size_t i = open; i < description.size(); ++i) {
-        if (description[i] == '{') {
-          ++depth;
-        } else if (description[i] == '}' && --depth == 0) {
-          params_json = description.substr(open, i - open + 1);
-          break;
-        }
-      }
-    }
-  }
-  const auto d = description.rfind("duration: ");
-  if (d != std::string::npos) {
-    duration_s = std::strtod(description.c_str() + d + 10, nullptr);
-  }
-  return true;
+  return ssos_sim::parse_fault_description(description, params_json, duration_s);
 }
 
 std::map<std::string, double> EpsFaultInjection::parse_params(const std::string & json)
 {
-  std::map<std::string, double> out;
-  std::size_t pos = 0;
-  while (true) {
-    const auto k0 = json.find('"', pos);
-    if (k0 == std::string::npos) {
-      break;
-    }
-    const auto k1 = json.find('"', k0 + 1);
-    if (k1 == std::string::npos) {
-      break;
-    }
-    const std::string key = json.substr(k0 + 1, k1 - k0 - 1);
-    const auto colon = json.find(':', k1);
-    if (colon == std::string::npos) {
-      break;
-    }
-    std::size_t v = colon + 1;
-    while (v < json.size() && std::isspace(static_cast<unsigned char>(json[v]))) {
-      ++v;
-    }
-    if (v < json.size() && json[v] == '"') {
-      // String value: skip it.
-      const auto end = json.find('"', v + 1);
-      pos = end == std::string::npos ? json.size() : end + 1;
-      continue;
-    }
-    if (json.compare(v, 4, "true") == 0) {
-      out[key] = 1.0;
-    } else if (json.compare(v, 5, "false") == 0) {
-      out[key] = 0.0;
-    } else {
-      char * end = nullptr;
-      const double value = std::strtod(json.c_str() + v, &end);
-      if (end != json.c_str() + v && std::isfinite(value)) {
-        out[key] = value;
-      }
-    }
-    const auto next = json.find_first_of(",}", v);
-    pos = next == std::string::npos ? json.size() : next + 1;
-  }
-  return out;
+  return ssos_sim::parse_fault_params(json);
 }
 
 bool EpsFaultInjection::apply(const std::string & type,
@@ -157,9 +93,7 @@ bool EpsFaultInjection::apply(const std::string & type,
   }
 
   if (type == "clear_faults") {
-    const bool changed = !active_.empty();
-    active_.clear();
-    revision_ += changed ? 1 : 0;
+    clear();
     message = "cleared all injected EPS faults";
     return true;
   }
@@ -170,26 +104,6 @@ bool EpsFaultInjection::apply(const std::string & type,
     const auto it = params.find(info->index);
     index = it != params.end() ? static_cast<int>(std::lround(it->second)) : 0;
     key += ":" + std::to_string(index);
-  }
-
-  const auto clear = params.find("clear");
-  if (clear != params.end() && clear->second != 0.0) {
-    const auto before = active_.size();
-    active_.erase(std::remove_if(active_.begin(), active_.end(),
-      [&](const InjectedFault & f) {
-        return f.type == type && (index < 0 || f.key == key);
-      }), active_.end());
-    revision_ += active_.size() != before ? 1 : 0;
-    message = "cleared " + key;
-    return true;
-  }
-
-  if (type == "battery_low_soc") {
-    const auto it = params.find(info->value);
-    pending_soc_ = std::clamp(it != params.end() ? it->second : info->default_value, 0.0, 1.0);
-    ++revision_;
-    message = "battery state of charge set to " + std::to_string(*pending_soc_);
-    return true;
   }
 
   InjectedFault fault;
@@ -203,6 +117,9 @@ bool EpsFaultInjection::apply(const std::string & type,
     fault.params[info->index] = index;
   }
   fault.expires_s = duration_s > 0.0 ? now_s + duration_s : -1.0;
+  if (type == "battery_low_soc") {
+    pending_soc_ = std::clamp(fault.params[info->value], 0.0, 1.0);
+  }
 
   const auto existing = std::find_if(active_.begin(), active_.end(),
       [&key](const InjectedFault & f) {return f.key == key;});
@@ -246,14 +163,33 @@ double EpsFaultInjection::param_or(const InjectedFault & f, const std::string & 
   return it != f.params.end() ? it->second : fallback;
 }
 
+bool EpsFaultInjection::has(const std::string & type) const
+{
+  return std::any_of(active_.begin(), active_.end(),
+           [&type](const InjectedFault & f) {return f.type == type;});
+}
+
+std::map<int, double> EpsFaultInjection::unit_values(const std::string & type) const
+{
+  std::map<int, double> out;
+  const auto * info = find_type(type);
+  if (info == nullptr || *info->index == '\0') {
+    return out;
+  }
+  for (const auto & f : active_) {
+    if (f.type == type) {
+      out[static_cast<int>(std::lround(param_or(f, info->index, 0.0)))] =
+        param_or(f, info->value, info->default_value);
+    }
+  }
+  return out;
+}
+
 std::set<int> EpsFaultInjection::indices(const std::string & type) const
 {
   std::set<int> out;
-  const std::string idx = index_param(type);
-  for (const auto & f : active_) {
-    if (f.type == type && !idx.empty()) {
-      out.insert(static_cast<int>(std::lround(param_or(f, idx, 0.0))));
-    }
+  for (const auto & unit : unit_values(type)) {
+    out.insert(unit.first);
   }
   return out;
 }

@@ -22,6 +22,20 @@ void ElectrolysisStackModel::reset(double temperature_k)
   temperature_k_ = temperature_k;
 }
 
+void ElectrolysisStackModel::settle(double current_a, double pressure_pa,
+                                    double coolant_temp_k)
+{
+  // Cell voltage depends weakly on temperature, so a few fixed-point passes
+  // converge well below 0.01 K.
+  const double n = static_cast<double>(std::max(stack_.n_cells, 1));
+  const double ua = std::max(stack_.heat_loss_coeff_w_k, 1.0e-6);
+  for (int i = 0; i < 20; ++i) {
+    const CellState cell = cell_.solve(current_a, temperature_k_, pressure_pa);
+    const double waste = std::max(0.0, cell.voltage - kThermoneutral) * current_a * n;
+    temperature_k_ = coolant_temp_k + waste / ua;
+  }
+}
+
 StackState ElectrolysisStackModel::step(double dt, double current_a,
                                         double pressure_pa, double coolant_temp_k)
 {

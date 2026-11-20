@@ -1,11 +1,22 @@
-# Cabin atmosphere parameters for ssos_eclss/cabin_node.
+# Cabin atmosphere for ssos_eclss/cabin_node. The simulation starts with the
+# station already on orbit: air at the ARS steady state and the CHX setpoint.
 cabin_node:
   ros__parameters:
     use_sim_time: true
     step_rate_hz: 1.0
-    crew_size: 4
-    cabin_volume_m3: 100.0
+    cabin_volume_m3: 388.0            # ISS habitable volume
     cabin_temp_c: 22.0
-    co2_alarm_ppm: 7000.0
-    # Faults are injected explicitly (sim fault-injection), not auto-tripped.
-    enable_auto_faults: false
+    initial_co2_ppm: 2600.0
+    initial_relative_humidity: 0.45
+    leak_area_m2: 2.0e-8              # about 0.25 kg/day of air
+    # Caution and warning limits.
+    co2_alarm_ppm: 5300.0             # about 4 mmHg ppCO2
+    o2_low_pct: 19.5
+    o2_high_pct: 23.5
+    pressure_low_kpa: 97.0
+    pressure_high_kpa: 104.0
+    rh_low: 0.25
+    rh_high: 0.75
+    leak_alarm_kg_day: 3.0
+    o2_sensor_tolerance_pct: 0.5
+    enable_auto_faults: true

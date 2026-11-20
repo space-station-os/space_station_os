@@ -7,8 +7,9 @@
 // Output = flux * area * efficiency * illumination * beta derate * degradation.
 // Illumination ramps up with a half-cosine after each sunrise while the arrays
 // re-acquire the sun, and drops to zero on eclipse entry. Beta precesses once
-// every beta_precession_orbits sunrises; above the lock limit the SARJ is
-// treated as gimbal-locked and an extra derate applies. No ROS.
+// every beta_precession_orbits sunrises; above the lock limit, or while a lock
+// is forced, the SARJ is treated as gimbal-locked and an extra derate applies.
+// No ROS.
 
 namespace ssos_eps
 {
@@ -21,7 +22,7 @@ struct SolarArrayState
   double illumination;         // pointing/penumbra factor [0, 1]
   double beta_deg;             // solar beta angle [deg]
   double beta_derate;          // output factor from beta and gimbal lock [-]
-  bool gimbal_locked;          // |beta| at or above the lock limit
+  bool gimbal_locked;          // |beta| at or above the lock limit, or lock forced
   double incident_flux_w_m2;   // flux reaching the cells [W/m^2]
   double array_power_w;        // DC power at the array terminals [W]
   double panel_temperature_c;  // lumped panel temperature [C]
@@ -46,6 +47,9 @@ public:
   /// Beta angle for the current orbit count.
   double beta_angle_deg() const;
 
+  /// Hold the SARJ gimbal-locked regardless of beta.
+  void set_gimbal_lock(bool locked) {forced_lock_ = locked;}
+
   void set_params(const SolarArrayParams & array, const PanelThermalParams & thermal);
   const SolarArrayParams & array_params() const {return array_;}
   const PanelThermalParams & thermal_params() const {return thermal_;}
@@ -57,6 +61,7 @@ private:
   SolarArrayState state_{};
   double time_since_sunrise_s_{0.0};
   bool initialized_{false};
+  bool forced_lock_{false};
 };
 
 }  // namespace solar

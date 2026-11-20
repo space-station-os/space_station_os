@@ -46,8 +46,8 @@ def generate_launch_description():
         namespace='', output='screen')
 
     # ---- ssos_sim: simulation_controller (lifecycle) ----
-    # Seed an ISS-like cabin CO2 (~2600 ppm ~= 2 torr ppCO2) so the ARS, which
-    # reads /sim/world_state, sees a realistic load and the beds actually fill.
+    # World-state cabin fields are initial conditions only; cabin_node owns the
+    # cabin atmosphere.
     sim_controller = LifecycleNode(
         package='ssos_sim', executable='simulation_controller',
         name='simulation_controller', namespace='', output='screen',

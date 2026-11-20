@@ -252,7 +252,9 @@ TEST(EpsDistribution, ChannelLossIsReroutedWithinTheMbsu)
   EXPECT_DOUBLE_EQ(one.channels[0].load_served_w, 0.0);
   EXPECT_EQ(one.mbsus[0].available_sources, 2);
   EXPECT_FALSE(one.mbsus[0].redundancy_lost);
-  EXPECT_TRUE(one.healthy);
+  EXPECT_TRUE(one.feeder_open);
+  EXPECT_FALSE(one.healthy);
+  EXPECT_EQ(one.status_message, "MBSU channel feeder open");
 
   eps.set_channel_offline(1, true);
   const EpsState & two = eps.step(1.0, kShadow);
@@ -307,6 +309,7 @@ TEST(EpsDistribution, MbsuFaultIsolatesItsDdcus)
   EXPECT_TRUE(s.mbsu_unstable);
   EXPECT_EQ(s.ddcus[4].mode, ddcu::DdcuMode::OFF);
   EXPECT_EQ(s.ddcus[5].mode, ddcu::DdcuMode::OFF);
+  EXPECT_FALSE(s.ddcu_fault);
   EXPECT_FALSE(s.healthy);
 }
 

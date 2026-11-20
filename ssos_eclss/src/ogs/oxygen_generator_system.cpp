@@ -30,6 +30,11 @@ void OxygenGeneratorSystem::set_parameters(const OgsParameters & params)
   separator_->set_params(params_.separator);
 }
 
+void OxygenGeneratorSystem::settle(double current_a)
+{
+  stack_->settle(current_a, params_.operating.cell_pressure_pa, params_.operating.coolant_temp_k);
+}
+
 OgsResult OxygenGeneratorSystem::step(double dt, double current_a,
                                       double available_water_mol_s)
 {

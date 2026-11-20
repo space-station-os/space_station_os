@@ -31,6 +31,19 @@ EpsParameters zero_beta()
   p.solar.array.fixed_beta_deg = 0.0;
   return p;
 }
+
+// Steps through the orbit from t until done() holds or max_s has passed.
+template<typename Pred>
+bool run_until(EpsSystem & eps, double & t, double max_s, Pred done)
+{
+  constexpr double dt = 10.0;
+  for (const double end = t + max_s; t < end; t += dt) {
+    if (done(eps.step(dt, environment(t)))) {
+      return true;
+    }
+  }
+  return false;
+}
 }  // namespace
 
 TEST(EpsOrbit, DefaultTopologyMatchesLegacyStation)
@@ -171,17 +184,131 @@ TEST(EpsOrbit, ArrayDegradationReducesGeneration)
   EXPECT_NEAR(half, 0.5 * full, 1.0e-6);
 }
 
-TEST(EpsOrbit, GimbalLockReducesGeneration)
+TEST(EpsOrbit, GimbalLockOnlyByDrill)
 {
+  // Even at the peak of the beta cycle the gimbals keep tracking.
   EpsParameters p = zero_beta();
-  EpsSystem nominal(p);
-  p.solar.array.fixed_beta_deg = 74.0;
-  EpsSystem locked(p);
-  const EpsState & a = nominal.step(1.0, EpsInput{1361.0, false});
-  const EpsState & b = locked.step(1.0, EpsInput{1361.0, false});
-  EXPECT_TRUE(b.array.gimbal_locked);
-  EXPECT_NEAR(b.generation_w, p.solar.array.gimbal_lock_derate * a.generation_w,
-              0.01 * a.generation_w);
+  p.solar.array.fixed_beta_deg = p.solar.array.beta_max_deg;
+  EpsSystem eps(p);
+  const double full = eps.step(1.0, EpsInput{1361.0, false}).generation_w;
+  EXPECT_FALSE(eps.state().array.gimbal_locked);
+  EXPECT_TRUE(eps.state().healthy);
+
+  eps.set_gimbal_lock(true);
+  const EpsState & locked = eps.step(1.0, EpsInput{1361.0, false});
+  EXPECT_TRUE(locked.array.gimbal_locked);
+  EXPECT_NEAR(locked.generation_w, p.solar.array.gimbal_lock_derate * full, 1.0e-6 * full);
+  EXPECT_FALSE(locked.healthy);
+  EXPECT_EQ(locked.status_message, "solar array gimbal locked");
+
+  eps.set_gimbal_lock(false);
+  EXPECT_TRUE(eps.step(1.0, EpsInput{1361.0, false}).healthy);
+}
+
+TEST(EpsOrbit, StartsSettledWithoutWarmUp)
+{
+  EpsSystem eps;
+  const auto & p = eps.parameters();
+  EXPECT_DOUBLE_EQ(eps.state().battery_soc, 0.95);
+
+  const EpsState & s = eps.step(0.0, environment(0.0));
+  for (const auto & d : s.ddcus) {
+    EXPECT_NEAR(d.temperature_c, p.ddcu.coldplate_temp_c + d.heat_w / p.ddcu.heat_transfer_w_k,
+                1.0);
+  }
+  for (const auto & o : s.orus) {
+    EXPECT_NEAR(o.temperature_c,
+                p.battery.coldplate_temp_c + o.heat_w / p.battery.heat_transfer_w_k, 1.0);
+  }
+  EXPECT_TRUE(s.healthy);
+
+  // Constant load: the DDCUs hold their starting temperature.
+  std::vector<double> start;
+  for (const auto & d : s.ddcus) {
+    start.push_back(d.temperature_c);
+  }
+  for (int i = 1; i <= 600; ++i) {
+    eps.step(1.0, environment(i));
+  }
+  for (std::size_t d = 0; d < start.size(); ++d) {
+    EXPECT_NEAR(eps.state().ddcus[d].temperature_c, start[d], 0.1) << "DDCU " << d;
+  }
+}
+
+TEST(EpsOrbit, SixteenNominalOrbitsWithoutAFault)
+{
+  // Default beta precession (0 to ~8 deg over 16 orbits) and a fixed 5 deg.
+  for (const bool fixed : {false, true}) {
+    EpsParameters p = default_eps_parameters();
+    p.solar.array.use_fixed_beta = fixed;
+    p.solar.array.fixed_beta_deg = 5.0;
+    EpsSystem eps(p);
+    double max_ddcu_c = 0.0;
+    double max_oru_c = 0.0;
+    double min_soc = 1.0;
+    int unhealthy_steps = 0;
+    for (double t = 0.0; t < 16.0 * kPeriodS; t += 5.0) {
+      const EpsState & s = eps.step(5.0, environment(t));
+      unhealthy_steps += s.healthy ? 0 : 1;
+      min_soc = std::min(min_soc, s.battery_soc);
+      for (const auto & d : s.ddcus) {
+        max_ddcu_c = std::max(max_ddcu_c, d.temperature_c);
+      }
+      for (const auto & o : s.orus) {
+        max_oru_c = std::max(max_oru_c, o.temperature_c);
+      }
+    }
+    EXPECT_EQ(unhealthy_steps, 0) << "fixed beta " << fixed;
+    EXPECT_GT(min_soc, 0.9);
+    EXPECT_LT(max_ddcu_c, p.ddcu.trip_temp_c - 10.0);
+    EXPECT_LT(max_oru_c, p.battery.max_temp_c - 10.0);
+    EXPECT_GE(eps.state().array.orbit_count, 15);
+  }
+}
+
+TEST(EpsOrbit, OruOverheatDrillTripsAndRecovers)
+{
+  EpsSystem eps(zero_beta());
+  double t = 0.0;
+  eps.set_oru_extra_heat(4, 800.0);
+  ASSERT_TRUE(run_until(eps, t, 2.0 * kPeriodS, [](const EpsState & s) {
+      return s.oru_overheat;
+    }));
+  const EpsState & hot = eps.state();
+  EXPECT_EQ(hot.orus[4].health, battery::BatteryHealth::OVERHEAT);
+  EXPECT_EQ(hot.orus[5].health, battery::BatteryHealth::GOOD);
+  EXPECT_FALSE(hot.healthy);
+  EXPECT_FALSE(hot.load_unserved);
+  EXPECT_EQ(hot.status_message, "battery ORU over temperature");
+
+  eps.set_oru_extra_heat(4, 0.0);
+  ASSERT_TRUE(run_until(eps, t, kPeriodS, [](const EpsState & s) {return s.healthy;}));
+  EXPECT_LT(eps.state().orus[4].temperature_c, eps.parameters().battery.max_temp_c);
+}
+
+TEST(EpsOrbit, DdcuOverheatDrillTripsShedsAndRecovers)
+{
+  EpsSystem eps(zero_beta());
+  double t = 0.0;
+  eps.set_ddcu_extra_heat(0, 400.0);
+  ASSERT_TRUE(run_until(eps, t, kPeriodS, [](const EpsState & s) {return s.ddcu_fault;}));
+  const EpsState & hot = eps.state();
+  EXPECT_EQ(hot.ddcus[0].mode, ddcu::DdcuMode::TRIPPED);
+  EXPECT_TRUE(hot.ddcu_fault);
+  EXPECT_TRUE(hot.load_shed);
+  EXPECT_FALSE(hot.healthy);
+  for (const auto & l : hot.loads) {
+    EXPECT_EQ(l.shed, l.ddcu == 0) << l.id;
+  }
+
+  // The extra heat alone keeps it above the reset temperature.
+  run_until(eps, t, 1800.0, [](const EpsState &) {return false;});
+  EXPECT_TRUE(eps.state().ddcus[0].over_temperature);
+
+  eps.set_ddcu_extra_heat(0, 0.0);
+  ASSERT_TRUE(run_until(eps, t, kPeriodS, [](const EpsState & s) {return s.healthy;}));
+  EXPECT_EQ(eps.state().ddcus[0].mode, ddcu::DdcuMode::REGULATING);
+  EXPECT_LE(eps.state().ddcus[0].temperature_c, eps.parameters().ddcu.reset_temp_c);
 }
 
 TEST(EpsOrbit, BcduFaultIsReportedAndCleared)

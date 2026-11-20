@@ -19,12 +19,14 @@
 #include "space_station_interfaces/msg/thermal_node_data_array.hpp"
 #include "space_station_interfaces/srv/register_subsystem.hpp"
 
+#include "ssos_sim/fault_format.hpp"
 #include "ssos_thermal/network/thermal_network.hpp"
 #include "ssos_thermal/nodes/thermal_diagnostics.hpp"
 
 // Lifecycle node wrapping the ROS-free ThermalNetwork solver. Integrates the
 // node/link graph every tick, drives the coolant-loop action when the
-// average temperature crosses cooling_trigger_threshold, and publishes
+// average temperature crosses cooling_trigger_threshold, applies the
+// simulation's thermal drills from /ssos/fault_event, and publishes
 // telemetry alongside a heartbeat/fault pair on the ssos_core contract.
 
 namespace ssos_thermal
@@ -54,7 +56,8 @@ private:
 
   void updateSimulation();
   void coolingCallback();
-  void publishThermalNetworkDiag(const network::ThermalNetwork::Hottest & hottest);
+  void publishThermalNetworkDiag(
+    const network::ThermalNetwork::Hottest & hottest, const std::string & over_limit);
   void registerWithManager();
   rcl_interfaces::msg::SetParametersResult onSetParameters(
     const std::vector<rclcpp::Parameter> & params);
@@ -96,11 +99,19 @@ private:
   rclcpp::Time last_step_time_;
   bool first_step_ = true;
 
+  // The one drill the simulation runs on thermal, timed in ROS time.
+  void onFaultEvent(const FaultEvent::SharedPtr msg);
+  void applyDrill();
+  rclcpp::Subscription<FaultEvent>::SharedPtr fault_sub_;
+  ssos_sim::FaultTracker drill_;
+
+  // A node is over temperature until it is 1 degC back under its limit.
+  bool overheated_ = false;
+
   // Parameter callback handle
   OnSetParametersCallbackHandle::SharedPtr param_cb_handle_;
 
   // Dynamic parameters
-  bool enable_failure_ = false;
   bool enable_cooling_ = true;
   bool cooling_active_ = false;
   double cooling_rate_ = 0.05;

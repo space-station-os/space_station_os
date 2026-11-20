@@ -5,11 +5,19 @@
 #
 #   itcs_sink       internal coolant loop rejecting to the external ammonia
 #                   loop through the interface heat exchanger (fixed 17 degC)
-#   base_link       cabin and structure; receives the power delivered to loads
+#   base_link       cabin air, structure and equipment; receives the power
+#                   delivered to loads; its temperature is the cabin air
+#                   temperature. 10 MJ/K lumps ~0.47 MJ/K of cabin air
+#                   (~390 m3) with ~10 t of racks, shell and equipment
+#                   that follow it (~0.9 kJ/(kg K)); time constant ~28 min
 #   itcs_coldplate  cold plate carrying the DDCUs and battery ORUs; receives
 #                   EPS conversion losses and returns its temperature to EPS
 #
 # conductance is to parent_link [W/K]; heat_capacity [J/K]; internal_power [W].
+# initial_temperature_c is the steady state with the nominal EPS loads (about
+# 4.7 kW on the cold plate, 26.7 kW delivered into the cabin), so the station
+# starts settled. max_temperature_c is the node's limit; the node reports
+# unhealthy above it and clears 1 degC below it.
 
 - node_name: "itcs_sink"
   parent_link: ""
@@ -20,24 +28,32 @@
 
 - node_name: "base_link"
   parent_link: "itcs_sink"
-  heat_capacity: 30300.0
+  heat_capacity: 1.0e7
   internal_power: 1380.0
   conductance: 6000.0
+  initial_temperature_c: 21.68
+  max_temperature_c: 27.0
 
 - node_name: "itcs_coldplate"
   parent_link: "itcs_sink"
   heat_capacity: 50000.0
   internal_power: 0.0
   conductance: 1000.0
+  initial_temperature_c: 21.70
+  max_temperature_c: 28.0
 
 - node_name: "SolarPanel1"
   parent_link: "base_link"
   heat_capacity: 1200.0
   internal_power: 10.0
   conductance: 0.5
+  initial_temperature_c: 41.68
+  max_temperature_c: 80.0
 
 - node_name: "SolarPanel2"
   parent_link: "base_link"
   heat_capacity: 1200.0
   internal_power: 10.0
   conductance: 0.5
+  initial_temperature_c: 41.68
+  max_temperature_c: 80.0

@@ -22,10 +22,10 @@ BatteryOruParams default_battery_oru_params()
   p.min_cell_voltage_v = 3.00;
   p.thermal_mass_j_k = 2.0e5;
   p.heat_transfer_w_k = 20.0;
-  p.coldplate_temp_c = 10.0;
+  p.coldplate_temp_c = 20.0;
   p.max_temp_c = 35.0;
-  p.initial_soc = 0.80;
-  p.initial_temp_c = 10.0;
+  p.initial_soc = 0.95;
+  p.initial_temp_c = 20.0;
   return p;
 }
 

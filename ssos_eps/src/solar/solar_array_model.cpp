@@ -25,6 +25,7 @@ void SolarArrayModel::reset()
   state_.beta_derate = 1.0;
   time_since_sunrise_s_ = 0.0;
   initialized_ = false;
+  forced_lock_ = false;
 }
 
 void SolarArrayModel::set_params(const SolarArrayParams & array,
@@ -77,7 +78,7 @@ const SolarArrayState & SolarArrayModel::step(double dt, double solar_flux_w_m2,
   if (array_.derate_with_beta_cosine) {
     derate = std::max(0.0, std::cos(units::deg_to_rad(std::min(abs_beta, 89.9))));
   }
-  state_.gimbal_locked = abs_beta >= array_.beta_lock_limit_deg;
+  state_.gimbal_locked = forced_lock_ || abs_beta >= array_.beta_lock_limit_deg;
   if (state_.gimbal_locked) {
     derate *= array_.gimbal_lock_derate;
   }

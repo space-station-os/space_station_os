@@ -2,12 +2,14 @@
 # four arrays (static: reconfigure to apply). Priority 0 is the most critical;
 # higher numbers are shed first. ddcu -1 places the load on the DDCU with the
 # most headroom. Further loads are added at runtime via /ssos/eps/load_request.
+# The eclss_* entries are the ECLSS units' measured nominal draw, so the
+# station load does not jump when ars/ogs/wrs register their own requests.
 eps_node:
   ros__parameters:
     loads.ids: ["gnc_avionics", "cdh_computers", "thermal_pumps", "eclss_ars",
                 "eclss_ogs", "eclss_wrs", "comms", "crew_systems",
                 "lab_payloads_a", "lab_payloads_b"]
-    loads.power_w: [3000.0, 2500.0, 4000.0, 1500.0, 3500.0, 1200.0, 1800.0, 3500.0,
+    loads.power_w: [3000.0, 2500.0, 4000.0, 760.0, 800.0, 60.0, 1800.0, 3500.0,
                     4500.0, 4500.0]
     loads.priority: [0, 0, 0, 0, 1, 1, 1, 2, 3, 3]
     loads.ddcu: [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1]

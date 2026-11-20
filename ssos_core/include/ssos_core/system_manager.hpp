@@ -37,6 +37,7 @@ struct SubsystemRecord
   rclcpp::Subscription<SubsystemHeartbeat>::SharedPtr heartbeat_sub;
   rclcpp::Time last_heard;
   bool registered{false};
+  bool heard{false};              // at least one heartbeat since registration
   bool reported_healthy{false};   // health as the subsystem itself reports it
   rclcpp::Time healthy_since;      // start of the current healthy streak
   rclcpp::Time fault_time;         // when the active fault was raised
@@ -60,6 +61,9 @@ public:
 
   /// Evaluate and return what the system state should be (for testing)
   uint8_t evaluate_system_state() const;
+  // Unhealthy, inactive, faulted or silent past the timeout. A subsystem that
+  // has registered but not yet sent a heartbeat only counts once it times out.
+  bool is_degraded(const SubsystemRecord & record, const rclcpp::Time & now) const;
 
 private:
   // Publishers

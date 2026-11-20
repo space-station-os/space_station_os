@@ -21,6 +21,7 @@ namespace nodes
 namespace
 {
 constexpr double kMaxStepS = 600.0;
+constexpr auto kRegisterTimeout = std::chrono::seconds(5);
 }  // namespace
 
 EpsNode::EpsNode(const rclcpp::NodeOptions & options)
@@ -124,8 +125,10 @@ CallbackReturn EpsNode::on_configure(const rclcpp_lifecycle::State &)
   ddcu_overload_reported_ = false;
   mbsu_unstable_reported_ = false;
   redundancy_reported_ = false;
+  feeder_open_reported_ = false;
   array_degraded_reported_ = false;
   battery_degraded_reported_ = false;
+  gimbal_lock_reported_ = false;
   params_dirty_ = false;
 
   RCLCPP_INFO(get_logger(),
@@ -163,11 +166,14 @@ CallbackReturn EpsNode::on_activate(const rclcpp_lifecycle::State &)
   heat_pub_->on_activate();
 
   first_step_ = true;
+  // Re-apply parameters and drills, including any received while inactive.
+  params_dirty_ = true;
   const auto period = std::chrono::duration<double>(1.0 / std::max(step_rate_hz_, 1.0e-3));
   step_timer_ = this->create_wall_timer(
     std::chrono::duration_cast<std::chrono::nanoseconds>(period),
     std::bind(&EpsNode::step, this));
-  register_with_manager();
+  registered_ = false;
+  registration_pending_ = false;
   return CallbackReturn::SUCCESS;
 }
 
@@ -288,8 +294,15 @@ void EpsNode::apply_fault_hooks()
   const auto lost_channels = injection_.indices("mbsu_channel_loss");
   const auto faulted_ddcus = injection_.indices("ddcu_fault");
   const auto faulted_mbsus = injection_.indices("mbsu_fault");
+  const auto oru_heat = injection_.unit_values("battery_oru_overheat");
+  const auto ddcu_heat = injection_.unit_values("ddcu_overheat");
+  auto heat_of = [](const std::map<int, double> & heat, int i) {
+      const auto it = heat.find(i);
+      return it != heat.end() ? it->second : 0.0;
+    };
   for (int i = 0; i < eps_->n_orus(); ++i) {
     eps_->set_oru_failed(i, i == failed_oru_ || failed_orus.count(i) > 0);
+    eps_->set_oru_extra_heat(i, heat_of(oru_heat, i));
   }
   for (int c = 0; c < eps_->n_channels(); ++c) {
     eps_->set_bcdu_fault(c, c == faulted_bcdu_ || faulted_bcdus.count(c) > 0);
@@ -297,10 +310,12 @@ void EpsNode::apply_fault_hooks()
   }
   for (int d = 0; d < eps_->n_ddcu(); ++d) {
     eps_->set_ddcu_fault(d, d == faulted_ddcu_ || faulted_ddcus.count(d) > 0);
+    eps_->set_ddcu_extra_heat(d, heat_of(ddcu_heat, d));
   }
   for (int m = 0; m < eps_->n_mbsu(); ++m) {
     eps_->set_mbsu_fault(m, m == faulted_mbsu_ || faulted_mbsus.count(m) > 0);
   }
+  eps_->set_gimbal_lock(injection_.has("array_gimbal_lock"));
 }
 
 void EpsNode::refresh_physics_parameters()
@@ -425,6 +440,9 @@ void EpsNode::step()
   heartbeat_pub_->publish(EpsDiagnostics::make_heartbeat(
       now, "eps", SubsystemHeartbeat::LIFECYCLE_ACTIVE, last_state_.healthy,
       last_state_.status_message));
+  if (!registered_) {
+    register_with_manager();
+  }
 }
 
 void EpsNode::publish_telemetry(const rclcpp::Time & now)
@@ -730,7 +748,10 @@ void EpsNode::publish_faults(const rclcpp::Time & now)
   edge(s.low_soc, low_soc_reported_, "low_battery_soc", FaultEvent::SEVERITY_CRITICAL,
        "EPS battery state of charge is below the configured threshold",
        {"/ssos/eps/battery/soc"});
-  edge(s.load_unserved, load_unserved_reported_, "load_unserved",
+  // Load lost to a cause that is already reported is not reported again.
+  const bool unexplained_unserved = s.load_unserved && !s.ddcu_overload && !s.ddcu_fault &&
+    !s.mbsu_unstable && !s.low_soc;
+  edge(unexplained_unserved, load_unserved_reported_, "load_unserved",
        FaultEvent::SEVERITY_CRITICAL,
        "EPS cannot supply the full station load",
        {"/ssos/eps/diagnostics"});
@@ -759,6 +780,10 @@ void EpsNode::publish_faults(const rclcpp::Time & now)
        FaultEvent::SEVERITY_WARNING,
        "An MBSU is running on a single source channel",
        {"/ssos/eps/diagnostics"});
+  edge(s.feeder_open, feeder_open_reported_, "mbsu_feeder_open",
+       FaultEvent::SEVERITY_WARNING,
+       "A channel's feeder to its MBSU is open; its load is rerouted",
+       {"/ssos/eps/diagnostics"});
   edge(s.array_degraded, array_degraded_reported_, "solar_array_degraded",
        FaultEvent::SEVERITY_WARNING,
        "Solar array output is below beginning of life",
@@ -767,12 +792,22 @@ void EpsNode::publish_faults(const rclcpp::Time & now)
        FaultEvent::SEVERITY_WARNING,
        "Battery state of health is below the minimum",
        {"/ssos/eps/battery/soc"});
+  edge(s.array.gimbal_locked, gimbal_lock_reported_, "solar_array_gimbal_lock",
+       FaultEvent::SEVERITY_WARNING,
+       "The solar array gimbals are locked and the array is derated",
+       {"/ssos/eps/solar/array_power_w"});
 }
 
 void EpsNode::register_with_manager()
 {
-  if (!register_client_->wait_for_service(std::chrono::milliseconds(200))) {
-    RCLCPP_WARN(get_logger(), "system_manager unavailable; continuing");
+  // Retried every step until system_manager accepts; never blocks the step.
+  // A request left unanswered for kRegisterTimeout is dropped and sent again.
+  const auto now = std::chrono::steady_clock::now();
+  if (registration_pending_ && now - registration_sent_ > kRegisterTimeout) {
+    register_client_->prune_pending_requests();
+    registration_pending_ = false;
+  }
+  if (registration_pending_ || !register_client_->service_is_ready()) {
     return;
   }
   auto req = std::make_shared<RegisterSubsystem::Request>();
@@ -784,7 +819,16 @@ void EpsNode::register_with_manager()
     "/ssos/eps/ddcu/ddcu_<n>/status", "/ssos/eps/loads", "/thermal/heat_loads"};
   req->subscribed_topics = {"/sim/world_state", "/ssos/fault_event", "/thermal/nodes/state"};
   req->heartbeat_topic = "/ssos/eps/heartbeat";
-  register_client_->async_send_request(req);
+  registration_pending_ = true;
+  registration_sent_ = now;
+  register_client_->async_send_request(
+    req, [this](rclcpp::Client<RegisterSubsystem>::SharedFuture future) {
+      registration_pending_ = false;
+      registered_ = future.get()->accepted;
+      if (registered_) {
+        RCLCPP_INFO(get_logger(), "Registered with system_manager");
+      }
+    });
 }
 
 void EpsNode::handle_load_request(const Load::Request::SharedPtr req,

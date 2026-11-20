@@ -7,8 +7,8 @@ eps_node:
     battery.capacity_ah: 134.0
     battery.soc_points: [0.0, 0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90, 1.00]
     battery.cell_ocv_v: [3.00, 3.30, 3.45, 3.55, 3.62, 3.67, 3.72, 3.80, 3.88, 3.95, 4.03, 4.10]
-    battery.initial_soc: 0.80
-    battery.initial_temp_c: 10.0
+    battery.initial_soc: 0.95
+    battery.initial_temp_c: 20.0
 
     battery.state_of_health: 1.0
     battery.internal_resistance_ohm: 0.05
@@ -20,5 +20,5 @@ eps_node:
 
     battery.thermal_mass_j_k: 200000.0
     battery.heat_transfer_w_k: 20.0
-    battery.coldplate_temp_c: 10.0
+    battery.coldplate_temp_c: 20.0
     battery.max_temp_c: 35.0

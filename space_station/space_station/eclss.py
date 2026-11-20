@@ -22,7 +22,7 @@ Subscribed (all best-effort; panel works with any subset present):
           (relative_humidity, co2_ppm also published; co2 used as fallback)
 
   /ssos/ars/co2_removal_kg_day std_msgs/Float64
-        CO2 removal rate. Compared against the 4.16 kg/day ISS requirement.
+        CO2 removal rate. Compared against the ARS caution level (3.0 kg/day).
 
   /ssos/ars/diagnostics        diagnostic_msgs/DiagnosticArray  (name="ars")
         KeyValues consumed:
@@ -75,9 +75,9 @@ from space_station.widgets import (
 _PA_PER_TORR = 133.322
 _DEFAULT_TOTAL_PA = 101325.0
 CO2_SETPOINT_TORR = 2.0
-CO2_REMOVAL_REQ = 4.16  # kg/day (ISS 4-crew requirement)
+CO2_REMOVAL_REQ = 3.0   # kg/day: ARS caution level (crew produce about 4.0)
 HALF_CYCLE_MIN = 80.0   # 10 air-save + 60 adsorb/desorb + 10 vacuum
-O2_REQUIRED_KG_DAY = 2.3   # OGS O2 production requirement
+O2_REQUIRED_KG_DAY = 2.0   # kg/day: below the crew's sleeping O2 use
 POTABLE_LIMIT_US = 100.0   # WRS potable-water conductivity limit [µS/cm]
 
 
@@ -679,7 +679,7 @@ class EclssWidget(QWidget):
             ok = self._removal >= CO2_REMOVAL_REQ
             self.card_removal.set_value(f"{self._removal:.2f}")
             self.card_removal.set_footer(
-                f"REQ {CO2_REMOVAL_REQ:.2f} KG/DAY", "green" if ok else "amber")
+                f"MIN {CO2_REMOVAL_REQ:.2f} KG/DAY", "green" if ok else "amber")
 
         if self._have_cabin_press:
             kpa = self._cabin_pa / 1000.0
@@ -716,7 +716,7 @@ class EclssWidget(QWidget):
             ok = self._o2_prod >= O2_REQUIRED_KG_DAY
             self.card_o2_prod.set_value(f"{self._o2_prod:.2f}")
             self.card_o2_prod.set_footer(
-                f"REQ {O2_REQUIRED_KG_DAY:.1f} KG/DAY", "green" if ok else "amber")
+                f"MIN {O2_REQUIRED_KG_DAY:.1f} KG/DAY", "green" if ok else "amber")
         if self._stack_v is not None:
             self.card_stack_v.set_value(f"{self._stack_v:.1f}")
             self.card_stack_v.set_footer("STACK", "green")

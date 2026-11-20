@@ -92,3 +92,23 @@ TEST(SabatierSystem, ProducesWaterForWrs)
   EXPECT_GT(r.water_produced_kg_s, 0.0);
   EXPECT_NEAR(r.water_produced_kg_s, r.water_produced_mol_s * units::M_H2O, 1.0e-15);
 }
+
+TEST(SabatierSystem, LargeStepsStayStableAtTheSetpoint)
+{
+  // One-minute and one-hour steps (high sim speeds) must not oscillate.
+  for (const double dt : {60.0, 3600.0}) {
+    SabatierSystem sab;
+    const double co2 = 4.0 / 86400.0 / 0.044;
+    const double h2 = 4.0 * co2;
+    SabatierResult prev{};
+    for (int i = 0; i < 50; ++i) {
+      const SabatierResult r = sab.step(dt, co2, h2);
+      EXPECT_NEAR(r.reactor_temp_k, 648.0, 5.0) << "dt=" << dt;
+      EXPECT_GE(r.heater_power_w, 0.0);
+      if (i > 2) {
+        EXPECT_NEAR(r.heater_power_w, prev.heater_power_w, 1.0) << "dt=" << dt;
+      }
+      prev = r;
+    }
+  }
+}

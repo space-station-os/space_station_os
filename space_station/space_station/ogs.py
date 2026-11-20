@@ -20,7 +20,9 @@ except Exception:
 
 from space_station.widgets import MetricCard, SpecRow, MeterBar, page_header
 
-O2_REQUIRED_KG_DAY = 2.3
+# The OGS follows cabin ppO2; below this it is short of even the sleeping
+# crew's O2 use.
+O2_REQUIRED_KG_DAY = 2.0
 OGA_MAX_KG_DAY = 9.25  # AOGA max (46.9 A)
 
 
@@ -106,7 +108,7 @@ class OGSWidget(QWidget):
             ok = self._o2 >= O2_REQUIRED_KG_DAY
             self.card_o2.set_value(f"{self._o2:.2f}")
             self.card_o2.set_footer(
-                f"REQ {O2_REQUIRED_KG_DAY:.1f} KG/DAY", "green" if ok else "amber")
+                f"MIN {O2_REQUIRED_KG_DAY:.1f} KG/DAY", "green" if ok else "amber")
             self.meter_o2.set_value(f"{self._o2:.2f}", self._o2 / OGA_MAX_KG_DAY)
         if self._h2 is not None:
             self.card_h2.set_value(f"{self._h2:.4f}")

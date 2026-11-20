@@ -92,7 +92,7 @@ flowchart TB
 |---|---|---|
 | `/ssos/register_subsystem` | `RegisterSubsystem` service | both nodes → `system_manager` |
 | `/ssos/thermal/heartbeat`, `/ssos/coolant/heartbeat` | `SubsystemHeartbeat` | → `system_manager`, GUI roster |
-| `/ssos/fault_event` | `FaultEvent` | `thermal_network` → `system_manager` |
+| `/ssos/fault_event` | `FaultEvent` | `thermal_network` → `system_manager` (over-temperature); simulation → `thermal_network` (drills, see [fault_catalog.md](fault_catalog.md)) |
 | `/thermal/nodes/state` | `ThermalNodeDataArray` | `thermal_network` → GUI, viewer |
 | `/thermal/links/flux` | `ThermalLinkFlowsArray` | `thermal_network` → GUI, viewer |
 | `/thermals/diagnostics` | `DiagnosticStatus` | `thermal_network` → telemetry consumers |
@@ -288,9 +288,14 @@ $$
 | $Q_{vent}$ | `vent_threshold_kj` — ammonia heat above which a radiator vent is requested |
 
 While a cooling goal is in flight, `ThermalNetworkNode` pauses its own
-`step()` and instead snaps **all** node temperatures to each feedback
-value (`set_all_temperatures()`) — this cooldown loop is the only heat
-sink anywhere in the package. The radiator call degrades gracefully: if
+`step()` and instead snaps every non-boundary node to each feedback value
+(`set_all_temperatures()`); a fixed node such as the station's `itcs_sink`
+is never touched, so the reset cannot fight the sink or an
+`itcs_loop_degraded` drill. With the shipped `cooling_trigger_threshold`
+of 400 °C this never happens in a station run (nominal average about
+32 °C, worst drill well under 100 °C): in the station network the fixed
+sink is the heat rejection path, and this cooldown loop is a legacy
+fallback for the sink-less standalone network. The radiator call degrades gracefully: if
 the legacy `radiator` isn't running, `coolant_node` logs it and continues.
 
 ## 7. Lifecycle

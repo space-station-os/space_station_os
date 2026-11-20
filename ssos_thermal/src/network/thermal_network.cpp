@@ -1,6 +1,5 @@
 #include "ssos_thermal/network/thermal_network.hpp"
 
-#include <cstdlib>
 #include <limits>
 
 #include "yaml-cpp/yaml.h"
@@ -20,13 +19,18 @@ ThermalNetwork ThermalNetwork::load_from_yaml(
     ThermalNodeState node;
     node.heat_capacity = entry["heat_capacity"].as<double>();
     node.internal_power = entry["internal_power"].as<double>();
-    node.temperature = reference_temp_c + std::rand() % 10;
-    if (entry["fixed_temperature_c"]) {
-      node.fixed = true;
-      node.temperature = entry["fixed_temperature_c"].as<double>();
+    node.temperature = entry["initial_temperature_c"] ?
+      entry["initial_temperature_c"].as<double>() : reference_temp_c;
+    if (entry["max_temperature_c"]) {
+      node.max_temperature = entry["max_temperature_c"].as<double>();
     }
 
     const std::string name = entry["node_name"].as<std::string>();
+    if (entry["fixed_temperature_c"]) {
+      node.fixed = true;
+      node.temperature = entry["fixed_temperature_c"].as<double>();
+      net.configured_fixed_c_[name] = node.temperature;
+    }
     const std::string parent_link =
       entry["parent_link"] ? entry["parent_link"].as<std::string>() : std::string();
     const double conductance = entry["conductance"].as<double>();
@@ -45,6 +49,7 @@ ThermalNetwork ThermalNetwork::load_from_yaml(
       link.joint_name = name;
       link.conductance = conductance;
       net.links_.push_back(link);
+      net.configured_conductance_.push_back(conductance);
     }
   }
 
@@ -165,6 +170,50 @@ void ThermalNetwork::set_all_temperatures(double temperature_c)
       node.temperature = temperature_c;
     }
   }
+}
+
+bool ThermalNetwork::set_fixed_temperature(const std::string & name, double temperature_c)
+{
+  const auto it = nodes_.find(name);
+  if (it == nodes_.end() || !it->second.fixed) {
+    return false;
+  }
+  it->second.temperature = temperature_c;
+  return true;
+}
+
+std::size_t ThermalNetwork::scale_conductance(const std::string & node, double factor)
+{
+  std::size_t changed = 0;
+  for (std::size_t i = 0; i < links_.size(); ++i) {
+    if (links_[i].from == node || links_[i].to == node) {
+      links_[i].conductance = configured_conductance_[i] * factor;
+      ++changed;
+    }
+  }
+  return changed;
+}
+
+void ThermalNetwork::clear_overrides()
+{
+  for (const auto & [name, temperature] : configured_fixed_c_) {
+    nodes_.at(name).temperature = temperature;
+  }
+  for (std::size_t i = 0; i < links_.size(); ++i) {
+    links_[i].conductance = configured_conductance_[i];
+  }
+}
+
+std::string ThermalNetwork::over_limit(double fallback_limit_c, double margin_c) const
+{
+  for (const auto & [name, node] : nodes_) {
+    if (!node.fixed &&
+      node.temperature > node.max_temperature.value_or(fallback_limit_c) - margin_c)
+    {
+      return name;
+    }
+  }
+  return "";
 }
 
 double ThermalNetwork::average_temperature() const

@@ -1,6 +1,8 @@
 #ifndef SSOS_EPS__BATTERY__BATTERY_ORU_MODEL_HPP_
 #define SSOS_EPS__BATTERY__BATTERY_ORU_MODEL_HPP_
 
+#include <algorithm>
+
 #include "ssos_eps/battery/battery_parameters.hpp"
 
 // Equivalent-circuit Li-ion battery ORU: open-circuit voltage as a function of
@@ -76,6 +78,14 @@ public:
   void set_failed(bool failed);
   bool failed() const {return failed_;}
 
+  /// Heat added to the thermal node on top of I^2 R, e.g. a failed heater
+  /// controller or a cold-plate blockage [W].
+  void set_extra_heat_w(double heat_w) {extra_heat_w_ = std::max(heat_w, 0.0);}
+
+  /// Jump to the thermal equilibrium of the present losses, without any
+  /// extra heat.
+  void settle_temperature();
+
   void set_params(const BatteryOruParams & params) {params_ = params;}
   const BatteryOruParams & params() const {return params_;}
   const BatteryOruState & state() const {return state_;}
@@ -91,6 +101,7 @@ private:
   BatteryOruParams params_;
   BatteryOruState state_{};
   bool failed_{false};
+  double extra_heat_w_{0.0};
 };
 
 }  // namespace battery

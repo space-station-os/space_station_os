@@ -38,6 +38,9 @@ public:
   explicit WaterRecoverySystem(const WrsParameters & params = default_wrs_parameters());
 
   void reset();
+  /// Multifiltration bed exhausted (breakthrough) or replaced with a fresh one.
+  void exhaust_multifiltration();
+  void replace_multifiltration();
 
   /// Advance the WRS by dt.
   /// @param dt            timestep [s]

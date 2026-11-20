@@ -36,6 +36,14 @@ void DdcuModel::reset()
   state_.temperature_c = params_.initial_temp_c;
   faulted_ = false;
   over_temperature_ = false;
+  extra_heat_w_ = 0.0;
+}
+
+void DdcuModel::settle_temperature()
+{
+  if (params_.heat_transfer_w_k > 0.0) {
+    state_.temperature_c = params_.coldplate_temp_c + state_.heat_w / params_.heat_transfer_w_k;
+  }
 }
 
 double DdcuModel::input_power_for(double output_w) const
@@ -88,12 +96,13 @@ const DdcuState & DdcuModel::step(double dt, const DdcuInput & input)
 
   if (dt > 0.0 && params_.thermal_mass_j_k > 0.0) {
     const double g = std::max(params_.heat_transfer_w_k, 0.0);
+    const double heat = state_.heat_w + extra_heat_w_;
     if (g > 0.0) {
-      const double t_eq = params_.coldplate_temp_c + state_.heat_w / g;
+      const double t_eq = params_.coldplate_temp_c + heat / g;
       const double decay = std::exp(-g * dt / params_.thermal_mass_j_k);
       state_.temperature_c = t_eq + (state_.temperature_c - t_eq) * decay;
     } else {
-      state_.temperature_c += state_.heat_w * dt / params_.thermal_mass_j_k;
+      state_.temperature_c += heat * dt / params_.thermal_mass_j_k;
     }
   }
   if (state_.temperature_c >= params_.trip_temp_c) {

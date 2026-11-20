@@ -149,6 +149,7 @@ void SystemManager::on_heartbeat(
   }
 
   const bool was_healthy = it->second.reported_healthy;
+  it->second.heard = true;
   it->second.last_heartbeat = *msg;
   it->second.last_heard = this->now();
   it->second.reported_healthy = msg->healthy;
@@ -219,32 +220,33 @@ uint8_t SystemManager::evaluate_system_state() const
     return SystemState::INIT;
   }
 
-  bool all_active = true;
-  bool all_healthy = true;
-
-  auto now = this->now();
-
+  const auto now = this->now();
+  bool degraded = false;
+  bool awaiting = false;
   for (const auto & [name, record] : subsystems_) {
-    double elapsed = (now - record.last_heard).seconds();
-    bool timed_out = elapsed > heartbeat_timeout_s_;
-
-    bool is_active =
-      record.last_heartbeat.lifecycle_state == SubsystemHeartbeat::LIFECYCLE_ACTIVE;
-
-    if (!is_active || timed_out) {
-      all_active = false;
-    }
-
-    if (!record.last_heartbeat.healthy || timed_out || record.has_active_fault) {
-      all_healthy = false;
-    }
+    (void)name;
+    degraded = degraded || is_degraded(record, now);
+    awaiting = awaiting ||
+      (!record.heard && (now - record.last_heard).seconds() <= heartbeat_timeout_s_);
   }
-
-  if (all_active && all_healthy) {
-    return SystemState::NOMINAL;
+  if (degraded) {
+    return SystemState::DEGRADED;
   }
+  // At startup, stay in INIT until every registered subsystem has reported.
+  if (awaiting && current_state_ == SystemState::INIT) {
+    return SystemState::INIT;
+  }
+  return SystemState::NOMINAL;
+}
 
-  return SystemState::DEGRADED;
+bool SystemManager::is_degraded(const SubsystemRecord & record, const rclcpp::Time & now) const
+{
+  const bool timed_out = (now - record.last_heard).seconds() > heartbeat_timeout_s_;
+  if (!record.heard) {
+    return timed_out;
+  }
+  return timed_out || record.has_active_fault || !record.last_heartbeat.healthy ||
+         record.last_heartbeat.lifecycle_state != SubsystemHeartbeat::LIFECYCLE_ACTIVE;
 }
 
 std::vector<std::string> SystemManager::clear_recovered_faults()
@@ -307,16 +309,11 @@ void SystemManager::run_evaluation()
         break;
       case SystemState::DEGRADED: {
         reason = "degraded subsystems:";
-        auto now = this->now();
+        const auto now = this->now();
         for (const auto & [name, record] : subsystems_) {
-          double elapsed = (now - record.last_heard).seconds();
-          bool timed_out = elapsed > heartbeat_timeout_s_;
-          if (!record.last_heartbeat.healthy ||
-            record.last_heartbeat.lifecycle_state != SubsystemHeartbeat::LIFECYCLE_ACTIVE ||
-            timed_out)
-          {
+          if (is_degraded(record, now)) {
             reason += " " + name;
-            if (timed_out) {
+            if ((now - record.last_heard).seconds() > heartbeat_timeout_s_) {
               reason += "(timeout)";
             }
           }
@@ -324,7 +321,8 @@ void SystemManager::run_evaluation()
         break;
       }
       case SystemState::INIT:
-        reason = "no subsystems registered";
+        reason = subsystems_.empty() ? "no subsystems registered" :
+          "waiting for first heartbeats";
         break;
       default:
         reason = "state transition";
@@ -350,15 +348,9 @@ void SystemManager::publish_state(uint8_t new_state, const std::string & reason)
   msg.state = new_state;
   msg.triggering_event = reason;
 
-  // Build degraded subsystems list
-  auto now = this->now();
+  const auto now = this->now();
   for (const auto & [name, record] : subsystems_) {
-    double elapsed = (now - record.last_heard).seconds();
-    bool timed_out = elapsed > heartbeat_timeout_s_;
-    if (!record.last_heartbeat.healthy ||
-      record.last_heartbeat.lifecycle_state != SubsystemHeartbeat::LIFECYCLE_ACTIVE ||
-      timed_out)
-    {
+    if (is_degraded(record, now)) {
       msg.degraded_subsystems.push_back(name);
     }
   }

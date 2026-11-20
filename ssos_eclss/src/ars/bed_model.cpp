@@ -214,8 +214,13 @@ void BedModel::integrate_substep(double h, const BedInlet & inlet, BedMode mode,
     }
     const double tg_left = (i == 0) ? tg_old[i] : tg_old[i - 1];
     const double tg_right = (i + 1 < n_) ? tg_old[i + 1] : tg_old[i];
-    const double cond_t = thermal_.axial_thermal_cond *
-                          (tg_left - 2.0 * tg_old[i] + tg_right) / (dz_ * dz_);
+    // Axial conduction is explicit while the exchange terms are implicit, so
+    // its weight must stay below the cell's implicit coupling or the gas
+    // temperature oscillates and diverges. That only binds at low pressure
+    // (regeneration under vacuum), where the gas carries almost no heat.
+    const double k_axial = std::min(thermal_.axial_thermal_cond,
+        0.2 * dz_ * dz_ * (cap_g / h + exch + u_wall));
+    const double cond_t = k_axial * (tg_left - 2.0 * tg_old[i] + tg_right) / (dz_ * dz_);
     // Implicit treatment of exch*(Ts-Tg) and wall*(Tg-Twall):
     //   cap_g (Tg_new - Tg)/h = adv + cond + exch (Ts_new - Tg_new)
     //                           - u_wall (Tg_new - Twall)

@@ -1,11 +1,14 @@
-# OGS (PEM water electrolysis) parameters for ssos_eclss/ogs_node.
+# OGS (PEM water electrolysis) for ssos_eclss/ogs_node. The stack current is
+# set by the cabin ppO2 controller; stack_current_a is where it starts.
 ogs_node:
   ros__parameters:
     use_sim_time: true
     step_rate_hz: 1.0
     # Request power from ssos_eps as load eclss_ogs; without EPS running the unit runs as if fully powered.
     eps_coupling: true
-    stack_current_a: 27.0
-    o2_required_kg_day: 2.3
-    # Faults are injected explicitly (sim fault-injection), not auto-tripped.
-    enable_auto_faults: false
+    stack_current_a: 17.5             # about 3.45 kg O2/day: 4 crew plus leakage
+    o2_setpoint_kpa: 21.0
+    o2_kp_a_per_kpa: 20.0
+    o2_integral_time_s: 86400.0
+    max_current_a: 46.9
+    enable_auto_faults: true

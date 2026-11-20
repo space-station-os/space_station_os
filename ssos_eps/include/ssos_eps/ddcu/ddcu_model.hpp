@@ -1,6 +1,7 @@
 #ifndef SSOS_EPS__DDCU__DDCU_MODEL_HPP_
 #define SSOS_EPS__DDCU__DDCU_MODEL_HPP_
 
+#include <algorithm>
 #include <string>
 
 #include "ssos_eps/ddcu/ddcu_parameters.hpp"
@@ -69,6 +70,14 @@ public:
   void set_fault(bool faulted) {faulted_ = faulted;}
   bool fault() const {return faulted_;}
 
+  /// Heat added to the thermal node on top of the conversion losses, e.g. a
+  /// failed fan or a cold-plate blockage [W].
+  void set_extra_heat_w(double heat_w) {extra_heat_w_ = std::max(heat_w, 0.0);}
+
+  /// Jump to the thermal equilibrium of the present losses, without any
+  /// extra heat.
+  void settle_temperature();
+
   void set_params(const DdcuParams & params) {params_ = params;}
   const DdcuParams & params() const {return params_;}
   const DdcuState & state() const {return state_;}
@@ -78,6 +87,7 @@ private:
   DdcuState state_{};
   bool faulted_{false};
   bool over_temperature_{false};
+  double extra_heat_w_{0.0};
 };
 
 }  // namespace ddcu

@@ -94,3 +94,45 @@ TEST(WaterRecovery, RecoveryFractionReasonable)
   EXPECT_GT(r.overall_recovery, 0.85);
   EXPECT_LE(r.overall_recovery, 1.0);
 }
+
+TEST(Multifiltration, HoldsRemovalUntilNearBreakthrough)
+{
+  MultifiltrationParams p = default_multifiltration_params();
+  MultifiltrationModel mf(p);
+  mf.reset();
+  // Use 80% of the bed: removal is still at its fresh value.
+  const double feed = 1.0e-3;
+  const double dt = 0.8 * p.bed_capacity_kg / (feed * p.inlet_conductivity_us * 1.0e-6 *
+    p.removal_efficiency);
+  MultifiltrationResult r = mf.process(dt, feed, p.inlet_conductivity_us);
+  r = mf.process(1.0, feed, p.inlet_conductivity_us);
+  EXPECT_NEAR(r.product_conductivity_us,
+    p.inlet_conductivity_us * (1.0 - p.removal_efficiency), 1.0e-6);
+  EXPECT_FALSE(r.broken_through);
+}
+
+TEST(Multifiltration, NominalFeedStaysPotableForMonths)
+{
+  WaterRecoverySystem wrs;
+  wrs.reset();
+  // About 6 kg/day urine distillate plus 11 kg/day condensate and Sabatier water.
+  WrsResult r{};
+  for (int day = 0; day < 180; ++day) {
+    r = wrs.step(86400.0, 6.0 / 86400.0, 11.0 / 86400.0, 1.0e-8);
+  }
+  EXPECT_TRUE(r.potable_in_spec);
+  EXPECT_FALSE(r.multifiltration_broken_through);
+}
+
+TEST(Multifiltration, ExhaustedBedGoesOutOfSpecAndReplacementRestores)
+{
+  WaterRecoverySystem wrs;
+  wrs.reset();
+  wrs.exhaust_multifiltration();
+  WrsResult r = wrs.step(1.0, 0.0, 10.0 / 86400.0, 1.0e-8);
+  EXPECT_FALSE(r.potable_in_spec);
+  EXPECT_TRUE(r.multifiltration_broken_through);
+  wrs.replace_multifiltration();
+  r = wrs.step(1.0, 0.0, 10.0 / 86400.0, 1.0e-8);
+  EXPECT_TRUE(r.potable_in_spec);
+}

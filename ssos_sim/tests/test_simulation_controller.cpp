@@ -117,9 +117,9 @@ TEST_F(SimControllerTest, InjectFaultServiceWorks)
   ASSERT_TRUE(inject_client_->wait_for_service(2s));
 
   auto req = std::make_shared<InjectFault::Request>();
-  req->target_subsystem = "eclss";
-  req->fault_type = "sensor_stuck_at";
-  req->parameters_json = "{\"stuck_value\": 0.0}";
+  req->target_subsystem = "cabin";
+  req->fault_type = "o2_sensor_stuck";
+  req->parameters_json = "{\"value_pct\": 23.0}";
   req->duration_s = 0.0;
 
   auto future = inject_client_->async_send_request(req);
@@ -142,9 +142,9 @@ TEST_F(SimControllerTest, FaultInjectionPublishesFaultEvent)
   spin_for(200ms);
 
   auto req = std::make_shared<InjectFault::Request>();
-  req->target_subsystem = "eclss";
-  req->fault_type = "sensor_stuck_at";
-  req->parameters_json = "{\"stuck_value\": 0.0}";
+  req->target_subsystem = "cabin";
+  req->fault_type = "o2_sensor_stuck";
+  req->parameters_json = "{\"value_pct\": 23.0}";
   req->duration_s = 0.0;
 
   inject_client_->async_send_request(req);
@@ -172,6 +172,43 @@ TEST_F(SimControllerTest, InjectedFaultDescriptionCarriesParamsAndDuration)
 
   EXPECT_EQ(description,
             "Injected fault: bcdu_fault (params: {\"channel\": 2}, duration: 45 s)");
+}
+
+TEST_F(SimControllerTest, OnlyOneDrillAtATime)
+{
+  ASSERT_TRUE(inject_client_->wait_for_service(2s));
+  int events = 0;
+  auto fault_sub = client_->create_subscription<FaultEvent>(
+    "/ssos/fault_event", 10, [&events](const FaultEvent::SharedPtr) {++events;});
+  spin_for(200ms);
+
+  auto inject = [this](const std::string & target, const std::string & type) {
+      auto req = std::make_shared<InjectFault::Request>();
+      req->target_subsystem = target;
+      req->fault_type = type;
+      req->parameters_json = "{}";
+      req->duration_s = 0.0;
+      auto future = inject_client_->async_send_request(req);
+      spin_for(300ms);
+      return future.get()->success;
+    };
+
+  EXPECT_TRUE(inject("ogs", "ogs_generation_failure"));
+  ASSERT_TRUE(sim_->active_drill().has_value());
+  EXPECT_EQ(sim_->active_drill()->target, "ogs");
+  // A second drill is refused and not announced.
+  EXPECT_FALSE(inject("eps", "bcdu_fault"));
+  EXPECT_EQ(events, 1);
+  // Unknown drills are refused outright.
+  EXPECT_FALSE(inject("ogs", "ogs_explodes"));
+  // clear_faults for another subsystem does not end the running drill.
+  EXPECT_TRUE(inject("eps", "clear_faults"));
+  EXPECT_TRUE(sim_->active_drill().has_value());
+  // clear_faults to the drill's subsystem ends it; then another may start.
+  EXPECT_TRUE(inject("ogs", "clear_faults"));
+  EXPECT_FALSE(sim_->active_drill().has_value());
+  EXPECT_TRUE(inject("eps", "bcdu_fault"));
+  EXPECT_EQ(events, 4);
 }
 
 class SimScenarioTest : public ::testing::Test
@@ -221,8 +258,13 @@ TEST_F(SimScenarioTest, LoadsScenarioAndFiresFaultsOnSchedule)
 {
   make_sim(std::string(SSOS_SIM_TEST_SCENARIOS) + "/test_schedule.yaml");
   std::vector<FaultEvent> faults;
+  // Activation clears every subsystem first; count only the scheduled drills.
   auto fault_sub = client_->create_subscription<FaultEvent>(
-    "/ssos/fault_event", 10, [&faults](const FaultEvent::SharedPtr m) {faults.push_back(*m);});
+    "/ssos/fault_event", 20, [&faults](const FaultEvent::SharedPtr m) {
+      if (m->fault_type != "clear_faults") {
+        faults.push_back(*m);
+      }
+    });
 
   ASSERT_EQ(sim_->configure().id(), lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
   EXPECT_EQ(sim_->scenario_name(), "test_schedule");
@@ -241,7 +283,7 @@ TEST_F(SimScenarioTest, LoadsScenarioAndFiresFaultsOnSchedule)
   EXPECT_EQ(faults[0].fault_type, "bcdu_fault");
   EXPECT_EQ(faults[0].description,
             "Scheduled fault: early_fault (params: {\"channel\": 3, \"note\": \"quoted\", "
-            "\"clear\": false}, duration: 0 s)");
+            "\"enabled\": false}, duration: 20 s)");
   ASSERT_EQ(faults[0].affected_interfaces.size(), 1u);
   EXPECT_EQ(faults[0].affected_interfaces[0], "/ssos/eps/bcdu/status");
 

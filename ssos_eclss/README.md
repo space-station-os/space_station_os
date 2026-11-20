@@ -16,10 +16,11 @@ physics code can run in simulation or on flight hardware. ROS lives only in
 | Subsystem | Model | Highlights |
 |-----------|-------|-----------|
 | **ARS** | 4-Bed Molecular Sieve (4BCO2 EDU) | 1D finite-volume packed-bed PDE, Toth/competitive isotherms, precooler, blower, air-save pump, 10-60-10 cycle |
-| **OGS** | PEM water electrolysis | Nernst + activation/ohmic/concentration overpotentials, stack thermal model |
-| **WRS** | Urine + water processor | Vapor-compression distillation, multifiltration, catalytic oxidation |
-| **Sabatier** | CO2 reduction | `CO2 + 4H2 -> CH4 + 2H2O`, Arrhenius kinetics — closes the loop |
-| **Cabin** | Well-mixed atmosphere | O2/CO2/N2/H2O balances, crew metabolic loads, leak model |
+| **OGS** | PEM water electrolysis | Nernst + activation/ohmic/concentration overpotentials, stack thermal model, cabin ppO2 PI control, feedwater from the potable tank |
+| **WRS** | Urine + water processor | Vapor-compression distillation, multifiltration with a breakthrough front, catalytic oxidation, wastewater and potable inventory with UPA batch processing |
+| **Sabatier** | CO2 reduction | `CO2 + 4H2 -> CH4 + 2H2O`, Arrhenius kinetics, exact reactor thermal update — closes the loop |
+| **Cabin** | Well-mixed atmosphere | O2/CO2/N2/H2O balances, leak model, condensing heat exchanger, N2/O2 pressure control from stored tanks |
+| **Crew** | Metabolic and water loads | Shared sleep, staggered exercise (one member at a time), ICES-2021-365 rates, ISS water balance, metabolic heat to thermal |
 | **Faults** | Physics-level injection | Sensor / actuator / thermal faults that alter real behaviour |
 
 ## Build & test
@@ -42,14 +43,31 @@ ros2 run ssos_eclss breakthrough_curve_gen # breakthrough curve CSV
 ## Run the ROS nodes
 
 ```bash
-ros2 launch ssos_eclss eclss.launch.py       # all four subsystems
+ros2 launch ssos_eclss eclss.launch.py       # crew, cabin, ARS, OGS, WRS, Sabatier
 ros2 launch ssos_eclss ars_only.launch.py    # ARS only
 ```
 
-Nodes are `rclcpp_lifecycle::LifecycleNode`s. They subscribe to
-`/sim/world_state` (the Epic A boundary), register with the `system_manager`
-via `/ssos/register_subsystem`, and publish telemetry, heartbeats on
-`/ssos/<name>/heartbeat` and faults on `/ssos/fault_event`.
+Nodes are `rclcpp_lifecycle::LifecycleNode`s on simulation time. They register
+with the `system_manager` via `/ssos/register_subsystem`, and publish
+telemetry, heartbeats on `/ssos/<name>/heartbeat` and faults on
+`/ssos/fault_event`. While the simulation is paused their physics holds still
+and the heartbeats continue.
+
+The simulation starts with the station already on orbit: crew aboard, cabin
+air at the ARS steady state and 45% RH, 400 kg of potable water, OGS at its
+operating temperature and ARS beds part-way through a cycle. Nothing faults on
+its own; faults are run as drills, see [docs/fault_catalog.md](docs/fault_catalog.md).
+
+| Flow | Topic |
+|------|-------|
+| Crew CO2, O2, latent water, urine, potable demand | `/ssos/crew/*_kg_day` |
+| Cabin atmosphere (pressure, temperature, RH, ppO2, ppCO2, ppH2O) | `/ssos/cabin/atmosphere` (`CabinAtmosphere`) |
+| CHX condensate to WRS | `/ssos/cabin/condensate_kg_day` |
+| ARS CO2 removal | `/ssos/ars/co2_removal_kg_day` |
+| OGS O2 and feedwater use | `/ssos/ogs/o2_kg_day`, `/ssos/ogs/water_demand_kg_day` |
+| Potable and wastewater inventory | `/ssos/wrs/potable_available_kg`, `/ssos/wrs/wastewater_kg` |
+| Sabatier water to WRS | `/ssos/sabatier/water_kg_day` |
+| Crew metabolic heat | `/thermal/heat_loads` (source `crew`) |
 
 ## Parameters
 
@@ -67,7 +85,7 @@ what-if) are live-tunable and validated before they reach the physics. See
 - [docs/WRS.md](docs/WRS.md) — Water Recovery System: physics + ROS 2 (ICES-2023-097)
 - [docs/parameters.md](docs/parameters.md) — parameter reference
 - [docs/validation.md](docs/validation.md) — validation against the ISS papers
-- [docs/fault_catalog.md](docs/fault_catalog.md) — fault taxonomy
+- [docs/fault_catalog.md](docs/fault_catalog.md) — drills, detected faults, component fault library
 
 ## References
 

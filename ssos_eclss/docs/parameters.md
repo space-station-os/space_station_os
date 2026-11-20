@@ -19,6 +19,42 @@ request its power from `ssos_eps` and lose function when EPS sheds it. It is
 read in `on_configure`. With it off, or with EPS not running, the unit behaves
 as if fully powered. See `ssos_eps/docs/integration.md`.
 
+## Station units
+
+Defaults are in `config/*_parameters.yaml`; the values below set the on-orbit
+starting state and the caution limits.
+
+| Node | Parameter | Default | Meaning |
+|------|-----------|---------|---------|
+| crew | `crew_size` | 4 | crew aboard |
+| crew | `initial_time_of_day_hr` | 10.75 | crew time at simulation start |
+| crew | `sleep_start_hr`, `sleep_hours` | 21.5, 8 | shared sleep window |
+| crew | `first_exercise_hr`, `exercise_spacing_hr` | 8, 2 | staggered exercise slots |
+| crew | `metabolic_scale` | 1.0 | multiplier on gas, latent and heat loads |
+| cabin | `cabin_volume_m3` | 388 | ISS habitable volume |
+| cabin | `initial_co2_ppm`, `initial_relative_humidity` | 2600, 0.45 | starting air |
+| cabin | `leak_area_m2` | 2e-8 | baseline leak, about 0.25 kg/day |
+| cabin | `co2_alarm_ppm` | 5300 | about 4 mmHg ppCO2 |
+| cabin | `o2_low_pct`, `o2_high_pct` | 19.5, 23.5 | O2 limits |
+| cabin | `pressure_low_kpa`, `pressure_high_kpa` | 97, 104 | pressure limits |
+| cabin | `rh_low`, `rh_high` | 0.25, 0.75 | humidity limits |
+| cabin | `leak_alarm_kg_day` | 3.0 | leak rate alarm |
+| ars | `warm_start_s` | 1200 (config), 0 (node) | bed pre-roll at configure, about 30 ms per 5 s |
+| ars | `min_capture_efficiency` | 0.5 | alarm below this averaged single-pass capture |
+| ars | `capture_time_constant_s` | 4800 | averaging time (about a half-cycle) |
+| ogs | `stack_current_a` | 17.5 | starting current, about 3.45 kg O2/day |
+| ogs | `o2_setpoint_kpa` | 21.0 | cabin ppO2 target |
+| ogs | `o2_kp_a_per_kpa`, `o2_integral_time_s` | 20, 86400 | ppO2 PI gains |
+| wrs | `initial_potable_kg`, `initial_wastewater_kg` | 400, 8 | starting inventory |
+| wrs | `wastewater_capacity_kg`, `potable_capacity_kg` | 22, 1000 | tank sizes |
+| wrs | `upa_start_fraction`, `upa_stop_fraction` | 0.70, 0.05 | UPA batch thresholds |
+| wrs | `low_supply_days` | 7 | potable reserve warning |
+| wrs | `wpa_reprocess_kg_day`, `wpa_waste_capacity_kg` | 10, 100 | held water fed back through the WPA, and its tank |
+| sabatier | `min_reactor_temp_k` | 550 | reactor cold warning |
+
+All units have `enable_auto_faults` (true): limit checks on. Drills are
+reported whether or not it is set.
+
 ## Validation
 
 The set-parameters callback rejects out-of-range values with a clear message

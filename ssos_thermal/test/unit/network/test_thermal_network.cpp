@@ -2,7 +2,9 @@
 
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <string>
+#include <unordered_map>
 
 #include "ssos_thermal/network/thermal_network.hpp"
 
@@ -48,6 +50,14 @@ TEST_F(ThermalNetworkTest, LoadsExpectedNodeAndLinkCount)
   ThermalNetwork net = ThermalNetwork::load_from_yaml(path_);
   EXPECT_EQ(net.nodes().size(), 2u);
   EXPECT_EQ(net.links().size(), 2u);
+}
+
+TEST_F(ThermalNetworkTest, NodesWithoutInitialTemperatureStartAtTheReference)
+{
+  ThermalNetwork net = ThermalNetwork::load_from_yaml(path_, 15.0);
+  EXPECT_DOUBLE_EQ(net.node_temperature("A"), 15.0);
+  EXPECT_DOUBLE_EQ(net.node_temperature("B"), 15.0);
+  EXPECT_FALSE(net.nodes().at("A").max_temperature.has_value());
 }
 
 TEST_F(ThermalNetworkTest, StepWarmsNodeWithNoOtherHeatSource)
@@ -198,7 +208,9 @@ protected:
       "  parent_link: \"sink\"\n"
       "  heat_capacity: 500.0\n"
       "  internal_power: 0.0\n"
-      "  conductance: 100.0\n";
+      "  conductance: 100.0\n"
+      "  initial_temperature_c: 25.0\n"
+      "  max_temperature_c: 30.0\n";
   }
 
   void TearDown() override
@@ -252,19 +264,92 @@ TEST_F(ThermalSinkTest, BoundaryNodesAreLeftOutOfAggregates)
   EXPECT_EQ(net.hottest().name, "plate");
 }
 
-TEST(StationThermalNetwork, ShippedConfigSettlesNearCoolantLoop)
+TEST_F(ThermalSinkTest, InitialTemperatureAndLimitComeFromYaml)
+{
+  auto net = ThermalNetwork::load_from_yaml(path_);
+  EXPECT_DOUBLE_EQ(net.node_temperature("plate"), 25.0);
+  EXPECT_DOUBLE_EQ(net.nodes().at("plate").max_temperature.value(), 30.0);
+  EXPECT_DOUBLE_EQ(ThermalNetwork::load_from_yaml(path_).node_temperature("plate"), 25.0);
+}
+
+TEST_F(ThermalSinkTest, OverLimitUsesNodeLimitAndMargin)
+{
+  auto net = ThermalNetwork::load_from_yaml(path_);
+  // plate's own 30 degC limit wins over the fallback; the sink is never checked.
+  EXPECT_EQ(net.over_limit(20.0), "");
+  net.set_all_temperatures(30.5);
+  EXPECT_EQ(net.over_limit(500.0), "plate");
+  // Once over, the caller passes the hysteresis margin: 29.5 still counts.
+  net.set_all_temperatures(29.5);
+  EXPECT_EQ(net.over_limit(500.0), "");
+  EXPECT_EQ(net.over_limit(500.0, 1.0), "plate");
+  net.set_all_temperatures(28.9);
+  EXPECT_EQ(net.over_limit(500.0, 1.0), "");
+}
+
+TEST_F(ThermalSinkTest, DrillOverridesAreRestored)
+{
+  auto net = ThermalNetwork::load_from_yaml(path_);
+  EXPECT_FALSE(net.set_fixed_temperature("plate", 30.0));
+  EXPECT_TRUE(net.set_fixed_temperature("sink", 30.0));
+  EXPECT_EQ(net.scale_conductance("plate", 0.1), 1u);
+  EXPECT_EQ(net.scale_conductance("missing", 0.1), 0u);
+  EXPECT_DOUBLE_EQ(net.node_temperature("sink"), 30.0);
+  EXPECT_DOUBLE_EQ(net.links().front().conductance, 10.0);
+  // Scaling is relative to the configured value, not compounded.
+  net.scale_conductance("sink", 0.5);
+  EXPECT_DOUBLE_EQ(net.links().front().conductance, 50.0);
+
+  net.clear_overrides();
+  EXPECT_DOUBLE_EQ(net.node_temperature("sink"), 17.0);
+  EXPECT_DOUBLE_EQ(net.links().front().conductance, 100.0);
+}
+
+TEST(StationThermalNetwork, StartsSettledAndStaysWithinLimitsForADay)
 {
   auto net = ThermalNetwork::load_from_yaml(
     std::string(SSOS_THERMAL_SOURCE_DIR) + "/config/station_thermal_nodes.yaml");
   ASSERT_EQ(net.nodes().count("itcs_sink"), 1u);
   ASSERT_EQ(net.nodes().count("itcs_coldplate"), 1u);
-  // ~31 kW of station load into the cabin, ~2.5 kW of EPS losses on the plate.
-  net.set_external_power("base_link", 30000.0);
-  net.set_external_power("itcs_coldplate", 2500.0);
-  for (int i = 0; i < 2000; ++i) {
-    net.step(0.5);
+  std::unordered_map<std::string, double> initial;
+  for (const auto & [name, node] : net.nodes()) {
+    initial[name] = node.temperature;
   }
-  EXPECT_NEAR(net.node_temperature("base_link"), 17.0 + (30000.0 + 1380.0 + 20.0) / 6000.0,
-              0.05);
-  EXPECT_NEAR(net.node_temperature("itcs_coldplate"), 17.0 + 2500.0 / 1000.0, 0.05);
+  // Nominal EPS loads: delivered power into the cabin, conversion losses on the plate.
+  net.set_external_power("base_link", 26700.0);
+  net.set_external_power("itcs_coldplate", 4700.0);
+  for (int i = 0; i < 24 * 3600 * 2; ++i) {
+    net.step(0.5);
+    ASSERT_EQ(net.over_limit(500.0), "") << "at step " << i;
+  }
+  for (const auto & [name, t0] : initial) {
+    EXPECT_NEAR(net.node_temperature(name), t0, 0.5) << name;
+  }
+}
+
+// Every drill has to show up as a limit trip; times match docs/fault_catalog.md.
+TEST(StationThermalNetwork, EveryDrillTripsALimit)
+{
+  const auto seconds_to_trip = [](const std::function<void(ThermalNetwork &)> & drill) {
+      auto net = ThermalNetwork::load_from_yaml(
+        std::string(SSOS_THERMAL_SOURCE_DIR) + "/config/station_thermal_nodes.yaml");
+      net.set_external_power("base_link", 26700.0);
+      net.set_external_power("itcs_coldplate", 4700.0);
+      drill(net);
+      for (int i = 1; i <= 2 * 3600 * 2; ++i) {
+        net.step(0.5);
+        if (net.over_limit(500.0) == "itcs_coldplate") {
+          return 0.5 * i;
+        }
+      }
+      return -1.0;
+    };
+  // itcs_loop_degraded: plate heads for 30.7 degC, time constant 50 s.
+  EXPECT_NEAR(seconds_to_trip([](ThermalNetwork & net) {
+      net.set_fixed_temperature("itcs_sink", 26.0);
+    }), 60.0, 3.0);
+  // coldplate_conductance_loss: plate heads for 30.4 degC, time constant 143 s.
+  EXPECT_NEAR(seconds_to_trip([](ThermalNetwork & net) {
+      net.scale_conductance("itcs_coldplate", 0.35);
+    }), 183.0, 5.0);
 }
